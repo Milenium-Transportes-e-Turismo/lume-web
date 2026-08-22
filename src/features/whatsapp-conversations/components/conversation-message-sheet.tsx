@@ -15,7 +15,6 @@ import {
   MessageCircleMore,
   Music,
   Paperclip,
-  RefreshCw,
   Search,
   Send,
   Smile,
@@ -36,21 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu';
 import { Input } from '@/shared/ui/input';
-import {
-  Message,
-  MessageAvatar,
-  MessageContent,
-  MessageFooter,
-  MessageHeader,
-} from '@/shared/ui/message';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/shared/ui/sheet';
+import { Message, MessageAvatar, MessageContent } from '@/shared/ui/message';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { Textarea } from '@/shared/ui/textarea';
 import { toast } from '@/shared/ui/toast';
@@ -62,12 +47,18 @@ import type {
   WhatsAppMessageKind,
 } from '../domain';
 import { resolveConversationHistoryScrollTop } from './conversation-history-scroll';
-import { DELIVERY_STATUS_LABELS, MESSAGE_KIND_LABELS } from './conversation-labels';
+import { MESSAGE_KIND_LABELS } from './conversation-labels';
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'America/Sao_Paulo',
+});
+
+const TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   hour: '2-digit',
   minute: '2-digit',
   timeZone: 'America/Sao_Paulo',
@@ -353,23 +344,19 @@ function MessageAttachmentPreview({
 
 export interface ConversationMessageSheetProps {
   readonly conversation: WhatsAppConversation;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
   readonly isLoading: boolean;
   readonly isLoaded: boolean;
   readonly detailError: string;
   readonly onRetry: () => void;
   readonly onLoadOlder: () => void;
   readonly isLoadingOlder: boolean;
-  readonly onRefresh: () => void;
+  readonly searchOpen: boolean;
+  readonly onSearchOpenChange: (open: boolean) => void;
   readonly messageDraft: string;
   readonly onMessageDraftChange: (value: string) => void;
   readonly selectedAttachment: File | null;
   readonly onSelectedAttachmentChange: (file: File | null, kind?: AttachmentPickerKind) => void;
   readonly canSendMessage: boolean;
-  readonly canTakeOver: boolean;
-  readonly isTakingOver: boolean;
-  readonly onTakeOver: () => void;
   readonly isSendingMessage: boolean;
   readonly onSendMessage: () => void;
   readonly feedbackMessage: string;
@@ -378,33 +365,29 @@ export interface ConversationMessageSheetProps {
 
 export function ConversationMessageSheet({
   conversation,
-  open,
-  onOpenChange,
   isLoading,
   isLoaded,
   detailError,
   onRetry,
   onLoadOlder,
   isLoadingOlder,
-  onRefresh,
+  searchOpen,
+  onSearchOpenChange,
   messageDraft,
   onMessageDraftChange,
   selectedAttachment,
   onSelectedAttachmentChange,
   canSendMessage,
-  canTakeOver,
-  isTakingOver,
-  onTakeOver,
   isSendingMessage,
   onSendMessage,
   feedbackMessage,
   feedbackTone,
 }: ConversationMessageSheetProps) {
+  const open = true;
   const historyRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const attachmentPickerKindRef = useRef<AttachmentPickerKind>('auto');
   const initialScrollFrameRef = useRef<number | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMessages, setSearchMessages] = useState<WhatsAppConversation['messages']>([]);
   const [searchTotal, setSearchTotal] = useState(0);
@@ -572,281 +555,230 @@ export function ConversationMessageSheet({
   );
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger
-        render={
-          <Button type="button" variant="outline" size="sm" className="h-9 whitespace-nowrap" />
-        }
-      >
-        <MessageCircleMore aria-hidden="true" />
-        <span className="sr-only">Mensagens e anexos — </span>
-        Abrir chat
-        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {conversation.messageHistory?.total ?? conversation.messages.length}
-        </span>
-      </SheetTrigger>
-
-      <SheetContent className="w-full gap-0 overflow-x-hidden data-[side=right]:w-full sm:!max-w-none sm:data-[side=right]:w-[min(60rem,calc(100vw-3rem))]">
-        <SheetHeader className="border-b pr-12">
-          <div className="flex min-w-0 items-center gap-3">
-            <Avatar className="size-10 shrink-0">
-              {conversation.contact.profilePictureUrl ? (
-                <AvatarImage
-                  src={conversation.contact.profilePictureUrl}
-                  alt={`Foto de ${conversation.contact.name}`}
-                />
-              ) : null}
-              <AvatarFallback>{getInitial(conversation.contact.name)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <SheetTitle className="truncate">Conversa com {conversation.contact.name}</SheetTitle>
-              <SheetDescription>
-                {conversation.contact.phone} · Mensagens e anexos salvos.
-              </SheetDescription>
-            </div>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
+    <section
+      className="flex min-h-0 flex-1 flex-col overflow-x-hidden bg-background"
+      aria-label={`Histórico da conversa com ${conversation.contact.name}`}
+    >
+      {searchOpen ? (
+        <section className="border-b bg-muted/10 p-3 sm:p-4" aria-label="Pesquisar mensagens">
+          <div className="flex items-center gap-2">
+            <Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Pesquisar texto ou nome de arquivo"
+              maxLength={160}
+              autoFocus
+            />
             <Button
               type="button"
-              variant={searchOpen ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={() => setSearchOpen((current) => !current)}
-              aria-expanded={searchOpen}
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Fechar pesquisa"
+              onClick={() => onSearchOpenChange(false)}
             >
-              <Search aria-hidden="true" />
-              Pesquisar mensagens
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onRefresh}>
-              <RefreshCw aria-hidden="true" />
-              Atualizar
+              <X aria-hidden="true" />
             </Button>
           </div>
-        </SheetHeader>
-
-        {searchOpen ? (
-          <section className="border-b bg-muted/10 p-3 sm:p-4" aria-label="Pesquisar mensagens">
-            <div className="flex items-center gap-2">
-              <Search aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Pesquisar texto ou nome de arquivo"
-                maxLength={160}
-                autoFocus
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Fechar pesquisa"
-                onClick={() => setSearchOpen(false)}
-              >
-                <X aria-hidden="true" />
-              </Button>
-            </div>
-            {searchQuery.trim().length < 2 ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Digite ao menos dois caracteres para pesquisar todo o histórico.
-              </p>
-            ) : isSearching ? (
-              <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
-                Pesquisando...
-              </p>
-            ) : searchError ? (
-              <p className="mt-2 text-xs text-destructive-emphasis">{searchError}</p>
-            ) : (
-              <div className="mt-2 max-h-52 space-y-1 overflow-y-auto" aria-live="polite">
-                <p className="text-xs text-muted-foreground">
-                  {searchTotal === 1
-                    ? '1 mensagem encontrada'
-                    : `${searchTotal.toLocaleString('pt-BR')} mensagens encontradas`}
-                </p>
-                {searchMessages.map((message) => (
-                  <article key={message.id} className="rounded-lg border bg-background p-2 text-sm">
-                    <p className="line-clamp-3 whitespace-pre-wrap break-words">
-                      {message.text ||
-                        message.attachment?.fileName ||
-                        MESSAGE_KIND_LABELS[message.kind]}
-                    </p>
-                    <small className="text-muted-foreground">
-                      {formatDateTime(message.occurredAt)} ·{' '}
-                      {message.direction === 'outbound' ? 'Atendimento' : conversation.contact.name}
-                    </small>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        <div
-          ref={bindHistoryRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 p-4 sm:p-6"
-          onScroll={(event) => {
-            const history = event.currentTarget;
-            previousHistoryRef.current.scrollHeight = history.scrollHeight;
-            previousHistoryRef.current.scrollTop = history.scrollTop;
-            previousHistoryRef.current.clientHeight = history.clientHeight;
-            if (
-              history.scrollTop <= 64 &&
-              !isLoadingOlder &&
-              conversation.messageHistory &&
-              conversation.messageHistory.page < conversation.messageHistory.totalPages
-            ) {
-              onLoadOlder();
-            }
-          }}
-        >
-          {isLoading && !isLoaded ? (
-            <div className="space-y-4" role="status">
-              <span className="sr-only">Carregando histórico completo...</span>
-              <Skeleton className="h-20 w-3/4 rounded-2xl" />
-              <Skeleton className="ml-auto h-24 w-2/3 rounded-2xl" />
-              <Skeleton className="h-16 w-1/2 rounded-2xl" />
-            </div>
-          ) : detailError ? (
-            <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-center">
-              <p className="text-sm text-muted-foreground">O histórico não pôde ser carregado.</p>
-              <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-                Tentar novamente
-              </Button>
-            </div>
-          ) : conversation.messages.length > 0 ? (
-            <div className="space-y-5">
-              {conversation.messageHistory &&
-              conversation.messageHistory.page < conversation.messageHistory.totalPages ? (
-                <div className="flex justify-center">
-                  <div className="flex flex-col items-center gap-1 text-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isLoadingOlder}
-                      onClick={onLoadOlder}
-                    >
-                      {isLoadingOlder
-                        ? 'Carregando mensagens anteriores...'
-                        : 'Carregar 100 mensagens anteriores'}
-                    </Button>
-                    <small className="text-muted-foreground" aria-live="polite">
-                      Exibindo {conversation.messages.length.toLocaleString('pt-BR')} de{' '}
-                      {conversation.messageHistory.total.toLocaleString('pt-BR')} mensagens
-                    </small>
-                  </div>
-                </div>
-              ) : null}
-              {conversation.messages.map((message) => {
-                const isOutbound = message.direction === 'outbound';
-                const failedAttempt = [...message.attempts]
-                  .reverse()
-                  .find((attempt) => attempt.status === 'failed');
-                const messageMetadata = [
-                  formatDateTime(message.occurredAt),
-                  ...(isOutbound
-                    ? [message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendente']
-                    : []),
-                  DELIVERY_STATUS_LABELS[message.deliveryStatus],
-                ].join(' · ');
-
-                return (
-                  <Message key={message.id} align={isOutbound ? 'end' : 'start'}>
-                    <MessageAvatar>
-                      {isOutbound ? (
-                        <CurrentUserAvatar
-                          name={
-                            message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendimento'
-                          }
-                          imageAlt="Foto do atendente"
-                        />
-                      ) : (
-                        <Avatar>
-                          {conversation.contact.profilePictureUrl ? (
-                            <AvatarImage
-                              src={conversation.contact.profilePictureUrl}
-                              alt={conversation.contact.name}
-                            />
-                          ) : null}
-                          <AvatarFallback>{getInitial(conversation.contact.name)}</AvatarFallback>
-                        </Avatar>
-                      )}
-                    </MessageAvatar>
-                    <MessageContent>
-                      <MessageHeader>
-                        {isOutbound ? 'Atendimento' : conversation.contact.name}
-                      </MessageHeader>
-                      <Bubble
-                        variant={isOutbound ? 'tinted' : 'secondary'}
-                        className="max-w-[88%] sm:max-w-[80%] xl:max-w-[42rem]"
-                      >
-                        <BubbleContent>
-                          <div className="space-y-2">
-                            {message.text ? (
-                              <p className="whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">
-                                {message.text}
-                              </p>
-                            ) : null}
-                            {message.attachment ? (
-                              <MessageAttachmentPreview
-                                kind={message.kind}
-                                attachment={message.attachment}
-                              />
-                            ) : null}
-                            {failedAttempt ? (
-                              <p className="flex items-start gap-1 text-xs text-destructive-emphasis">
-                                <AlertCircle aria-hidden="true" className="mt-0.5 size-3.5" />
-                                <span>Não foi possível enviar esta mensagem. Tente novamente.</span>
-                              </p>
-                            ) : null}
-                          </div>
-                        </BubbleContent>
-                      </Bubble>
-                      <MessageFooter className="w-full max-w-full min-w-0 justify-center text-center text-[11px] sm:text-xs">
-                        <span
-                          className="block w-full min-w-0 max-w-full whitespace-normal break-words text-center [overflow-wrap:anywhere]"
-                          data-occurred-at={message.occurredAt}
-                        >
-                          {messageMetadata}
-                        </span>
-                      </MessageFooter>
-                    </MessageContent>
-                  </Message>
-                );
-              })}
-            </div>
+          {searchQuery.trim().length < 2 ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Digite ao menos dois caracteres para pesquisar todo o histórico.
+            </p>
+          ) : isSearching ? (
+            <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
+              Pesquisando...
+            </p>
+          ) : searchError ? (
+            <p className="mt-2 text-xs text-destructive-emphasis">{searchError}</p>
           ) : (
-            <div className="flex h-full min-h-56 flex-col items-center justify-center gap-2 text-center">
-              <MessageCircleMore aria-hidden="true" className="size-9 text-muted-foreground" />
-              <strong>Nenhuma mensagem registrada</strong>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                As próximas mensagens e anexos desta conversa aparecerão aqui.
+            <div className="mt-2 max-h-52 space-y-1 overflow-y-auto" aria-live="polite">
+              <p className="text-xs text-muted-foreground">
+                {searchTotal === 1
+                  ? '1 mensagem encontrada'
+                  : `${searchTotal.toLocaleString('pt-BR')} mensagens encontradas`}
               </p>
+              {searchMessages.map((message) => (
+                <article key={message.id} className="rounded-lg border bg-background p-2 text-sm">
+                  <p className="line-clamp-3 whitespace-pre-wrap break-words">
+                    {message.text ||
+                      message.attachment?.fileName ||
+                      MESSAGE_KIND_LABELS[message.kind]}
+                  </p>
+                  <small className="text-muted-foreground">
+                    {formatDateTime(message.occurredAt)} ·{' '}
+                    {message.direction === 'outbound' ? 'Atendimento' : conversation.contact.name}
+                  </small>
+                </article>
+              ))}
             </div>
           )}
-        </div>
+        </section>
+      ) : null}
 
-        <div className="space-y-3 border-t bg-background p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="font-semibold">Responder pelo painel</p>
-              <p className="text-xs text-muted-foreground">
-                {canSendMessage
-                  ? 'Envio autorizado para o atendente responsável.'
-                  : 'Assuma esta conversa para responder ao cliente.'}
-              </p>
-            </div>
-            <span
-              className={
-                canSendMessage
-                  ? 'shrink-0 whitespace-nowrap rounded-full bg-success/10 px-2 py-1 text-[11px] font-semibold text-success-emphasis'
-                  : 'shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground'
-              }
-            >
-              {canSendMessage ? 'Atendente ativo' : 'Envio bloqueado'}
-            </span>
+      <div
+        ref={bindHistoryRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 p-3 sm:p-4"
+        onScroll={(event) => {
+          const history = event.currentTarget;
+          previousHistoryRef.current.scrollHeight = history.scrollHeight;
+          previousHistoryRef.current.scrollTop = history.scrollTop;
+          previousHistoryRef.current.clientHeight = history.clientHeight;
+          if (
+            history.scrollTop <= 64 &&
+            !isLoadingOlder &&
+            conversation.messageHistory &&
+            conversation.messageHistory.page < conversation.messageHistory.totalPages
+          ) {
+            onLoadOlder();
+          }
+        }}
+      >
+        {isLoading && !isLoaded ? (
+          <div className="space-y-4" role="status">
+            <span className="sr-only">Carregando histórico completo...</span>
+            <Skeleton className="h-20 w-3/4 rounded-2xl" />
+            <Skeleton className="ml-auto h-24 w-2/3 rounded-2xl" />
+            <Skeleton className="h-16 w-1/2 rounded-2xl" />
           </div>
+        ) : detailError ? (
+          <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-center">
+            <p className="text-sm text-muted-foreground">O histórico não pôde ser carregado.</p>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              Tentar novamente
+            </Button>
+          </div>
+        ) : conversation.messages.length > 0 ? (
+          <div className="space-y-5">
+            {conversation.messageHistory &&
+            conversation.messageHistory.page < conversation.messageHistory.totalPages ? (
+              <div className="flex justify-center">
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoadingOlder}
+                    onClick={onLoadOlder}
+                  >
+                    {isLoadingOlder
+                      ? 'Carregando mensagens anteriores...'
+                      : 'Carregar 100 mensagens anteriores'}
+                  </Button>
+                  <small className="text-muted-foreground" aria-live="polite">
+                    Exibindo {conversation.messages.length.toLocaleString('pt-BR')} de{' '}
+                    {conversation.messageHistory.total.toLocaleString('pt-BR')} mensagens
+                  </small>
+                </div>
+              </div>
+            ) : null}
+            {conversation.messages.map((message) => {
+              const isOutbound = message.direction === 'outbound';
+              const failedAttempt = [...message.attempts]
+                .reverse()
+                .find((attempt) => attempt.status === 'failed');
+              const messageTime = TIME_FORMATTER.format(new Date(message.occurredAt));
+              const messageSender =
+                message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendente';
+
+              return (
+                <Message key={message.id} align={isOutbound ? 'end' : 'start'}>
+                  <MessageAvatar>
+                    {isOutbound ? (
+                      <CurrentUserAvatar
+                        name={
+                          message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendimento'
+                        }
+                        imageAlt="Foto do atendente"
+                      />
+                    ) : (
+                      <Avatar>
+                        {conversation.contact.profilePictureUrl ? (
+                          <AvatarImage
+                            src={conversation.contact.profilePictureUrl}
+                            alt={conversation.contact.name}
+                          />
+                        ) : null}
+                        <AvatarFallback>{getInitial(conversation.contact.name)}</AvatarFallback>
+                      </Avatar>
+                    )}
+                  </MessageAvatar>
+                  <MessageContent>
+                    <Bubble
+                      variant={isOutbound ? 'tinted' : 'secondary'}
+                      className="max-w-[88%] sm:max-w-[80%] xl:max-w-[42rem]"
+                    >
+                      <BubbleContent>
+                        <div className="space-y-2">
+                          {message.text ? (
+                            <p className="whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">
+                              {message.text}
+                            </p>
+                          ) : null}
+                          {message.attachment ? (
+                            <MessageAttachmentPreview
+                              kind={message.kind}
+                              attachment={message.attachment}
+                            />
+                          ) : null}
+                          {failedAttempt ? (
+                            <p className="flex items-start gap-1 text-xs text-destructive-emphasis">
+                              <AlertCircle aria-hidden="true" className="mt-0.5 size-3.5" />
+                              <span>Não foi possível enviar esta mensagem. Tente novamente.</span>
+                            </p>
+                          ) : null}
+                          <small
+                            className="ml-auto block w-fit text-[10px] leading-none text-muted-foreground/80"
+                            data-occurred-at={message.occurredAt}
+                          >
+                            {isOutbound
+                              ? `Enviada por ${messageSender} · ${messageTime}`
+                              : messageTime}
+                          </small>
+                        </div>
+                      </BubbleContent>
+                    </Bubble>
+                  </MessageContent>
+                </Message>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex h-full min-h-56 flex-col items-center justify-center gap-2 text-center">
+            <MessageCircleMore aria-hidden="true" className="size-9 text-muted-foreground" />
+            <strong>Nenhuma mensagem registrada</strong>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              As próximas mensagens e anexos desta conversa aparecerão aqui.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t bg-background p-2">
+        {selectedAttachment ? (
+          <div className="flex min-w-0 items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2">
+            <Paperclip aria-hidden="true" className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1">
+              <strong className="block truncate text-xs">{selectedAttachment.name}</strong>
+              <small className="text-[10px] text-muted-foreground">
+                {formatFileSize(selectedAttachment.size)}
+              </small>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Remover anexo"
+              disabled={isSendingMessage}
+              onClick={() => onSelectedAttachmentChange(null, 'auto')}
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </div>
+        ) : null}
+        <div className="flex min-h-12 min-w-0 items-end gap-1 rounded-2xl border bg-card p-1 shadow-xs focus-within:ring-2 focus-within:ring-ring/25">
           {canSendMessage ? (
-            <div className="flex items-center gap-1" aria-label="Opções da mensagem">
+            <div className="flex shrink-0 items-center" aria-label="Opções da mensagem">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -967,118 +899,64 @@ export function ConversationMessageSheet({
               }
             }}
             maxLength={HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH}
-            rows={4}
+            rows={1}
             disabled={!canSendMessage || isSendingMessage}
             placeholder={
               canSendMessage
-                ? `Responder para ${conversation.contact.name}`
+                ? 'Digite uma mensagem'
                 : 'Assuma esta conversa para responder ao cliente.'
             }
             aria-label={`Mensagem para ${conversation.contact.name}`}
+            className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2 py-2.5 shadow-none focus-visible:ring-0"
           />
-          <input
-            ref={attachmentInputRef}
-            type="file"
-            className="sr-only"
-            disabled={!canSendMessage || isSendingMessage}
-            onChange={(event) => {
-              onSelectedAttachmentChange(
-                event.target.files?.[0] ?? null,
-                attachmentPickerKindRef.current,
-              );
-              event.currentTarget.value = '';
-            }}
-          />
-          {selectedAttachment ? (
-            <div className="flex min-w-0 items-center gap-2 rounded-lg border bg-muted/30 p-2">
-              <Paperclip aria-hidden="true" className="size-4 shrink-0" />
-              <span className="min-w-0 flex-1">
-                <strong className="block truncate text-sm">{selectedAttachment.name}</strong>
-                <small className="text-muted-foreground">
-                  {formatFileSize(selectedAttachment.size)}
-                </small>
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Remover anexo"
-                disabled={isSendingMessage}
-                onClick={() => onSelectedAttachmentChange(null, 'auto')}
-              >
-                <X aria-hidden="true" />
-              </Button>
-            </div>
-          ) : null}
-          <div className="space-y-2">
-            <p className="whitespace-nowrap text-xs text-muted-foreground">
-              {messageDraft.length.toLocaleString('pt-BR')} /{' '}
-              {HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH.toLocaleString('pt-BR')} caracteres
-            </p>
-            <div
-              className={
-                !canSendMessage && canTakeOver
-                  ? 'grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 overflow-x-hidden'
-                  : 'grid w-full min-w-0 max-w-full grid-cols-1 overflow-x-hidden'
-              }
-            >
-              {!canSendMessage && canTakeOver ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full min-w-0 max-w-full gap-1 overflow-hidden px-1 text-xs sm:px-2.5 sm:text-sm"
-                  onClick={onTakeOver}
-                  disabled={isTakingOver}
-                >
-                  {isTakingOver ? (
-                    <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
-                  ) : null}
-                  {isTakingOver
-                    ? 'Iniciando...'
-                    : conversation.conversationState === 'closed'
-                      ? 'Iniciar atendimento'
-                      : 'Assumir atendimento'}
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                className="w-full min-w-0 max-w-full gap-1 overflow-hidden px-1 text-xs sm:px-2.5 sm:text-sm"
-                onClick={onSendMessage}
-                disabled={
-                  !canSendMessage ||
-                  isSendingMessage ||
-                  (messageDraft.trim().length === 0 && selectedAttachment === null)
-                }
-              >
-                {isSendingMessage ? (
-                  <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
-                ) : (
-                  <Send aria-hidden="true" className="size-3.5" />
-                )}
-                {isSendingMessage
-                  ? 'Enviando...'
-                  : selectedAttachment
-                    ? 'Enviar anexo'
-                    : 'Enviar mensagem'}
-              </Button>
-            </div>
-          </div>
-          {feedbackMessage ? (
-            <p
-              aria-live="polite"
-              className={
-                feedbackTone === 'error'
-                  ? 'text-sm text-destructive-emphasis'
-                  : feedbackTone === 'success'
-                    ? 'text-sm text-success-emphasis'
-                    : 'text-sm text-muted-foreground'
-              }
-            >
-              {feedbackMessage}
-            </p>
-          ) : null}
+          <Button
+            type="button"
+            size="icon"
+            className="shrink-0 rounded-full"
+            onClick={onSendMessage}
+            aria-label={selectedAttachment ? 'Enviar anexo' : 'Enviar mensagem'}
+            title={selectedAttachment ? 'Enviar anexo' : 'Enviar mensagem'}
+            disabled={
+              !canSendMessage ||
+              isSendingMessage ||
+              (messageDraft.trim().length === 0 && selectedAttachment === null)
+            }
+          >
+            {isSendingMessage ? (
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+            ) : (
+              <Send aria-hidden="true" />
+            )}
+          </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+        <input
+          ref={attachmentInputRef}
+          type="file"
+          className="sr-only"
+          disabled={!canSendMessage || isSendingMessage}
+          onChange={(event) => {
+            onSelectedAttachmentChange(
+              event.target.files?.[0] ?? null,
+              attachmentPickerKindRef.current,
+            );
+            event.currentTarget.value = '';
+          }}
+        />
+        {feedbackMessage ? (
+          <p
+            aria-live="polite"
+            className={
+              feedbackTone === 'error'
+                ? 'text-sm text-destructive-emphasis'
+                : feedbackTone === 'success'
+                  ? 'text-sm text-success-emphasis'
+                  : 'text-sm text-muted-foreground'
+            }
+          >
+            {feedbackMessage}
+          </p>
+        ) : null}
+      </div>
+    </section>
   );
 }

@@ -13,8 +13,38 @@ const companySchema = z.object({
   legalName: z.string(),
   tradeName: nullableString,
   costCenter: nullableString,
+  clientType: z.enum(['pf', 'pj']),
+  avicExternalId: nullableString,
+  individualName: nullableString,
+  cpf: nullableString,
+  individualEmail: nullableString,
+  individualWhatsapp: nullableString,
+  individualPhones: z.array(
+    z.object({ number: z.string(), description: nullableString.optional() }),
+  ),
+  cnpj: nullableString,
+  legalEmail: nullableString,
+  legalWhatsapp: nullableString,
+  legalPhones: z.array(z.object({ number: z.string(), description: nullableString.optional() })),
   status: z.enum(['active', 'inactive', 'suspended']),
   version: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const companyCommentSchema = z.object({
+  id: z.string().uuid(),
+  comment: z.string(),
+  authorName: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const companyHistorySchema = z.object({
+  id: z.string().uuid(),
+  action: z.string(),
+  actorName: nullableString,
+  beforeSnapshot: z.record(z.string(), z.unknown()).nullable(),
+  afterSnapshot: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
 });
 const addressSchema = z.object({
   label: z.string(),
@@ -214,19 +244,28 @@ export class TenantApiRoutingGateway implements RoutingGateway {
     private readonly timeoutMs = 10_000,
   ) {}
 
-  listCompanies(query: { search?: string; status?: string } = {}) {
-    return this.json(`/routing/companies${queryString(query)}`, listSchema(companySchema));
+  listCompanies(
+    query: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      status?: string;
+      clientType?: string;
+      sort?: string;
+    } = {},
+  ) {
+    return this.json(`/clients${queryString(query)}`, listSchema(companySchema));
   }
 
   createCompany(input: Record<string, unknown>) {
-    return this.json('/routing/companies', companySchema, {
+    return this.json('/clients', companySchema, {
       method: 'POST',
       body: { ...input, commandId: randomUUID() },
     });
   }
 
   updateCompany(id: string, input: Record<string, unknown>) {
-    return this.json(`/routing/companies/${encodeURIComponent(id)}`, companySchema, {
+    return this.json(`/clients/${encodeURIComponent(id)}`, companySchema, {
       method: 'PATCH',
       body: { ...input, commandId: randomUUID() },
     });
@@ -241,6 +280,44 @@ export class TenantApiRoutingGateway implements RoutingGateway {
         body: { commandId: randomUUID(), password },
       },
     );
+  }
+
+  getCompany(id: string) {
+    return this.json(`/clients/${encodeURIComponent(id)}`, companySchema);
+  }
+
+  listCompanyComments(id: string) {
+    return this.json(`/clients/${encodeURIComponent(id)}/comments`, z.array(companyCommentSchema));
+  }
+
+  addCompanyComment(id: string, comment: string) {
+    return this.json(`/clients/${encodeURIComponent(id)}/comments`, companyCommentSchema, {
+      method: 'POST',
+      body: { commandId: randomUUID(), comment },
+    });
+  }
+
+  updateCompanyComment(id: string, commentId: string, comment: string) {
+    return this.json(
+      `/clients/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`,
+      companyCommentSchema,
+      {
+        method: 'PATCH',
+        body: { commandId: randomUUID(), comment },
+      },
+    );
+  }
+
+  removeCompanyComment(id: string, commentId: string) {
+    return this.json(
+      `/clients/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}?commandId=${randomUUID()}`,
+      z.object({ removed: z.literal(true) }),
+      { method: 'DELETE' },
+    );
+  }
+
+  listCompanyHistory(id: string) {
+    return this.json(`/clients/${encodeURIComponent(id)}/history`, z.array(companyHistorySchema));
   }
 
   listFixedPoints(

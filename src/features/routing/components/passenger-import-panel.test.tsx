@@ -12,8 +12,21 @@ const client = {
   legalName: 'Cliente de teste',
   tradeName: null,
   costCenter: null,
+  clientType: 'pf' as const,
+  avicExternalId: null,
+  individualName: 'Cliente de teste',
+  cpf: '52998224725',
+  individualEmail: null,
+  individualWhatsapp: '5534999999999',
+  individualPhones: [],
+  cnpj: null,
+  legalEmail: null,
+  legalWhatsapp: null,
+  legalPhones: [],
   status: 'active' as const,
   version: 1,
+  createdAt: '2026-08-21T12:00:00.000Z',
+  updatedAt: '2026-08-21T12:00:00.000Z',
 };
 
 describe('PassengerImportPanel', () => {

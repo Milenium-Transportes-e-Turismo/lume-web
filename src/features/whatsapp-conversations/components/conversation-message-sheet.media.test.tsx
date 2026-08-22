@@ -79,23 +79,19 @@ function renderSheet() {
   render(
     <ConversationMessageSheet
       conversation={createWhatsAppConversationFixture({ id: conversationId, messages })}
-      open
-      onOpenChange={jest.fn()}
       isLoading={false}
       isLoaded
       detailError=""
       onRetry={jest.fn()}
       onLoadOlder={jest.fn()}
       isLoadingOlder={false}
-      onRefresh={jest.fn()}
+      searchOpen={false}
+      onSearchOpenChange={jest.fn()}
       messageDraft=""
       onMessageDraftChange={jest.fn()}
       selectedAttachment={null}
       onSelectedAttachmentChange={jest.fn()}
       canSendMessage={false}
-      canTakeOver={false}
-      isTakingOver={false}
-      onTakeOver={jest.fn()}
       isSendingMessage={false}
       onSendMessage={jest.fn()}
       feedbackMessage=""
@@ -154,23 +150,19 @@ describe('pré-visualização de mídias no chat', () => {
     render(
       <ConversationMessageSheet
         conversation={createWhatsAppConversationFixture({ id: conversationId })}
-        open
-        onOpenChange={jest.fn()}
         isLoading={false}
         isLoaded
         detailError=""
         onRetry={jest.fn()}
         onLoadOlder={jest.fn()}
         isLoadingOlder={false}
-        onRefresh={jest.fn()}
+        searchOpen={false}
+        onSearchOpenChange={jest.fn()}
         messageDraft="Olá "
         onMessageDraftChange={onMessageDraftChange}
         selectedAttachment={null}
         onSelectedAttachmentChange={onSelectedAttachmentChange}
         canSendMessage
-        canTakeOver={false}
-        isTakingOver={false}
-        onTakeOver={jest.fn()}
         isSendingMessage={false}
         onSendMessage={jest.fn()}
         feedbackMessage=""

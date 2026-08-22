@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   ArrowLeft,
@@ -20,18 +21,27 @@ import {
   MessageCircle,
   MessageSquarePlus,
   Phone,
+  Plus,
   RefreshCw,
   RotateCcw,
   Search,
-  ShieldAlert,
-  UserRound,
 } from 'lucide-react';
 
+import { findClientByPhoneAction } from '@/features/clients/actions/client-actions';
 import { updateQuoteProposalStatusAction } from '@/features/quote-proposals/actions';
 import { cn } from '@/shared/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
-import { Button, buttonVariants } from '@/shared/ui/button';
+import { Button } from '@/shared/ui/button';
 import { userFacingMessage } from '@/shared/lib/user-facing-message';
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/ui/alert-dialog';
 import {
   Dialog,
   DialogClose,
@@ -45,6 +55,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/se
 import { Textarea } from '@/shared/ui/textarea';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/shared/ui/dropdown-menu';
 
 import {
   closeWhatsAppConversationAction,
@@ -65,7 +83,6 @@ import {
   canSendHumanWhatsAppMessage,
   canTakeOverWhatsAppConversation,
   getWhatsAppConversationMetrics,
-  isWhatsAppAwaitingProposal,
   isWhatsAppBotBlocked,
   isWhatsAppConversationDepartment,
   isWhatsAppHumanActive,
@@ -87,7 +104,6 @@ import {
   type ConversationControl,
 } from './conversation-labels';
 import { ConversationMessageSheet } from './conversation-message-sheet';
-import { ConversationMetricsCards } from './conversation-metrics-cards';
 import { ConversationQuoteActions } from './conversation-quote-actions';
 import { conversationWorkspaceStyles as styles } from './conversation-workspace.styles';
 
@@ -236,23 +252,6 @@ function getClosureActor(transition: WhatsAppConversation['transitions'][number]
   return 'Automação';
 }
 
-function getLatestClosureTransition(
-  transitions: WhatsAppConversation['transitions'],
-): WhatsAppConversation['transitions'][number] | null {
-  return transitions.reduce<WhatsAppConversation['transitions'][number] | null>(
-    (latest, transition) => {
-      if (transition.name !== 'close' && transition.name !== 'close-after-rejection') {
-        return latest;
-      }
-      if (latest === null) return transition;
-      return new Date(transition.createdAt).valueOf() > new Date(latest.createdAt).valueOf()
-        ? transition
-        : latest;
-    },
-    null,
-  );
-}
-
 const TRANSITION_LABELS: Readonly<Record<string, string>> = {
   'present-main-menu': 'Menu principal apresentado',
   'select-commercial': 'Atendimento comercial selecionado',
@@ -302,6 +301,7 @@ export function ConversationWorkspace({
   initialError = null,
   currentUserId = null,
 }: ConversationWorkspaceProps) {
+  const router = useRouter();
   const [conversations, setConversations] = useState(initialConversations);
   const [pagination, setPagination] = useState(initialPagination);
   const [metrics, setMetrics] = useState(
@@ -312,6 +312,7 @@ export function ConversationWorkspace({
   );
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [inboxView, setInboxView] = useState<'all' | 'unread'>('all');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [listPage, setListPage] = useState(initialPagination.page);
   const [departmentFilter, setDepartmentFilter] = useState<WhatsAppConversationDepartment | 'all'>(
@@ -340,11 +341,14 @@ export function ConversationWorkspace({
   const [isForwardDialogOpen, setIsForwardDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [isQuoteDialogOpen, setIsQuoteDialogOpen] = useState(false);
+  const [isClientMissingDialogOpen, setIsClientMissingDialogOpen] = useState(false);
+  const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
+  const [isResolvingClient, startClientLookup] = useTransition();
   const [closeReason, setCloseReason] = useState('');
   const [manualCommercialStatus, setManualCommercialStatus] =
     useState<ManualCommercialStatus>('under-review');
   const [manualCommercialStatusReason, setManualCommercialStatusReason] = useState('');
-  const [isMessagesOpen, setIsMessagesOpen] = useState(false);
   const [loadedConversationIds, setLoadedConversationIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
@@ -673,10 +677,17 @@ export function ConversationWorkspace({
           conversation.requestStatus === requestStatusFilter);
       const matchesSearch =
         normalizedQuery.length === 0 || conversationMatchesSearch(conversation, normalizedQuery);
+      const matchesInboxView = inboxView === 'all' || conversation.unreadCount > 0;
 
-      return matchesDepartment && matchesControl && matchesRequestStatus && matchesSearch;
+      return (
+        matchesDepartment &&
+        matchesControl &&
+        matchesRequestStatus &&
+        matchesSearch &&
+        matchesInboxView
+      );
     });
-  }, [conversations, controlFilter, departmentFilter, requestStatusFilter, searchTerm]);
+  }, [conversations, controlFilter, departmentFilter, inboxView, requestStatusFilter, searchTerm]);
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
@@ -689,7 +700,22 @@ export function ConversationWorkspace({
     canSendHumanWhatsAppMessage(selectedConversation) &&
     selectedConversation.assignedTo?.id === currentUserId;
   const actionHistory = selectedConversation?.transitions ?? [];
-  const latestClosure = getLatestClosureTransition(actionHistory);
+
+  function handleClientHeaderClick() {
+    if (!selectedConversation || isResolvingClient) return;
+    startClientLookup(async () => {
+      const result = await findClientByPhoneAction(selectedConversation.contact.phone);
+      if (result.status === 'found') {
+        router.push(`/clients/${result.clientId}`);
+        return;
+      }
+      if (result.status === 'not-found') {
+        setIsClientMissingDialogOpen(true);
+        return;
+      }
+      toast.add({ title: 'Cliente não localizado', description: result.message, type: 'error' });
+    });
+  }
 
   function applyActionResult(result: WhatsAppConversationActionResult, successMessage: string) {
     if (result.conversation) {
@@ -716,6 +742,8 @@ export function ConversationWorkspace({
     setIsForwardDialogOpen(false);
     setIsStatusDialogOpen(false);
     setIsHistoryDialogOpen(false);
+    setIsQuoteDialogOpen(false);
+    setIsMessageSearchOpen(false);
     setCloseReason('');
     setManualCommercialStatus(
       isManualCommercialStatus(conversation.requestStatus)
@@ -723,7 +751,6 @@ export function ConversationWorkspace({
         : 'under-review',
     );
     setManualCommercialStatusReason('');
-    setIsMessagesOpen(false);
     humanMessageSubmissionRef.current = null;
 
     if (conversation.unreadCount === 0) return;
@@ -1052,19 +1079,6 @@ export function ConversationWorkspace({
 
   return (
     <>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <Button type="button" onClick={() => setIsStartConversationDialogOpen(true)}>
-          <MessageSquarePlus aria-hidden="true" />
-          Nova conversa
-        </Button>
-        <Link
-          href="/whatsapp-conversations/import"
-          className={buttonVariants({ variant: 'outline' })}
-        >
-          <FileUp aria-hidden="true" />
-          Importar históricos
-        </Link>
-      </div>
       <Dialog open={isStartConversationDialogOpen} onOpenChange={setIsStartConversationDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1102,30 +1116,59 @@ export function ConversationWorkspace({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <ConversationMetricsCards conversations={conversations} metrics={metrics} className="mt-4" />
       <section aria-labelledby="conversation-workspace-title" className={styles.section()}>
         <h2 id="conversation-workspace-title" className={styles.visuallyHidden()}>
           Caixa de entrada de conversas
         </h2>
 
-        <aside className={cn(styles.sidebar(), mobileDetailOpen ? 'hidden xl:flex' : 'flex')}>
+        <aside className={cn(styles.sidebar(), mobileDetailOpen ? 'hidden lg:flex' : 'flex')}>
           <div className={styles.sidebarHeader()}>
             <div className={styles.sidebarHeading()}>
               <div>
-                <p className={styles.sidebarEyebrow()}>Caixa de entrada</p>
+                <p className={styles.sidebarEyebrow()}>Conversas</p>
                 <p className={styles.sidebarTitle()}>
                   {pagination.total === 1 ? '1 conversa' : `${pagination.total} conversas`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void refreshList(true)}
-                disabled={isRefreshing}
-                className={styles.refreshButton()}
-              >
-                <RefreshCw aria-hidden="true" />
-                {isRefreshing ? 'Atualizando' : 'Atualizar'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void refreshList(true)}
+                  disabled={isRefreshing}
+                  className={styles.refreshButton()}
+                  aria-label={isRefreshing ? 'Atualizando conversas' : 'Atualizar conversas'}
+                  title={isRefreshing ? 'Atualizando conversas' : 'Atualizar conversas'}
+                >
+                  <RefreshCw aria-hidden="true" />
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="outline"
+                        aria-label="Ações das conversas"
+                      />
+                    }
+                  >
+                    <Plus aria-hidden="true" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => setIsStartConversationDialogOpen(true)}>
+                        <MessageSquarePlus aria-hidden="true" />
+                        Nova conversa
+                      </DropdownMenuItem>
+                      <DropdownMenuItem render={<Link href="/whatsapp-conversations/import" />}>
+                        <FileUp aria-hidden="true" />
+                        Importar históricos
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
             {listError ? (
@@ -1148,114 +1191,152 @@ export function ConversationWorkspace({
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Nome, telefone, mensagem ou etapa"
+                placeholder="Pesquisar ou começar nova conversa"
                 className={styles.searchInput()}
               />
             </div>
 
-            <div className={styles.filters()}>
-              <div>
-                <label htmlFor="department-filter" className={styles.filterLabel()}>
-                  Departamento
-                </label>
-                <Select
-                  value={departmentFilter}
-                  onValueChange={(value) => {
-                    setListPage(1);
-                    setDepartmentFilter(isWhatsAppConversationDepartment(value) ? value : 'all');
-                  }}
+            <div className={styles.quickFilters()} aria-label="Filtros rápidos das conversas">
+              <button
+                type="button"
+                className={styles.quickFilter({ active: inboxView === 'all' })}
+                onClick={() => setInboxView('all')}
+              >
+                Tudo
+              </button>
+              <button
+                type="button"
+                className={styles.quickFilter()}
+                disabled
+                title="Favoritos estarão disponíveis em uma próxima atualização"
+              >
+                Favoritas
+              </button>
+              <button
+                type="button"
+                className={styles.quickFilter()}
+                disabled
+                title="Grupos não fazem parte do atendimento individual"
+              >
+                Grupos
+              </button>
+              {metrics.unreadConversations > 0 ? (
+                <button
+                  type="button"
+                  className={styles.quickFilter({ active: inboxView === 'unread' })}
+                  onClick={() => setInboxView('unread')}
                 >
-                  <SelectTrigger id="department-filter" className={styles.filterSelect()}>
-                    <span>
-                      {departmentFilter === 'all' ? 'Todos' : DEPARTMENT_LABELS[departmentFilter]}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {WHATSAPP_ROUTABLE_DEPARTMENTS.map((department) => (
-                      <SelectItem key={department} value={department}>
-                        {DEPARTMENT_LABELS[department]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label htmlFor="control-filter" className={styles.filterLabel()}>
-                  Condução
-                </label>
-                <Select
-                  value={controlFilter}
-                  onValueChange={(value) => {
-                    setListPage(1);
-                    setControlFilter(
-                      value === 'bot' ||
-                        value === 'human' ||
-                        value === 'paused' ||
-                        value === 'closed'
-                        ? value
-                        : 'all',
-                    );
-                  }}
-                >
-                  <SelectTrigger id="control-filter" className={styles.filterSelect()}>
-                    <span>
-                      {controlFilter === 'all'
-                        ? 'Todas'
-                        : controlFilter === 'bot'
-                          ? 'Bot ativo'
-                          : controlFilter === 'human'
-                            ? 'Atendente ativo'
-                            : controlFilter === 'paused'
-                              ? 'Bot bloqueado'
-                              : 'Encerrada'}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="bot">Bot ativo</SelectItem>
-                    <SelectItem value="human">Atendente ativo</SelectItem>
-                    <SelectItem value="paused">Bot bloqueado</SelectItem>
-                    <SelectItem value="closed">Encerrada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className={styles.wideFilter()}>
-                <label htmlFor="request-status-filter" className={styles.filterLabel()}>
-                  Status comercial
-                </label>
-                <Select
-                  value={requestStatusFilter}
-                  onValueChange={(value) => {
-                    setListPage(1);
-                    setRequestStatusFilter(
-                      typeof value === 'string' &&
-                        (WHATSAPP_REQUEST_STATUSES as readonly string[]).includes(value)
-                        ? (value as WhatsAppRequestStatus)
-                        : 'all',
-                    );
-                  }}
-                >
-                  <SelectTrigger id="request-status-filter" className={styles.filterSelect()}>
-                    <span>
-                      {requestStatusFilter === 'all'
-                        ? 'Todos os status'
-                        : REQUEST_STATUS_LABELS[requestStatusFilter]}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    {WHATSAPP_REQUEST_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {REQUEST_STATUS_LABELS[status]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  Não lidas {metrics.unreadConversations}
+                </button>
+              ) : null}
             </div>
+
+            <details className={styles.advancedFilters()}>
+              <summary>Mais filtros</summary>
+              <div className={styles.filters()}>
+                <div>
+                  <label htmlFor="department-filter" className={styles.filterLabel()}>
+                    Departamento
+                  </label>
+                  <Select
+                    value={departmentFilter}
+                    onValueChange={(value) => {
+                      setListPage(1);
+                      setDepartmentFilter(isWhatsAppConversationDepartment(value) ? value : 'all');
+                    }}
+                  >
+                    <SelectTrigger id="department-filter" className={styles.filterSelect()}>
+                      <span>
+                        {departmentFilter === 'all' ? 'Todos' : DEPARTMENT_LABELS[departmentFilter]}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {WHATSAPP_ROUTABLE_DEPARTMENTS.map((department) => (
+                        <SelectItem key={department} value={department}>
+                          {DEPARTMENT_LABELS[department]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label htmlFor="control-filter" className={styles.filterLabel()}>
+                    Condução
+                  </label>
+                  <Select
+                    value={controlFilter}
+                    onValueChange={(value) => {
+                      setListPage(1);
+                      setControlFilter(
+                        value === 'bot' ||
+                          value === 'human' ||
+                          value === 'paused' ||
+                          value === 'closed'
+                          ? value
+                          : 'all',
+                      );
+                    }}
+                  >
+                    <SelectTrigger id="control-filter" className={styles.filterSelect()}>
+                      <span>
+                        {controlFilter === 'all'
+                          ? 'Todas'
+                          : controlFilter === 'bot'
+                            ? 'Bot ativo'
+                            : controlFilter === 'human'
+                              ? 'Atendente ativo'
+                              : controlFilter === 'paused'
+                                ? 'Bot bloqueado'
+                                : 'Encerrada'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="bot">Bot ativo</SelectItem>
+                      <SelectItem value="human">Atendente ativo</SelectItem>
+                      <SelectItem value="paused">Bot bloqueado</SelectItem>
+                      <SelectItem value="closed">Encerrada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className={styles.wideFilter()}>
+                  <label htmlFor="request-status-filter" className={styles.filterLabel()}>
+                    Status comercial
+                  </label>
+                  <Select
+                    value={requestStatusFilter}
+                    onValueChange={(value) => {
+                      setListPage(1);
+                      setRequestStatusFilter(
+                        typeof value === 'string' &&
+                          (WHATSAPP_REQUEST_STATUSES as readonly string[]).includes(value)
+                          ? (value as WhatsAppRequestStatus)
+                          : 'all',
+                      );
+                    }}
+                  >
+                    <SelectTrigger id="request-status-filter" className={styles.filterSelect()}>
+                      <span>
+                        {requestStatusFilter === 'all'
+                          ? 'Todos os status'
+                          : REQUEST_STATUS_LABELS[requestStatusFilter]}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      {WHATSAPP_REQUEST_STATUSES.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {REQUEST_STATUS_LABELS[status]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </details>
           </div>
 
           <div className={styles.conversationList()}>
@@ -1375,7 +1456,7 @@ export function ConversationWorkspace({
           ) : null}
         </aside>
 
-        <div className={cn(styles.detail(), mobileDetailOpen ? 'flex' : 'hidden xl:flex')}>
+        <div className={cn(styles.detail(), mobileDetailOpen ? 'flex' : 'hidden lg:flex')}>
           {selectedConversation !== null ? (
             <>
               <header className={styles.detailHeader()}>
@@ -1383,13 +1464,19 @@ export function ConversationWorkspace({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="xl:hidden"
+                  className="lg:hidden"
                   onClick={() => setMobileDetailOpen(false)}
                   aria-label="Voltar para a caixa de entrada"
                 >
                   <ArrowLeft aria-hidden="true" />
                 </Button>
-                <div className={styles.contactBlock()}>
+                <button
+                  type="button"
+                  className={styles.contactBlock()}
+                  onClick={handleClientHeaderClick}
+                  disabled={isResolvingClient}
+                  aria-label={`Abrir cadastro de ${selectedConversation.contact.name}`}
+                >
                   <Avatar className={styles.detailAvatar()}>
                     {selectedConversation.contact.profilePictureUrl ? (
                       <AvatarImage
@@ -1411,89 +1498,30 @@ export function ConversationWorkspace({
                       Última interação: {formatDateTime(selectedConversation.lastMessageAt)}
                     </p>
                   </div>
-                </div>
-                <div className={styles.headerAssignment()}>
-                  <UserRound aria-hidden="true" />
-                  <span>
-                    {selectedConversation.conversationState === 'closed' && latestClosure !== null
-                      ? `Encerrado por: ${getClosureActor(latestClosure)}`
-                      : selectedConversation.assignedTo === null
-                        ? 'Sem atendente responsável'
-                        : `Responsável: ${selectedConversation.assignedTo.name}`}
-                  </span>
-                </div>
-              </header>
-
-              <div className={styles.highlightGrid()}>
-                <div
-                  className={styles.highlight({
-                    tone: isWhatsAppBotBlocked(selectedConversation) ? 'danger' : 'success',
-                  })}
-                >
-                  {isWhatsAppBotBlocked(selectedConversation) ? (
-                    <ShieldAlert aria-hidden="true" />
-                  ) : (
-                    <Bot aria-hidden="true" />
-                  )}
-                  <span>
-                    <strong>
-                      {isWhatsAppBotBlocked(selectedConversation)
-                        ? 'Bot bloqueado'
-                        : 'Bot autorizado'}
-                    </strong>
-                    <small>
-                      {isWhatsAppBotBlocked(selectedConversation)
-                        ? 'A automação não pode responder neste estado.'
-                        : 'A automação está permitida neste estado.'}
-                    </small>
-                  </span>
-                </div>
-                <div
-                  className={styles.highlight({
-                    tone: isWhatsAppHumanActive(selectedConversation) ? 'info' : 'neutral',
-                  })}
-                >
-                  <Headset aria-hidden="true" />
-                  <span>
-                    <strong>
-                      {isWhatsAppHumanActive(selectedConversation)
-                        ? 'Atendente ativo'
-                        : 'Sem atendente ativo'}
-                    </strong>
-                    <small>
-                      {selectedConversation.assignedTo?.name ??
-                        'Nenhum responsável assumiu o atendimento.'}
-                    </small>
-                  </span>
-                </div>
-                {selectedConversation.department === 'commercial' ? (
-                  <div
-                    className={styles.highlight({
-                      tone: isWhatsAppAwaitingProposal(selectedConversation)
-                        ? 'warning'
-                        : 'neutral',
-                    })}
+                </button>
+                <div className={styles.headerAssignment()} aria-label="Ferramentas da conversa">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setIsQuoteDialogOpen(true)}
+                    aria-label="Abrir orçamentos"
+                    title="Orçamentos"
                   >
                     <FileText aria-hidden="true" />
-                    <span>
-                      <strong>
-                        {isWhatsAppAwaitingProposal(selectedConversation)
-                          ? 'Aguardando proposta'
-                          : selectedConversation.requestStatus === 'waiting-for-customer'
-                            ? 'Proposta enviada'
-                            : 'Sem proposta pendente'}
-                      </strong>
-                      <small>
-                        {selectedConversation.requestStatus === 'waiting-for-customer'
-                          ? 'PDF entregue; aguardando retorno do cliente.'
-                          : selectedConversation.flowStep === 'commercial-follow-up-menu'
-                            ? 'Segundo contato retomado no acompanhamento comercial.'
-                            : getFlowStepLabel(selectedConversation)}
-                      </small>
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isMessageSearchOpen ? 'secondary' : 'ghost'}
+                    size="icon-sm"
+                    onClick={() => setIsMessageSearchOpen((current) => !current)}
+                    aria-label="Pesquisar mensagens"
+                    title="Pesquisar mensagens"
+                  >
+                    <Search aria-hidden="true" />
+                  </Button>
+                </div>
+              </header>
 
               <div className={styles.dimensionGrid()}>
                 <div className={styles.dimensionItem()}>
@@ -1557,7 +1585,7 @@ export function ConversationWorkspace({
                       className={styles.actionButton({ action: 'human' })}
                     >
                       <Headset aria-hidden="true" />
-                      Assumir
+                      Atendente {isWhatsAppHumanActive(selectedConversation) ? 'ativo' : 'inativo'}
                     </button>
                     <button
                       type="button"
@@ -1574,7 +1602,7 @@ export function ConversationWorkspace({
                       className={styles.actionButton({ action: 'bot' })}
                     >
                       <Bot aria-hidden="true" />
-                      Devolver ao bot
+                      BOT {isWhatsAppBotBlocked(selectedConversation) ? 'inativo' : 'ativo'}
                     </button>
                     <button
                       type="button"
@@ -1599,48 +1627,10 @@ export function ConversationWorkspace({
                       ) : (
                         <CircleStop aria-hidden="true" />
                       )}
-                      {selectedConversation.conversationState === 'closed'
-                        ? 'Iniciar atendimento'
-                        : 'Encerrar atendimento'}
+                      {selectedConversation.conversationState === 'closed' ? 'Iniciar' : 'Encerrar'}
                     </button>
                   </div>
                   <div className={styles.actions()}>
-                    <ConversationMessageSheet
-                      conversation={selectedConversation}
-                      open={isMessagesOpen}
-                      onOpenChange={setIsMessagesOpen}
-                      isLoading={isLoadingDetail}
-                      isLoaded={loadedConversationIds.has(selectedConversation.id)}
-                      detailError={detailError}
-                      onRetry={() => void loadConversationDetail(selectedConversation.id)}
-                      onLoadOlder={() => {
-                        const nextPage = (selectedConversation.messageHistory?.page ?? 1) + 1;
-                        void loadConversationDetail(selectedConversation.id, nextPage);
-                      }}
-                      isLoadingOlder={isLoadingOlderMessages}
-                      onRefresh={() => void refreshList(true)}
-                      messageDraft={messageDraft}
-                      onMessageDraftChange={setMessageDraft}
-                      selectedAttachment={selectedAttachment}
-                      onSelectedAttachmentChange={(file, kind = 'auto') => {
-                        setSelectedAttachment(file);
-                        setSelectedAttachmentKind(file ? kind : 'auto');
-                        humanMediaSubmissionRef.current = null;
-                      }}
-                      canSendMessage={canCurrentUserSendMessage}
-                      canTakeOver={canTakeOverWhatsAppConversation(selectedConversation)}
-                      isTakingOver={isUpdatingConversation}
-                      onTakeOver={() =>
-                        handleVersionedAction(
-                          takeOverWhatsAppConversationAction,
-                          'Atendimento assumido com sucesso.',
-                        )
-                      }
-                      isSendingMessage={isSendingMessage}
-                      onSendMessage={handleSendHumanMessage}
-                      feedbackMessage={feedbackTone === 'error' ? '' : feedbackMessage}
-                      feedbackTone={feedbackTone}
-                    />
                     <button
                       type="button"
                       onClick={() => setIsForwardDialogOpen(true)}
@@ -1827,12 +1817,14 @@ export function ConversationWorkspace({
                 </Dialog>
               </div>
 
-              <section aria-labelledby="quote-request-title" className={styles.quotePanel()}>
-                <div className={styles.panelHeading()}>
-                  <div>
-                    <p className={styles.panelEyebrow()}>Atendimento comercial</p>
-                    <h4 id="quote-request-title">Orçamentos</h4>
-                  </div>
+              <Dialog open={isQuoteDialogOpen} onOpenChange={setIsQuoteDialogOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Orçamentos da conversa</DialogTitle>
+                    <DialogDescription>
+                      Consulte, crie ou atualize propostas ligadas a este atendimento.
+                    </DialogDescription>
+                  </DialogHeader>
                   <div className={styles.quoteActions()}>
                     <ConversationQuoteActions
                       conversation={selectedConversation}
@@ -1849,14 +1841,74 @@ export function ConversationWorkspace({
                     <Button
                       type="button"
                       variant="outline"
+                      size="sm"
                       onClick={() => setIsHistoryDialogOpen(true)}
                     >
                       <History aria-hidden="true" />
-                      Histórico de ações
+                      Histórico
                     </Button>
                   </div>
-                </div>
-              </section>
+                </DialogContent>
+              </Dialog>
+
+              <AlertDialog
+                open={isClientMissingDialogOpen}
+                onOpenChange={setIsClientMissingDialogOpen}
+              >
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cliente ainda não cadastrado</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Este contato não possui cadastro de cliente. Você pode fechar este aviso ou
+                      iniciar o cadastro com nome e telefone já preenchidos.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogClose render={<Button variant="outline" />}>
+                      Fechar
+                    </AlertDialogClose>
+                    <Button
+                      render={
+                        <Link
+                          href={`/clients/new?name=${encodeURIComponent(selectedConversation.contact.name)}&phone=${encodeURIComponent(selectedConversation.contact.phone)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        />
+                      }
+                    >
+                      Cadastrar
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <ConversationMessageSheet
+                conversation={selectedConversation}
+                isLoading={isLoadingDetail}
+                isLoaded={loadedConversationIds.has(selectedConversation.id)}
+                detailError={detailError}
+                onRetry={() => void loadConversationDetail(selectedConversation.id)}
+                onLoadOlder={() => {
+                  const nextPage = (selectedConversation.messageHistory?.page ?? 1) + 1;
+                  void loadConversationDetail(selectedConversation.id, nextPage);
+                }}
+                isLoadingOlder={isLoadingOlderMessages}
+                searchOpen={isMessageSearchOpen}
+                onSearchOpenChange={setIsMessageSearchOpen}
+                messageDraft={messageDraft}
+                onMessageDraftChange={setMessageDraft}
+                selectedAttachment={selectedAttachment}
+                onSelectedAttachmentChange={(file, kind = 'auto') => {
+                  setSelectedAttachment(file);
+                  setSelectedAttachmentKind(file ? kind : 'auto');
+                  humanMediaSubmissionRef.current = null;
+                }}
+                canSendMessage={canCurrentUserSendMessage}
+                isSendingMessage={isSendingMessage}
+                onSendMessage={handleSendHumanMessage}
+                feedbackMessage={feedbackTone === 'error' ? '' : feedbackMessage}
+                feedbackTone={feedbackTone}
+              />
 
               <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
                 <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">

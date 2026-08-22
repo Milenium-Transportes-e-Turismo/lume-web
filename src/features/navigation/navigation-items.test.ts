@@ -51,6 +51,18 @@ describe('getAuthorizedNavigationItems', () => {
     },
   );
 
+  it.each([
+    'clients:view',
+    'clients:create',
+    'clients:update',
+    'clients:manage',
+    'clients:history',
+  ] as const)('shows Clients to any department with a related permission: %s', (permission) => {
+    const items = getAuthorizedNavigationItems(createEmployee([permission], true, ['operations']));
+
+    expect(items.map((item) => item.label)).toContain('Clientes');
+  });
+
   it('shows Users to an explicit administrator even without department data', () => {
     const administrator = {
       ...createEmployee(['users:view'], true, []),

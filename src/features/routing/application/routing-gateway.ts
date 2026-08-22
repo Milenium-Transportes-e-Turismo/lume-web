@@ -1,6 +1,8 @@
 import type {
   RoutingBinary,
   RoutingCompany,
+  RoutingCompanyComment,
+  RoutingCompanyHistory,
   RoutingContract,
   RoutingFixedPoint,
   RoutingList,
@@ -31,10 +33,27 @@ export class RoutingError extends Error {
 }
 
 export interface RoutingGateway {
-  listCompanies(query?: { search?: string; status?: string }): Promise<RoutingList<RoutingCompany>>;
+  listCompanies(query?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+    clientType?: string;
+    sort?: string;
+  }): Promise<RoutingList<RoutingCompany>>;
   createCompany(input: Record<string, unknown>): Promise<RoutingCompany>;
   updateCompany(id: string, input: Record<string, unknown>): Promise<RoutingCompany>;
   deleteCompany(id: string, password: string): Promise<{ deleted: true }>;
+  getCompany(id: string): Promise<RoutingCompany>;
+  listCompanyComments(id: string): Promise<readonly RoutingCompanyComment[]>;
+  addCompanyComment(id: string, comment: string): Promise<RoutingCompanyComment>;
+  updateCompanyComment(
+    id: string,
+    commentId: string,
+    comment: string,
+  ): Promise<RoutingCompanyComment>;
+  removeCompanyComment(id: string, commentId: string): Promise<{ removed: true }>;
+  listCompanyHistory(id: string): Promise<readonly RoutingCompanyHistory[]>;
   listFixedPoints(query?: {
     search?: string;
     routingCompanyId?: string;

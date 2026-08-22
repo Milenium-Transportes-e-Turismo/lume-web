@@ -68,11 +68,8 @@ export function AuthenticatedNavigation({ user }: AuthenticatedNavigationProps) 
     <>
       {[
         { label: 'Geral', items: items.filter((item) => item.group === 'general') },
+        { label: 'Cadastros', items: items.filter((item) => item.group === 'records') },
         { label: 'Comercial', items: items.filter((item) => item.group === 'commercial') },
-        {
-          label: 'Operacional',
-          items: items.filter((item) => item.group === 'routing'),
-        },
         {
           label: 'Pessoas',
           items: items.filter((item) => item.group === 'people-operations'),

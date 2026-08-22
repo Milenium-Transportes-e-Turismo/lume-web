@@ -12,8 +12,21 @@ const client = {
   legalName: 'Cliente de teste',
   tradeName: null,
   costCenter: null,
+  clientType: 'pj' as const,
+  avicExternalId: null,
+  individualName: null,
+  cpf: null,
+  individualEmail: null,
+  individualWhatsapp: null,
+  individualPhones: [],
+  cnpj: '11222333000181',
+  legalEmail: null,
+  legalWhatsapp: null,
+  legalPhones: [],
   status: 'active' as const,
   version: 1,
+  createdAt: '2026-08-21T12:00:00.000Z',
+  updatedAt: '2026-08-21T12:00:00.000Z',
 };
 
 describe('ContractCreationForm', () => {

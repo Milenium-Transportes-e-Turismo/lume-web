@@ -5,7 +5,7 @@ export const DEFAULT_CLIENT_PERMISSIONS = {
     'dashboard:view',
     'profile:view',
     'profile:update',
-    'routing-companies:view',
+    'clients:view',
     'routing-contracts:view',
     'passengers:view',
     'passengers:create',

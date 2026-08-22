@@ -82,7 +82,7 @@ export default async function UsersRoute({
     rethrowTenantPageError(error);
   }
 
-  if (canManageAccess && session.user.permissions.includes('routing-companies:view')) {
+  if (canManageAccess && session.user.permissions.includes('clients:view')) {
     const companies = await executeAuthenticatedRoutingRequest((gateway) =>
       gateway.listCompanies({ status: 'active' }),
     );

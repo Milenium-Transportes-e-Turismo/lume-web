@@ -9,7 +9,7 @@ import {
   LifeBuoy,
   MessageCircle,
   ContactRound,
-  Route,
+  Building2,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,7 +24,7 @@ import {
 } from '@/features/auth/domain';
 
 export type NavigationGroup =
-  'general' | 'commercial' | 'routing' | 'people-operations' | 'administration';
+  'general' | 'records' | 'commercial' | 'people-operations' | 'administration';
 
 export interface InternalNavigationItem {
   readonly label: string;
@@ -38,18 +38,17 @@ export interface InternalNavigationItem {
 
 export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
   {
-    label: 'Roteirização',
-    href: '/routing',
-    permission: 'routes:view',
+    label: 'Clientes',
+    href: '/clients',
+    permission: 'clients:view',
     alternativePermissions: [
-      'routes:use',
-      'routing-contracts:view',
-      'routing-companies:view',
-      'passengers:view',
-      'passengers:import',
+      'clients:create',
+      'clients:update',
+      'clients:manage',
+      'clients:history',
     ],
-    icon: Route,
-    group: 'routing',
+    icon: Building2,
+    group: 'records',
   },
   {
     label: 'Dashboard',

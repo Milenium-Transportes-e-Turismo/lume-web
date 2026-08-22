@@ -6,8 +6,21 @@ const company = {
   legalName: 'Cliente Exemplo S.A.',
   tradeName: 'Cliente Exemplo',
   costCenter: null,
-  status: 'suspended',
+  clientType: 'pj',
+  avicExternalId: null,
+  individualName: null,
+  cpf: null,
+  individualEmail: null,
+  individualWhatsapp: null,
+  individualPhones: [],
+  cnpj: '12345678000195',
+  legalEmail: null,
+  legalWhatsapp: null,
+  legalPhones: [],
+  status: 'inactive',
   version: 2,
+  createdAt: '2026-08-21T12:00:00.000Z',
+  updatedAt: '2026-08-21T12:00:00.000Z',
 };
 
 describe('TenantApiRoutingGateway', () => {
@@ -20,12 +33,12 @@ describe('TenantApiRoutingGateway', () => {
     );
     const gateway = new TenantApiRoutingGateway('http://tenant-api.local', 'access-token', fetcher);
 
-    await expect(gateway.listCompanies({ status: 'suspended' })).resolves.toEqual({
+    await expect(gateway.listCompanies({ status: 'inactive' })).resolves.toEqual({
       items: [company],
       total: 1,
     });
     expect(fetcher).toHaveBeenCalledWith(
-      'http://tenant-api.local/routing/companies?status=suspended',
+      'http://tenant-api.local/clients?status=inactive',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer access-token' }),
       }),
