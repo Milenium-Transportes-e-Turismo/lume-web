@@ -15,7 +15,7 @@ import {
   rethrowTenantPageError,
 } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
-import { executeAuthenticatedRoutingRequest } from '@/features/routing/server';
+import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 
 export default async function UsersRoute({
   searchParams,
@@ -83,8 +83,8 @@ export default async function UsersRoute({
   }
 
   if (canManageAccess && session.user.permissions.includes('clients:view')) {
-    const companies = await executeAuthenticatedRoutingRequest((gateway) =>
-      gateway.listCompanies({ status: 'active' }),
+    const companies = await executeAuthenticatedClientRequest((gateway) =>
+      gateway.list({ status: 'active' }),
     );
     routingCompanies = companies.items.map((company) => ({
       id: company.id,

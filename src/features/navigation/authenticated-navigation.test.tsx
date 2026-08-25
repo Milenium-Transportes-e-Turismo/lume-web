@@ -159,6 +159,19 @@ describe('AuthenticatedNavigation', () => {
     expect(screen.getByRole('link', { name: 'Clientes' })).toHaveAttribute('aria-current', 'page');
   });
 
+  it('renders route planning under the Operations group', () => {
+    mockedUsePathname.mockReturnValue('/routing');
+
+    renderNavigation(createEmployee(['route-planner:calculate'], true, ['operations']));
+
+    expect(screen.getByText('Operacional')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Roteirização' })).toHaveAttribute('href', '/routing');
+    expect(screen.getByRole('link', { name: 'Roteirização' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
   it('renders Users and document management in the People group', () => {
     renderNavigation(
       createEmployee(['users:view', 'documents:manage'], true, ['management'], true),

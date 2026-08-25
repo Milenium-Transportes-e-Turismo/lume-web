@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
-import type { RoutingCompany, RoutingPhone } from '@/features/routing/domain/routing';
+import type { Client, ClientPhone } from '@/features/clients/domain';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Input } from '@/shared/ui/input';
@@ -11,11 +11,11 @@ import { Label } from '@/shared/ui/label';
 
 type ClientFormProps = {
   readonly action: (data: FormData) => void | Promise<void>;
-  readonly client?: RoutingCompany;
+  readonly client?: Client;
   readonly initialValues?: { readonly name?: string; readonly phone?: string };
 };
 
-function PhoneList({ name, initial }: { name: string; initial: readonly RoutingPhone[] }) {
+function PhoneList({ name, initial }: { name: string; initial: readonly ClientPhone[] }) {
   const [items, setItems] = useState(() => initial.map((item) => ({ ...item })));
   return (
     <div className="space-y-3">

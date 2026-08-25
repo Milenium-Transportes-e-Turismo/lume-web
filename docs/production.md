@@ -107,7 +107,11 @@ balanceador. Nenhuma sonda expõe segredos ou JWTs.
     o envio de suporte pelo provedor e, ao simular uma falha autorizada, o
     `mailto:` com identificação do solicitante; confirme também a negativa de
     `/users` e `/license` fora de Gerência ou sem suas permissões individuais.
-11. Direcione tráfego e acompanhe erros 401, 403, 409, 423, 5xx e falhas de
+11. Com um usuário autorizado, confirme **Roteirização** sob **Operacional** e
+    execute um cálculo controlado. A requisição deve ir somente para a Tenant
+    API e uma base de pedágios indisponível deve aparecer como cobertura parcial,
+    sem valores simulados.
+12. Direcione tráfego e acompanhe erros 401, 403, 409, 423, 5xx e falhas de
     readiness.
 
 O envio pelo atendente registra primeiro uma mensagem `pending` na Tenant API. A

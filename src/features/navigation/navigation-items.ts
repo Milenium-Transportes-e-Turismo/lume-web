@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   MessageCircle,
+  Route,
   ContactRound,
   Building2,
   Users,
@@ -24,7 +25,7 @@ import {
 } from '@/features/auth/domain';
 
 export type NavigationGroup =
-  'general' | 'records' | 'commercial' | 'people-operations' | 'administration';
+  'general' | 'records' | 'commercial' | 'operations' | 'people-operations' | 'administration';
 
 export interface InternalNavigationItem {
   readonly label: string;
@@ -88,6 +89,14 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
     group: 'commercial',
   },
   {
+    label: 'Roteirização',
+    href: '/routing',
+    permission: 'route-planner:view',
+    alternativePermissions: ['route-planner:calculate'],
+    icon: Route,
+    group: 'operations',
+  },
+  {
     label: 'Usuários',
     href: '/users',
     permission: 'users:view',
@@ -137,6 +146,14 @@ function hasOrganizationalScope(user: User, item: InternalNavigationItem): boole
   if (user.isAdministrator === true) return true;
   if (item.href === '/users') return true;
   if (item.group === 'commercial') return hasCommercialScope(user);
+  if (item.group === 'operations') {
+    return (
+      user.type === 'employee' &&
+      user.departments.some((department) =>
+        ['management', 'commercial', 'operations', 'information-technology'].includes(department),
+      )
+    );
+  }
   if (item.group === 'people-operations') {
     return (
       user.type === 'employee' &&

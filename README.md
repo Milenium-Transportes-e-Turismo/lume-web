@@ -184,24 +184,17 @@ API um contrato de lote, progresso, erros por registro e download. A exceção j
 publicada é o módulo de roteirização descrito abaixo. Conversão de documentos e
 planilhas continua proibida no navegador.
 
-## Roteirização orientada por contrato
+## Roteirização e custos rodoviários
 
-O módulo `/routing` segue cliente, contrato, importação da lista geral
-de colaboradores, sugestão automática, revisão, aprovação e publicação. Não há
-cadastro manual de rota-base. O modelo oficial e a importação usam XLSX; versões
-aprovadas podem ser exportadas em PDF e XLSX operacional ou XLSX/CSV para Google
-My Maps. Centro de custo pertence ao contrato e ao relatório operacional, mas é
-intencionalmente omitido dos arquivos do My Maps.
+`/routing` é a interface do Lume Routing Core. Ela envia origem, destino,
+paradas, veículo, data e combustível para a Tenant API e apresenta distância,
+duração, geometria, pedágios e custos. O navegador não chama Nominatim,
+Valhalla ou banco diretamente e não executa cálculos de negócio.
 
-Os modos de acesso são colaborador, candidato e cliente. Cliente PF ou PJ exige
-vínculo com o respectivo cadastro em **Clientes**. Funcionários internos com
-`passengers:import` selecionam o cliente na tela antes de baixar o modelo ou
-importar XLSX, CSV ou TSV; CPF/CNPJ não é repetido em cada linha.
-
-Em `/routing/companies`, o cadastro e as consultas são separados nas abas
-**Cadastrar cliente**, **Em operação** e **Desativados**. Um cliente ativo deve
-ser desativado para preservar o histórico antes que a opção progressiva de
-exclusão definitiva, protegida pela senha atual, seja exibida.
+O cadastro corporativo de clientes PF/PJ continua em `/clients`. As telas
+anteriores de contratos, colaboradores, pontos fixos, sugestões e exportações
+foram removidas; o novo núcleo é independente e poderá ser consumido pelos
+fluxos eventual e contínuo em etapas posteriores.
 
 ## Qualidade
 

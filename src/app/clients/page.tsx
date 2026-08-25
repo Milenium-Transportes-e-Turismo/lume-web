@@ -7,7 +7,7 @@ import {
   formatClientPhone,
 } from '@/features/clients/components/client-format';
 import { AuthenticatedShell } from '@/features/navigation';
-import { executeAuthenticatedRoutingRequest } from '@/features/routing/server';
+import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
 import { Button } from '@/shared/ui/button';
@@ -49,8 +49,8 @@ export default async function ClientsPage({
   const page = Math.max(1, Number(search.page) || 1);
   const pageSize = 20;
   const result = hasPermission(session.user, 'clients:view')
-    ? await executeAuthenticatedRoutingRequest((gateway) =>
-        gateway.listCompanies({
+    ? await executeAuthenticatedClientRequest((gateway) =>
+        gateway.list({
           page,
           pageSize,
           search: search.search,

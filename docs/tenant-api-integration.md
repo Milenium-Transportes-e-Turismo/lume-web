@@ -561,21 +561,14 @@ departamento.
 
 ## Roteirização
 
-O gateway autenticado integra `routing/companies`, `routing/fixed-points`,
-`routing/contracts`, `routing/passengers` e `routing/routes`. Comandos de criação, importação,
-geração e ciclo de aprovação recebem `commandId`; alterações concorrentes usam
-`expectedVersion`. O upload XLSX/CSV/TSV é multipart e nunca expõe o token ao
-browser. A seleção do cliente é enviada fora da planilha, e correções de CEP
-pendentes usam o endpoint do registro de importação antes de revalidá-lo.
+O gateway server-only envia `POST /routing/calculations` para a Tenant API. A
+Server Action valida origem, destino, paradas, veículo, combustível e data antes
+do envio, e a resposta completa é validada novamente com Zod. O token continua
+restrito ao servidor Next.js.
 
-No frontend, a exclusão definitiva de um cliente só é apresentada quando seu
-status já não é `active`; clientes em operação recebem primeiro a ação de
-desativação, que preserva o histórico. A Tenant API ainda valida senha,
-dependências e permissões no comando de exclusão.
-
-Rotas são geradas exclusivamente por contrato. Downloads são proxied por Route
-Handlers autenticadas: `export.pdf`, `export.xlsx`, `my-maps.xlsx` e
-`my-maps.csv`. Os formatos do My Maps não incluem centro de custo.
+O navegador nunca chama Nominatim ou Valhalla e não calcula distância,
+combustível, pedágio ou custo. As geometrias retornadas são dados do mapa futuro;
+o componente visual não se torna fonte de regra de negócio.
 
 ## Dashboard e notificações por departamento
 

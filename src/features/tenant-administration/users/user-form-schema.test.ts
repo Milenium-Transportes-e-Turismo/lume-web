@@ -107,7 +107,7 @@ describe('userFormSchema', () => {
       documentAccessMode: 'client' as const,
       clientCategory: 'legal-entity' as const,
       departments: ['client-company'],
-      permissionCodes: ['passengers:import'],
+      permissionCodes: [],
     };
 
     expect(userFormSchema.safeParse(client).success).toBe(false);

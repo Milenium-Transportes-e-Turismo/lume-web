@@ -4,7 +4,7 @@ import { updateClientAction } from '@/features/clients/actions/client-actions';
 import { ClientForm } from '@/features/clients/components/client-form';
 import { clientDisplayName } from '@/features/clients/components/client-format';
 import { AuthenticatedShell } from '@/features/navigation';
-import { executeAuthenticatedRoutingRequest } from '@/features/routing/server';
+import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
 import { Button } from '@/shared/ui/button';
@@ -18,8 +18,8 @@ export default async function EditClientPage({
 }) {
   const session = await requireTenantSession(['clients:update']);
   const [{ clientId }, search] = await Promise.all([params, searchParams]);
-  const client = await executeAuthenticatedRoutingRequest((gateway) =>
-    gateway.getCompany(clientId),
+  const client = await executeAuthenticatedClientRequest((gateway) =>
+    gateway.get(clientId),
   );
   return (
     <AuthenticatedShell user={session.user}>

@@ -13,7 +13,7 @@ import {
   formatClientPhone,
 } from '@/features/clients/components/client-format';
 import { AuthenticatedShell } from '@/features/navigation';
-import { executeAuthenticatedRoutingRequest } from '@/features/routing/server';
+import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
 import { Button } from '@/shared/ui/button';
@@ -58,10 +58,10 @@ export default async function ClientPage({
     hasPermission(session.user, 'clients:update') || hasPermission(session.user, 'clients:manage');
   const canHistory = hasPermission(session.user, 'clients:history');
   const [client, comments, history] = await Promise.all([
-    executeAuthenticatedRoutingRequest((gateway) => gateway.getCompany(clientId)),
-    executeAuthenticatedRoutingRequest((gateway) => gateway.listCompanyComments(clientId)),
+    executeAuthenticatedClientRequest((gateway) => gateway.get(clientId)),
+    executeAuthenticatedClientRequest((gateway) => gateway.listComments(clientId)),
     canHistory
-      ? executeAuthenticatedRoutingRequest((gateway) => gateway.listCompanyHistory(clientId))
+      ? executeAuthenticatedClientRequest((gateway) => gateway.listHistory(clientId))
       : Promise.resolve([]),
   ]);
   const name = clientDisplayName(client);

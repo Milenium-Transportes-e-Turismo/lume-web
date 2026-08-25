@@ -12,7 +12,7 @@ import {
 import { AuthenticatedShell } from '@/features/navigation';
 import { Button } from '@/shared/ui/button';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
-import { executeAuthenticatedRoutingRequest } from '@/features/routing/server';
+import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 
 export default async function UserEditorRoute({
   params,
@@ -55,8 +55,8 @@ export default async function UserEditorRoute({
   }
 
   if (canManageAccess && session.user.permissions.includes('clients:view')) {
-    const companies = await executeAuthenticatedRoutingRequest((gateway) =>
-      gateway.listCompanies({ status: 'active' }),
+    const companies = await executeAuthenticatedClientRequest((gateway) =>
+      gateway.list({ status: 'active' }),
     );
     routingCompanies = companies.items.map((company) => ({
       id: company.id,

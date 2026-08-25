@@ -54,6 +54,7 @@ export const PERMISSION_RESOURCES = [
   'invoices',
   'service-requests',
   'support',
+  'route-planner',
 ] as const;
 
 export type PermissionResource = string;
@@ -67,6 +68,7 @@ export const PERMISSION_ACTIONS = [
   'use',
   'approve',
   'export',
+  'calculate',
 ] as const;
 
 export type PermissionAction = string;

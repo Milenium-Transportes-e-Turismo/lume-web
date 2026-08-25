@@ -69,6 +69,7 @@ describe('user authorization contracts', () => {
       'invoices',
       'service-requests',
       'support',
+      'route-planner',
     ]);
   });
 
@@ -82,6 +83,7 @@ describe('user authorization contracts', () => {
       'use',
       'approve',
       'export',
+      'calculate',
     ]);
   });
 

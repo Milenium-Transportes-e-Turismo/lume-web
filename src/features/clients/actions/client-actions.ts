@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-import { RoutingError } from '@/features/routing/application';
-import { executeAuthenticatedRoutingMutation } from '@/features/routing/server';
+import { ClientError } from '@/features/clients/application';
+import { executeAuthenticatedClientMutation } from '@/features/clients/server';
 import { normalizePhone } from '@/shared/utils/brazilian-data';
 
 function text(data: FormData, key: string): string {
@@ -41,11 +41,11 @@ function clientPayload(data: FormData) {
 }
 
 function fail(path: string, error: unknown): never {
-  if (error instanceof RoutingError && error.code === 'unauthorized') {
+  if (error instanceof ClientError && error.code === 'unauthorized') {
     redirect('/auth/session-expired');
   }
   const message =
-    error instanceof RoutingError ? error.message : 'Não foi possível concluir a operação.';
+    error instanceof ClientError ? error.message : 'Não foi possível concluir a operação.';
   const separator = path.includes('?') ? '&' : '?';
   redirect(`${path}${separator}error=${encodeURIComponent(message)}`);
 }
@@ -53,8 +53,8 @@ function fail(path: string, error: unknown): never {
 export async function createClientAction(data: FormData): Promise<void> {
   let clientId = '';
   try {
-    const client = await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.createCompany(clientPayload(data)),
+    const client = await executeAuthenticatedClientMutation((gateway) =>
+      gateway.create(clientPayload(data)),
     );
     clientId = client.id;
   } catch (error) {
@@ -74,8 +74,8 @@ export async function findClientByPhoneAction(phone: string): Promise<ClientLook
   if (searchedPhone.length < 10) return { status: 'not-found' };
 
   try {
-    const result = await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.listCompanies({ search: searchedPhone, page: 1, pageSize: 100 }),
+    const result = await executeAuthenticatedClientMutation((gateway) =>
+      gateway.list({ search: searchedPhone, page: 1, pageSize: 100 }),
     );
     const comparablePhone = (value: string | null | undefined) => {
       const digits = normalizePhone(value ?? '');
@@ -95,7 +95,7 @@ export async function findClientByPhoneAction(phone: string): Promise<ClientLook
     return {
       status: 'error',
       message:
-        error instanceof RoutingError ? error.message : 'Não foi possível consultar clientes.',
+        error instanceof ClientError ? error.message : 'Não foi possível consultar clientes.',
     };
   }
 }
@@ -103,8 +103,8 @@ export async function findClientByPhoneAction(phone: string): Promise<ClientLook
 export async function updateClientAction(data: FormData): Promise<void> {
   const clientId = text(data, 'clientId');
   try {
-    await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.updateCompany(clientId, {
+    await executeAuthenticatedClientMutation((gateway) =>
+      gateway.update(clientId, {
         ...clientPayload(data),
         expectedVersion: Number(text(data, 'expectedVersion') || '1'),
       }),
@@ -120,11 +120,9 @@ export async function updateClientAction(data: FormData): Promise<void> {
 export async function changeClientStatusAction(data: FormData): Promise<void> {
   const clientId = text(data, 'clientId');
   try {
-    const current = await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.getCompany(clientId),
-    );
-    await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.updateCompany(clientId, {
+    const current = await executeAuthenticatedClientMutation((gateway) => gateway.get(clientId));
+    await executeAuthenticatedClientMutation((gateway) =>
+      gateway.update(clientId, {
         clientType: current.clientType,
         avicExternalId: current.avicExternalId,
         individualName: current.individualName,
@@ -153,8 +151,8 @@ export async function changeClientStatusAction(data: FormData): Promise<void> {
 export async function addClientCommentAction(data: FormData): Promise<void> {
   const clientId = text(data, 'clientId');
   try {
-    await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.addCompanyComment(clientId, text(data, 'comment')),
+    await executeAuthenticatedClientMutation((gateway) =>
+      gateway.addComment(clientId, text(data, 'comment')),
     );
   } catch (error) {
     fail(`/clients/${clientId}?tab=profile`, error);
@@ -168,8 +166,8 @@ export async function addClientCommentAction(data: FormData): Promise<void> {
 export async function updateClientCommentAction(data: FormData): Promise<void> {
   const clientId = text(data, 'clientId');
   try {
-    await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.updateCompanyComment(clientId, text(data, 'commentId'), text(data, 'comment')),
+    await executeAuthenticatedClientMutation((gateway) =>
+      gateway.updateComment(clientId, text(data, 'commentId'), text(data, 'comment')),
     );
   } catch (error) {
     fail(`/clients/${clientId}?tab=profile`, error);
@@ -183,8 +181,8 @@ export async function updateClientCommentAction(data: FormData): Promise<void> {
 export async function removeClientCommentAction(data: FormData): Promise<void> {
   const clientId = text(data, 'clientId');
   try {
-    await executeAuthenticatedRoutingMutation((gateway) =>
-      gateway.removeCompanyComment(clientId, text(data, 'commentId')),
+    await executeAuthenticatedClientMutation((gateway) =>
+      gateway.removeComment(clientId, text(data, 'commentId')),
     );
   } catch (error) {
     fail(`/clients/${clientId}?tab=profile`, error);

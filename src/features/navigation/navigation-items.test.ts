@@ -29,7 +29,7 @@ describe('getAuthorizedNavigationItems', () => {
     const items = getAuthorizedNavigationItems(createEmployee(['dashboard:view']));
 
     expect(items.map((item) => item.label)).toEqual(['Dashboard']);
-    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(12);
+    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(13);
   });
 
   it('shows License only with its explicit permission inside Management', () => {
@@ -61,6 +61,18 @@ describe('getAuthorizedNavigationItems', () => {
     const items = getAuthorizedNavigationItems(createEmployee([permission], true, ['operations']));
 
     expect(items.map((item) => item.label)).toContain('Clientes');
+  });
+
+  it('shows route planning only inside an operational employee scope', () => {
+    const operational = getAuthorizedNavigationItems(
+      createEmployee(['route-planner:calculate'], true, ['operations']),
+    );
+    const unrelated = getAuthorizedNavigationItems(
+      createEmployee(['route-planner:calculate'], true, ['purchasing']),
+    );
+
+    expect(operational.map((item) => item.label)).toContain('Roteirização');
+    expect(unrelated.map((item) => item.label)).not.toContain('Roteirização');
   });
 
   it('shows Users to an explicit administrator even without department data', () => {

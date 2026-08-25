@@ -9,7 +9,7 @@ const COMMON_PERMISSION_RESOURCES = new Set([
 ]);
 
 const RELATED_PERMISSION_RESOURCES: Readonly<Record<string, readonly string[]>> = {
-  commercial: ['commercial', 'clients', 'quotes', 'whatsapp-conversations'],
+  commercial: ['commercial', 'clients', 'quotes', 'whatsapp-conversations', 'route-planner'],
   purchasing: ['purchasing', 'contracts', 'documents'],
   controllership: ['financial', 'commercial', 'clients', 'reports'],
   'personnel-department': ['personnel-department', 'human-resources', 'reports'],
@@ -26,8 +26,16 @@ const RELATED_PERMISSION_RESOURCES: Readonly<Record<string, readonly string[]>> 
     'reports',
     'trips',
     'service-requests',
+    'route-planner',
   ],
-  'information-technology': ['users', 'ai-agents', 'manuals', 'reports', 'settings'],
+  'information-technology': [
+    'users',
+    'ai-agents',
+    'manuals',
+    'reports',
+    'settings',
+    'route-planner',
+  ],
 };
 
 export function permissionResource(permission: string): string {

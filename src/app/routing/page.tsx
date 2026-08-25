@@ -1,81 +1,24 @@
-import { ArrowRight, Building2, FileSpreadsheet, Route, UsersRound } from 'lucide-react';
-import Link from 'next/link';
-
+import { RoutePlannerForm } from '@/features/route-planner/components/route-planner-form';
+import { hasPermission } from '@/features/auth/domain';
 import { AuthenticatedShell } from '@/features/navigation';
-import { RoutingShell } from '@/features/routing/components';
 import { requireTenantSession } from '@/features/tenant-administration/server';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
-
-const stages = [
-  {
-    icon: Building2,
-    title: '1. Cliente',
-    description: 'Cadastre o cliente PF ou PJ da Milenium, sem criar um novo tenant.',
-    href: '/routing/companies',
-  },
-  {
-    icon: FileSpreadsheet,
-    title: '2. Contrato operacional',
-    description: 'Defina unidade, centros de custo, vigência, turnos, veículos, capacidade e KM.',
-    href: '/routing/contracts',
-  },
-  {
-    icon: UsersRound,
-    title: '3. Lista geral de colaboradores',
-    description: 'Escolha o cliente, baixe o modelo oficial XLSX e importe a lista vinculada.',
-    href: '/routing/passengers',
-  },
-  {
-    icon: Route,
-    title: '4. Sugestão, revisão e aprovação',
-    description:
-      'A IA aplica as regras do contrato; o operacional revisa, aprova, publica e exporta.',
-    href: '/routing/routes',
-  },
-] as const;
 
 export default async function RoutingPage() {
-  const session = await requireTenantSession([
-    'routes:view',
-    'routes:use',
-    'routing-contracts:view',
-    'routing-companies:view',
-    'passengers:view',
-    'passengers:import',
-  ]);
+  const session = await requireTenantSession(['route-planner:view', 'route-planner:calculate']);
   return (
     <AuthenticatedShell user={session.user}>
-      <RoutingShell
-        title="Roteirização"
-        description="A rota não nasce de um cadastro manual: ela é uma sugestão operacional produzida a partir do contrato vigente e dos colaboradores elegíveis."
-      >
-        <div className="grid gap-4 lg:grid-cols-4">
-          {stages.map(({ icon: Icon, ...stage }) => (
-            <Link key={stage.href} href={stage.href} className="group">
-              <Card className="h-full transition-colors group-hover:border-primary/50">
-                <CardHeader>
-                  <Icon className="size-6 text-primary" />
-                  <CardTitle className="text-base">{stage.title}</CardTitle>
-                  <CardDescription>{stage.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center gap-2 text-sm font-medium text-primary">
-                  Abrir etapa <ArrowRight className="size-4" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Exportações do MVP</CardTitle>
-            <CardDescription>
-              PDF e XLSX para a operação; XLSX e CSV para Google My Maps. O centro de custo
-              permanece no contrato e no relatório operacional, mas não integra os arquivos do My
-              Maps.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </RoutingShell>
+      <main className="mx-auto w-full max-w-[1600px] space-y-6 p-4 md:p-6">
+        <header className="space-y-2">
+          <p className="text-sm font-semibold text-primary">Lume Routing Core</p>
+          <h1 className="text-3xl font-bold tracking-tight">Roteirização e custos rodoviários</h1>
+          <p className="max-w-4xl text-sm text-muted-foreground">
+            Calcule distância, duração, pedágios e combustível sem depender do Google Maps. Os
+            valores de distância, tempo e combustível são estimativas; tarifas ausentes nunca são
+            preenchidas silenciosamente.
+          </p>
+        </header>
+        <RoutePlannerForm canCalculate={hasPermission(session.user, 'route-planner:calculate')} />
+      </main>
     </AuthenticatedShell>
   );
 }

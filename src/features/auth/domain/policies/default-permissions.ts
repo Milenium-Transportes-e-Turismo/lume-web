@@ -46,6 +46,8 @@ export const DEFAULT_DEPARTMENT_PERMISSIONS = {
     'manuals:view',
     'reports:view',
     'reports:export',
+    'route-planner:view',
+    'route-planner:calculate',
   ],
 
   purchasing: [
@@ -130,6 +132,8 @@ export const DEFAULT_DEPARTMENT_PERMISSIONS = {
     'manuals:view',
     'reports:view',
     'reports:export',
+    'route-planner:view',
+    'route-planner:calculate',
   ],
 
   operations: [
@@ -147,6 +151,8 @@ export const DEFAULT_DEPARTMENT_PERMISSIONS = {
     'manuals:view',
     'reports:view',
     'reports:export',
+    'route-planner:view',
+    'route-planner:calculate',
   ],
 
   cleaning: [
@@ -194,5 +200,7 @@ export const DEFAULT_DEPARTMENT_PERMISSIONS = {
     'settings:view',
     'settings:update',
     'settings:manage',
+    'route-planner:view',
+    'route-planner:calculate',
   ],
 } as const satisfies Record<Department, readonly Permission[]>;
