@@ -9,6 +9,8 @@ import type {
   WhatsAppMessage,
 } from '../domain';
 import {
+  archiveWhatsAppConversationForDashboard,
+  changeWhatsAppConversationDepartmentForDashboard,
   closeWhatsAppConversationForDashboard,
   closeWhatsAppConversationAfterRejectionForDashboard,
   forwardWhatsAppConversationForDashboard,
@@ -18,6 +20,7 @@ import {
   sendHumanWhatsAppMessageForDashboard,
   startWhatsAppConversationForDashboard,
   takeOverWhatsAppConversationForDashboard,
+  unarchiveWhatsAppConversationForDashboard,
 } from '../server';
 import { hasPermission } from '@/features/auth/domain';
 import { getCurrentAuthenticatedSession } from '@/features/auth/server';
@@ -360,6 +363,38 @@ export async function forwardWhatsAppConversationAction(
       message: 'Não foi possível encaminhar o atendimento.',
     };
   }
+}
+
+export async function changeWhatsAppConversationDepartmentAction(
+  input: ForwardWhatsAppConversationActionInput,
+): Promise<WhatsAppConversationActionResult> {
+  if (!(await isAuthorized())) {
+    return {
+      success: false,
+      code: 'forbidden',
+      message: 'Você não tem permissão para alterar o departamento desta conversa.',
+    };
+  }
+
+  return executeAction(input, (conversationId, expectedVersion) =>
+    changeWhatsAppConversationDepartmentForDashboard(
+      conversationId,
+      input.targetDepartment,
+      expectedVersion,
+    ),
+  );
+}
+
+export async function archiveWhatsAppConversationAction(
+  input: VersionedWhatsAppConversationActionInput,
+): Promise<WhatsAppConversationActionResult> {
+  return executeAction(input, archiveWhatsAppConversationForDashboard);
+}
+
+export async function unarchiveWhatsAppConversationAction(
+  input: VersionedWhatsAppConversationActionInput,
+): Promise<WhatsAppConversationActionResult> {
+  return executeAction(input, unarchiveWhatsAppConversationForDashboard);
 }
 
 export async function sendHumanWhatsAppMessageAction(

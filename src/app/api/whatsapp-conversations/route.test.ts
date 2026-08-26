@@ -106,6 +106,7 @@ describe('WhatsApp polling route', () => {
       department: undefined,
       control: undefined,
       requestStatus: undefined,
+      archive: 'active',
     });
   });
 
@@ -142,6 +143,7 @@ describe('WhatsApp polling route', () => {
       department: 'commercial',
       control: 'paused',
       requestStatus: 'under-review',
+      archive: 'active',
     });
   });
 

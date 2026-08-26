@@ -124,6 +124,10 @@ describe('CommercialNotificationCenter', () => {
       '/quote-proposals?tab=pending',
     );
     expect(screen.getByText('Ana Paula')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ana Paula/ })).toHaveAttribute(
+      'href',
+      '/whatsapp-conversations?conversationId=paused-commercial',
+    );
     expect(screen.queryByText('active-commercial')).not.toBeInTheDocument();
     await waitFor(() =>
       expect(

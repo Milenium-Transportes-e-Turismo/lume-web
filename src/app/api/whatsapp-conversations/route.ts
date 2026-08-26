@@ -64,6 +64,11 @@ export async function GET(request: Request) {
     (WHATSAPP_REQUEST_STATUSES as readonly string[]).includes(rawRequestStatus)
       ? (rawRequestStatus as WhatsAppRequestStatus)
       : undefined;
+  const rawArchive = searchParams.get('archive');
+  const archive =
+    rawArchive === 'active' || rawArchive === 'archived' || rawArchive === 'all'
+      ? rawArchive
+      : 'active';
 
   try {
     if (conversationId) {
@@ -100,6 +105,7 @@ export async function GET(request: Request) {
       department,
       control,
       requestStatus,
+      archive,
     });
     return NextResponse.json({
       conversations: result.conversations,

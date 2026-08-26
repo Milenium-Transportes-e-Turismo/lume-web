@@ -504,7 +504,9 @@ export function CommercialNotificationCenter({ user }: { readonly user: User }) 
                     {snapshot.pausedAutomations.map((conversation) => (
                       <Link
                         key={conversation.id}
-                        href="/whatsapp-conversations"
+                        href={`/whatsapp-conversations?conversationId=${encodeURIComponent(
+                          conversation.id,
+                        )}`}
                         className="flex items-center gap-3 rounded-xl border bg-card p-3 transition hover:bg-muted"
                       >
                         <span className="rounded-lg bg-destructive/10 p-2 text-destructive-emphasis">

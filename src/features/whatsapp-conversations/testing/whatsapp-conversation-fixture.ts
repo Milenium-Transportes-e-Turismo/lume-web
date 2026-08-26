@@ -60,5 +60,7 @@ export function createWhatsAppConversationFixture(
     messages: [],
     transitions: [],
     ...overrides,
+    archivedAt: overrides.archivedAt ?? null,
+    archiveReason: overrides.archiveReason ?? null,
   };
 }

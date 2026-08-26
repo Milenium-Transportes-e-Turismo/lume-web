@@ -1,6 +1,8 @@
 import 'server-only';
 
 import {
+  archiveWhatsAppConversation,
+  changeWhatsAppConversationDepartment,
   closeWhatsAppConversation,
   closeWhatsAppConversationAfterRejection,
   forwardWhatsAppConversation,
@@ -15,6 +17,7 @@ import {
   sendHumanWhatsAppMessage,
   startWhatsAppConversation,
   takeOverWhatsAppConversation,
+  unarchiveWhatsAppConversation,
   type GetWhatsAppConversationsFilters,
 } from '../application';
 import {
@@ -120,6 +123,39 @@ export function forwardWhatsAppConversationForDashboard(
 ) {
   return executeAuthenticatedWhatsAppMutation((repository) =>
     forwardWhatsAppConversation(repository, conversationId, targetDepartment, expectedVersion),
+  );
+}
+
+export function changeWhatsAppConversationDepartmentForDashboard(
+  conversationId: unknown,
+  targetDepartment: unknown,
+  expectedVersion: unknown,
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    changeWhatsAppConversationDepartment(
+      repository,
+      conversationId,
+      targetDepartment,
+      expectedVersion,
+    ),
+  );
+}
+
+export function archiveWhatsAppConversationForDashboard(
+  conversationId: unknown,
+  expectedVersion: unknown,
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    archiveWhatsAppConversation(repository, conversationId, expectedVersion),
+  );
+}
+
+export function unarchiveWhatsAppConversationForDashboard(
+  conversationId: unknown,
+  expectedVersion: unknown,
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    unarchiveWhatsAppConversation(repository, conversationId, expectedVersion),
   );
 }
 

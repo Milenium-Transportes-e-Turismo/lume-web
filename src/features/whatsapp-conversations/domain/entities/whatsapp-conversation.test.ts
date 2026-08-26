@@ -142,13 +142,13 @@ describe('WhatsApp conversation domain', () => {
         ...staleAssignment,
         conversationState: 'human-active',
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       canTakeOverWhatsAppConversation({
         ...staleAssignment,
         conversationState: 'closed',
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('keeps the approved-proposal close guard disabled during the MVP', () => {

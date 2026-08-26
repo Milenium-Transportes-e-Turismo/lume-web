@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 
 import {
@@ -63,6 +63,37 @@ const TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   minute: '2-digit',
   timeZone: 'America/Sao_Paulo',
 });
+
+const MESSAGE_DAY_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'America/Sao_Paulo',
+});
+
+const MESSAGE_DAY_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'America/Sao_Paulo',
+});
+
+function getMessageDayKey(value: string): string {
+  return MESSAGE_DAY_KEY_FORMATTER.format(new Date(value));
+}
+
+function formatMessageDay(value: string): string {
+  const currentKey = getMessageDayKey(new Date().toISOString());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = getMessageDayKey(yesterday.toISOString());
+  const messageKey = getMessageDayKey(value);
+
+  if (messageKey === currentKey) return 'Hoje';
+  if (messageKey === yesterdayKey) return 'Ontem';
+
+  return MESSAGE_DAY_FORMATTER.format(new Date(value));
+}
 
 const MIME_EXTENSIONS: Readonly<Record<string, string>> = {
   'image/jpeg': '.jpg',
@@ -672,7 +703,7 @@ export function ConversationMessageSheet({
                 </div>
               </div>
             ) : null}
-            {conversation.messages.map((message) => {
+            {conversation.messages.map((message, messageIndex) => {
               const isOutbound = message.direction === 'outbound';
               const failedAttempt = [...message.attempts]
                 .reverse()
@@ -680,66 +711,86 @@ export function ConversationMessageSheet({
               const messageTime = TIME_FORMATTER.format(new Date(message.occurredAt));
               const messageSender =
                 message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendente';
+              const previousMessage = conversation.messages[messageIndex - 1];
+              const startsNewDay =
+                !previousMessage ||
+                getMessageDayKey(previousMessage.occurredAt) !==
+                  getMessageDayKey(message.occurredAt);
 
               return (
-                <Message key={message.id} align={isOutbound ? 'end' : 'start'}>
-                  <MessageAvatar>
-                    {isOutbound ? (
-                      <CurrentUserAvatar
-                        name={
-                          message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendimento'
-                        }
-                        imageAlt="Foto do atendente"
-                      />
-                    ) : (
-                      <Avatar>
-                        {conversation.contact.profilePictureUrl ? (
-                          <AvatarImage
-                            src={conversation.contact.profilePictureUrl}
-                            alt={conversation.contact.name}
-                          />
-                        ) : null}
-                        <AvatarFallback>{getInitial(conversation.contact.name)}</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </MessageAvatar>
-                  <MessageContent>
-                    <Bubble
-                      variant={isOutbound ? 'tinted' : 'secondary'}
-                      className="max-w-[88%] sm:max-w-[80%] xl:max-w-[42rem]"
+                <Fragment key={message.id}>
+                  {startsNewDay ? (
+                    <div
+                      role="separator"
+                      aria-label={`Mensagens de ${formatMessageDay(message.occurredAt)}`}
+                      className="flex items-center gap-3 py-1"
                     >
-                      <BubbleContent>
-                        <div className="space-y-2">
-                          {message.text ? (
-                            <p className="whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">
-                              {message.text}
-                            </p>
-                          ) : null}
-                          {message.attachment ? (
-                            <MessageAttachmentPreview
-                              kind={message.kind}
-                              attachment={message.attachment}
+                      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+                      <span className="rounded-full border bg-background px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+                        {formatMessageDay(message.occurredAt)}
+                      </span>
+                      <span className="h-px flex-1 bg-border" aria-hidden="true" />
+                    </div>
+                  ) : null}
+                  <Message align={isOutbound ? 'end' : 'start'}>
+                    <MessageAvatar>
+                      {isOutbound ? (
+                        <CurrentUserAvatar
+                          name={
+                            message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendimento'
+                          }
+                          imageAlt="Foto do atendente"
+                        />
+                      ) : (
+                        <Avatar>
+                          {conversation.contact.profilePictureUrl ? (
+                            <AvatarImage
+                              src={conversation.contact.profilePictureUrl}
+                              alt={conversation.contact.name}
                             />
                           ) : null}
-                          {failedAttempt ? (
-                            <p className="flex items-start gap-1 text-xs text-destructive-emphasis">
-                              <AlertCircle aria-hidden="true" className="mt-0.5 size-3.5" />
-                              <span>Não foi possível enviar esta mensagem. Tente novamente.</span>
-                            </p>
-                          ) : null}
-                          <small
-                            className="ml-auto block w-fit text-[10px] leading-none text-muted-foreground/80"
-                            data-occurred-at={message.occurredAt}
-                          >
-                            {isOutbound
-                              ? `Enviada por ${messageSender} · ${messageTime}`
-                              : messageTime}
-                          </small>
-                        </div>
-                      </BubbleContent>
-                    </Bubble>
-                  </MessageContent>
-                </Message>
+                          <AvatarFallback>{getInitial(conversation.contact.name)}</AvatarFallback>
+                        </Avatar>
+                      )}
+                    </MessageAvatar>
+                    <MessageContent>
+                      <Bubble
+                        variant={isOutbound ? 'tinted' : 'secondary'}
+                        className="max-w-[88%] sm:max-w-[80%] xl:max-w-[42rem]"
+                      >
+                        <BubbleContent>
+                          <div className="space-y-2">
+                            {message.text ? (
+                              <p className="whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">
+                                {message.text}
+                              </p>
+                            ) : null}
+                            {message.attachment ? (
+                              <MessageAttachmentPreview
+                                kind={message.kind}
+                                attachment={message.attachment}
+                              />
+                            ) : null}
+                            {failedAttempt ? (
+                              <p className="flex items-start gap-1 text-xs text-destructive-emphasis">
+                                <AlertCircle aria-hidden="true" className="mt-0.5 size-3.5" />
+                                <span>Não foi possível enviar esta mensagem. Tente novamente.</span>
+                              </p>
+                            ) : null}
+                            <small
+                              className="ml-auto block w-fit text-[10px] leading-none text-muted-foreground/80"
+                              data-occurred-at={message.occurredAt}
+                            >
+                              {isOutbound
+                                ? `Enviada por ${messageSender} · ${messageTime}`
+                                : messageTime}
+                            </small>
+                          </div>
+                        </BubbleContent>
+                      </Bubble>
+                    </MessageContent>
+                  </Message>
+                </Fragment>
               );
             })}
           </div>
