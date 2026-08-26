@@ -2,6 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis } from 'recharts';
 import { BarChart3, Building2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import type { AuthenticatedSession } from '@/features/auth/domain';
@@ -87,6 +88,8 @@ export function DashboardPage({
   quoteMetrics = null,
   quoteInitialError = null,
 }: DashboardPageProps) {
+  const router = useRouter();
+
   useEffect(() => {
     if (!initialError) return;
     toast.add({
@@ -95,6 +98,20 @@ export function DashboardPage({
       type: 'error',
     });
   }, [initialError]);
+
+  useEffect(() => {
+    const refreshVisibleDashboard = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    const interval = window.setInterval(refreshVisibleDashboard, 15_000);
+    window.addEventListener('focus', refreshVisibleDashboard);
+    document.addEventListener('visibilitychange', refreshVisibleDashboard);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshVisibleDashboard);
+      document.removeEventListener('visibilitychange', refreshVisibleDashboard);
+    };
+  }, [router]);
   const assignedDepartments = session.user.departments.filter(
     (department): department is WhatsAppConversationDepartment =>
       isWhatsAppConversationDepartment(department),

@@ -97,6 +97,8 @@ const conversationSchema = z.object({
   lastOutboundAt: nullableIsoDateSchema,
   lastMessagePreview: z.string().nullable(),
   closedAt: nullableIsoDateSchema,
+  archivedAt: nullableIsoDateSchema.optional().default(null),
+  archiveReason: z.string().nullable().optional().default(null),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
   currentQuoteRequest: quoteRequestSchema.nullable(),
@@ -249,6 +251,7 @@ function filtersToQuery(filters?: GetWhatsAppConversationsFilters): string {
   if (filters?.state) params.set('state', filters.state);
   if (filters?.control) params.set('control', filters.control);
   if (filters?.requestStatus) params.set('requestStatus', filters.requestStatus);
+  if (filters?.archive) params.set('archive', filters.archive);
 
   return `?${params.toString()}`;
 }
@@ -366,6 +369,8 @@ function mapConversation(
     lastMessagePreview: conversation.lastMessagePreview ?? '',
     lastMessageAt: latestConversationActivity(conversation),
     closedAt: conversation.closedAt,
+    archivedAt: conversation.archivedAt,
+    archiveReason: conversation.archiveReason,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
     currentQuoteRequest: mapQuoteRequest(conversation.currentQuoteRequest),
@@ -618,6 +623,30 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     });
   }
 
+  async changeConversationDepartment(
+    conversationId: string,
+    targetDepartment: WhatsAppConversationDepartment,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation> {
+    return this.executeVersionedAction(conversationId, 'change-department', expectedVersion, {
+      targetDepartment,
+    });
+  }
+
+  async archiveConversation(
+    conversationId: string,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation> {
+    return this.executeVersionedAction(conversationId, 'archive', expectedVersion);
+  }
+
+  async unarchiveConversation(
+    conversationId: string,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation> {
+    return this.executeVersionedAction(conversationId, 'unarchive', expectedVersion);
+  }
+
   async markConversationAsRead(
     conversationId: string,
     expectedVersion: number,
@@ -711,7 +740,15 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
   private async executeVersionedAction(
     conversationId: string,
     action:
-      'take-over' | 'return-to-bot' | 'forward' | 'mark-read' | 'close' | 'close-after-rejection',
+      | 'take-over'
+      | 'return-to-bot'
+      | 'forward'
+      | 'change-department'
+      | 'archive'
+      | 'unarchive'
+      | 'mark-read'
+      | 'close'
+      | 'close-after-rejection',
     expectedVersion: number,
     extra: Readonly<Record<string, unknown>> = {},
   ): Promise<WhatsAppConversation> {

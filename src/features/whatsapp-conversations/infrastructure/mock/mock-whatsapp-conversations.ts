@@ -30,6 +30,8 @@ export const INITIAL_MOCK_WHATSAPP_CONVERSATIONS: readonly WhatsAppConversation[
     lastMessagePreview: 'Preciso de uma proposta.',
     lastMessageAt: '2026-07-21T13:42:00.000Z',
     closedAt: null,
+    archivedAt: null,
+    archiveReason: null,
     createdAt: '2026-07-21T13:35:00.000Z',
     updatedAt: '2026-07-21T13:42:00.000Z',
     currentQuoteRequest: {

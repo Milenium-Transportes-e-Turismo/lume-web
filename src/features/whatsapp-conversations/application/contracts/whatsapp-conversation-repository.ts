@@ -23,6 +23,7 @@ export interface GetWhatsAppConversationsFilters {
   readonly state?: WhatsAppConversationState;
   readonly control?: 'bot' | 'human' | 'paused' | 'closed';
   readonly requestStatus?: WhatsAppRequestStatus;
+  readonly archive?: 'active' | 'archived' | 'all';
 }
 
 export interface WhatsAppConversationPage {
@@ -105,6 +106,19 @@ export interface WhatsAppConversationRepository {
   forwardConversation(
     conversationId: string,
     targetDepartment: WhatsAppConversationDepartment,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation>;
+  changeConversationDepartment(
+    conversationId: string,
+    targetDepartment: WhatsAppConversationDepartment,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation>;
+  archiveConversation(
+    conversationId: string,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation>;
+  unarchiveConversation(
+    conversationId: string,
     expectedVersion: number,
   ): Promise<WhatsAppConversation>;
   markConversationAsRead(

@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { usePathname } from 'next/navigation';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { AUTHENTICATED_SESSION_VERSION, type AuthenticatedSession } from '@/features/auth/domain';
 import { createWhatsAppConversationFixture } from '@/features/whatsapp-conversations/testing/whatsapp-conversation-fixture';
@@ -14,6 +14,7 @@ jest.mock('@/shared/ui/toast', () => ({
 
 jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
+  useRouter: jest.fn(),
 }));
 
 jest.mock('@/features/auth/components', () => ({
@@ -21,6 +22,8 @@ jest.mock('@/features/auth/components', () => ({
 }));
 
 const mockedUsePathname = jest.mocked(usePathname);
+const mockedUseRouter = jest.mocked(useRouter);
+const refresh = jest.fn();
 
 const employeeSession: AuthenticatedSession = {
   version: AUTHENTICATED_SESSION_VERSION,
@@ -42,10 +45,46 @@ const employeeSession: AuthenticatedSession = {
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockedUsePathname.mockReturnValue('/dashboard');
+    mockedUseRouter.mockReturnValue({ refresh } as never);
+    refresh.mockClear();
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     mockedUsePathname.mockReset();
+    mockedUseRouter.mockReset();
+  });
+
+  it('atualiza os indicadores ao retornar para o dashboard', () => {
+    render(<DashboardPage session={employeeSession} conversations={[]} />);
+
+    fireEvent.focus(window);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('atualiza automaticamente as conversas e os orçamentos do dashboard', () => {
+    jest.useFakeTimers();
+    render(
+      <DashboardPage
+        session={employeeSession}
+        conversations={[]}
+        quoteMetrics={{
+          pending: 1,
+          sent: 0,
+          approved: 0,
+          cancelled: 0,
+          delivered: 0,
+          cancellationReasons: [],
+        }}
+      />,
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it('shows real operational metrics and graphs from conversations', () => {

@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 
 import { findClientByPhoneAction } from '@/features/clients/actions/client-actions';
 import {
+  archiveWhatsAppConversationAction,
+  changeWhatsAppConversationDepartmentAction,
   closeWhatsAppConversationAction,
   forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
@@ -10,6 +12,7 @@ import {
   sendHumanWhatsAppMessageAction,
   startWhatsAppConversationAction,
   takeOverWhatsAppConversationAction,
+  unarchiveWhatsAppConversationAction,
 } from '../actions';
 import type { WhatsAppConversation } from '../domain';
 import { createWhatsAppConversationFixture } from '../testing/whatsapp-conversation-fixture';
@@ -19,9 +22,11 @@ jest.setTimeout(15_000);
 
 const toastAdd = jest.fn();
 const routerPush = jest.fn();
+const routerReplace = jest.fn();
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: routerPush }),
+  useRouter: () => ({ push: routerPush, replace: routerReplace }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('@/features/clients/actions/client-actions', () => ({
@@ -33,6 +38,8 @@ jest.mock('@/shared/ui/toast', () => ({
 }));
 
 jest.mock('../actions', () => ({
+  archiveWhatsAppConversationAction: jest.fn(),
+  changeWhatsAppConversationDepartmentAction: jest.fn(),
   closeWhatsAppConversationAction: jest.fn(),
   forwardWhatsAppConversationAction: jest.fn(),
   markWhatsAppConversationAsReadAction: jest.fn(),
@@ -40,8 +47,11 @@ jest.mock('../actions', () => ({
   sendHumanWhatsAppMessageAction: jest.fn(),
   startWhatsAppConversationAction: jest.fn(),
   takeOverWhatsAppConversationAction: jest.fn(),
+  unarchiveWhatsAppConversationAction: jest.fn(),
 }));
 
+const mockedArchive = jest.mocked(archiveWhatsAppConversationAction);
+const mockedChangeDepartment = jest.mocked(changeWhatsAppConversationDepartmentAction);
 const mockedForward = jest.mocked(forwardWhatsAppConversationAction);
 const mockedClose = jest.mocked(closeWhatsAppConversationAction);
 const mockedMarkAsRead = jest.mocked(markWhatsAppConversationAsReadAction);
@@ -49,6 +59,7 @@ const mockedReturnToBot = jest.mocked(returnWhatsAppConversationToBotAction);
 const mockedSendMessage = jest.mocked(sendHumanWhatsAppMessageAction);
 const mockedStartConversation = jest.mocked(startWhatsAppConversationAction);
 const mockedTakeOver = jest.mocked(takeOverWhatsAppConversationAction);
+const mockedUnarchive = jest.mocked(unarchiveWhatsAppConversationAction);
 const mockedFindClient = jest.mocked(findClientByPhoneAction);
 const originalFetch = global.fetch;
 
@@ -488,6 +499,143 @@ describe('ConversationWorkspace', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   });
 
+  it('permite assumir uma conversa que está com outro atendente', async () => {
+    const conversation = createWhatsAppConversationFixture({
+      conversationState: 'human-active',
+      flowStep: 'human-service',
+      assignedTo: { id: 'employee-002', name: 'Outro atendente' },
+      version: 11,
+      unreadCount: 0,
+    });
+    const updated = createWhatsAppConversationFixture({
+      ...conversation,
+      assignedTo: { id: 'employee-001', name: 'Usuário Comercial' },
+      version: 12,
+    });
+    mockFetchDetail(conversation);
+    mockedTakeOver.mockResolvedValue({ success: true, conversation: updated });
+    const user = userEvent.setup();
+
+    render(
+      <ConversationWorkspace initialConversations={[conversation]} currentUserId="employee-001" />,
+    );
+
+    const takeOverButton = screen.getByRole('button', { name: 'Atendente ativo' });
+    expect(takeOverButton).toBeEnabled();
+    await user.click(takeOverButton);
+
+    await waitFor(() =>
+      expect(mockedTakeOver).toHaveBeenCalledWith({
+        conversationId: conversation.id,
+        expectedVersion: 11,
+      }),
+    );
+  });
+
+  it('arquiva manualmente uma conversa', async () => {
+    const conversation = createWhatsAppConversationFixture({
+      department: 'commercial',
+      version: 7,
+      unreadCount: 0,
+    });
+    const archived = createWhatsAppConversationFixture({
+      ...conversation,
+      archivedAt: '2026-08-25T12:00:00.000Z',
+      archiveReason: 'manual',
+      version: 8,
+    });
+    mockFetchDetail(conversation);
+    mockedArchive.mockResolvedValue({ success: true, conversation: archived });
+    const user = userEvent.setup();
+
+    render(<ConversationWorkspace initialConversations={[conversation]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Arquivar' }));
+    await waitFor(() =>
+      expect(mockedArchive).toHaveBeenCalledWith({
+        conversationId: conversation.id,
+        expectedVersion: 7,
+      }),
+    );
+  });
+
+  it('desarquiva manualmente uma conversa', async () => {
+    const archived = createWhatsAppConversationFixture({
+      archivedAt: '2026-08-25T12:00:00.000Z',
+      archiveReason: 'manual',
+      version: 8,
+      unreadCount: 0,
+    });
+    const unarchived = createWhatsAppConversationFixture({
+      ...archived,
+      archivedAt: null,
+      archiveReason: null,
+      version: 9,
+    });
+    mockFetchDetail(archived);
+    mockedUnarchive.mockResolvedValue({ success: true, conversation: unarchived });
+    const user = userEvent.setup();
+
+    render(<ConversationWorkspace initialConversations={[archived]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Desarquivar' }));
+    await waitFor(() =>
+      expect(mockedUnarchive).toHaveBeenCalledWith({
+        conversationId: archived.id,
+        expectedVersion: 8,
+      }),
+    );
+  });
+
+  it('permite corrigir o departamento da conversa', async () => {
+    const conversation = createWhatsAppConversationFixture({
+      department: 'commercial',
+      version: 7,
+      unreadCount: 0,
+    });
+    const changed = createWhatsAppConversationFixture({
+      ...conversation,
+      department: 'financial',
+      version: 8,
+    });
+    mockFetchDetail(conversation);
+    mockedChangeDepartment.mockResolvedValue({ success: true, conversation: changed });
+    const user = userEvent.setup();
+
+    render(<ConversationWorkspace initialConversations={[conversation]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Alterar departamento' }));
+    await user.click(screen.getByRole('combobox', { name: 'Novo departamento' }));
+    await user.click(await screen.findByRole('option', { name: 'Financeiro' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar departamento' }));
+
+    await waitFor(() =>
+      expect(mockedChangeDepartment).toHaveBeenCalledWith({
+        conversationId: conversation.id,
+        expectedVersion: 7,
+        targetDepartment: 'financial',
+      }),
+    );
+  });
+
+  it('exibe paginação numérica para navegar por muitas conversas', () => {
+    const conversation = createWhatsAppConversationFixture({ unreadCount: 0 });
+    mockFetchDetail(conversation);
+
+    render(
+      <ConversationWorkspace
+        initialConversations={[conversation]}
+        initialPagination={{ page: 3, pageSize: 25, total: 250, totalPages: 10 }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Ir para a página 3' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('button', { name: 'Ir para a página 4' })).toBeInTheDocument();
+  });
+
   it('uses the dedicated return-to-bot operation with the current version', async () => {
     const conversation = createWhatsAppConversationFixture({
       conversationState: 'human-active',
@@ -574,7 +722,7 @@ describe('ConversationWorkspace', () => {
     );
     expect(screen.queryByText(/Responsável:/)).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Atendente ativo' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'BOT inativo' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'BOT inativo' })).toBeEnabled());
   });
 
   it('renders empty and initial error states and retries the list request', async () => {

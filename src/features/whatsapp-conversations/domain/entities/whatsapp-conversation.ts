@@ -216,6 +216,8 @@ export interface WhatsAppConversation {
   readonly lastMessagePreview: string;
   readonly lastMessageAt: string;
   readonly closedAt: string | null;
+  readonly archivedAt: string | null;
+  readonly archiveReason: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly currentQuoteRequest: WhatsAppQuoteRequest | null;
@@ -281,7 +283,7 @@ export function isWhatsAppQuoteSummaryConfirmed(conversation: WhatsAppConversati
 }
 
 export function canTakeOverWhatsAppConversation(conversation: WhatsAppConversation): boolean {
-  return !(conversation.conversationState === 'human-active' && conversation.assignedTo !== null);
+  return conversation.conversationState !== 'closed';
 }
 
 export function canReturnWhatsAppConversationToBot(conversation: WhatsAppConversation): boolean {

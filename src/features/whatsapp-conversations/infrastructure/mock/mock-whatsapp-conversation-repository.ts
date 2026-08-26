@@ -123,6 +123,10 @@ export class MockWhatsAppConversationRepository implements WhatsAppConversationR
       (conversation) =>
         (!filters?.department || conversation.department === filters.department) &&
         (!filters?.state || conversation.conversationState === filters.state) &&
+        (filters?.archive === 'all' ||
+          (filters?.archive === 'archived'
+            ? conversation.archivedAt !== null
+            : conversation.archivedAt === null)) &&
         (!filters?.control ||
           (filters.control === 'bot' && conversation.conversationState === 'bot-active') ||
           (filters.control === 'human' && conversation.conversationState === 'human-active') ||
@@ -227,6 +231,36 @@ export class MockWhatsAppConversationRepository implements WhatsAppConversationR
       conversationState: 'sent-to-human',
       flowStep: 'human-service',
       assignedTo: null,
+    });
+  }
+
+  async changeConversationDepartment(
+    conversationId: string,
+    targetDepartment: WhatsAppConversationDepartment,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation> {
+    return updateConversation(conversationId, expectedVersion, {
+      department: targetDepartment,
+    });
+  }
+
+  async archiveConversation(
+    conversationId: string,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation> {
+    return updateConversation(conversationId, expectedVersion, {
+      archivedAt: new Date().toISOString(),
+      archiveReason: 'manual',
+    });
+  }
+
+  async unarchiveConversation(
+    conversationId: string,
+    expectedVersion: number,
+  ): Promise<WhatsAppConversation> {
+    return updateConversation(conversationId, expectedVersion, {
+      archivedAt: null,
+      archiveReason: null,
     });
   }
 

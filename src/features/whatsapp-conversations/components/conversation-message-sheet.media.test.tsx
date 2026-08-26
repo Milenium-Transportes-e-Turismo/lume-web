@@ -101,6 +101,59 @@ function renderSheet() {
 }
 
 describe('pré-visualização de mídias no chat', () => {
+  it('separa mensagens recebidas e enviadas pela data no fuso de São Paulo', () => {
+    const messages: readonly WhatsAppMessage[] = [
+      {
+        id: '00000000-0000-4000-8000-000000000520',
+        direction: 'inbound',
+        deliveryStatus: 'received',
+        kind: 'text',
+        text: 'Mensagem do primeiro dia.',
+        attachment: null,
+        sentBy: null,
+        occurredAt: '2026-08-06T12:00:00.000Z',
+        attempts: [],
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000521',
+        direction: 'outbound',
+        deliveryStatus: 'sent',
+        kind: 'text',
+        text: 'Mensagem do segundo dia.',
+        attachment: null,
+        sentBy: { id: 'employee-001', name: 'Usuário Comercial' },
+        occurredAt: '2026-08-07T12:00:00.000Z',
+        attempts: [],
+      },
+    ];
+
+    render(
+      <ConversationMessageSheet
+        conversation={createWhatsAppConversationFixture({ id: conversationId, messages })}
+        isLoading={false}
+        isLoaded
+        detailError=""
+        onRetry={jest.fn()}
+        onLoadOlder={jest.fn()}
+        isLoadingOlder={false}
+        searchOpen={false}
+        onSearchOpenChange={jest.fn()}
+        messageDraft=""
+        onMessageDraftChange={jest.fn()}
+        selectedAttachment={null}
+        onSelectedAttachmentChange={jest.fn()}
+        canSendMessage={false}
+        isSendingMessage={false}
+        onSendMessage={jest.fn()}
+        feedbackMessage=""
+        feedbackTone="neutral"
+      />,
+    );
+
+    expect(screen.getByText('06 de agosto de 2026')).toBeInTheDocument();
+    expect(screen.getByText('07 de agosto de 2026')).toBeInTheDocument();
+  });
+
   it('renderiza texto, imagem, áudio, vídeo, figurinha e PDF com nomes claros', () => {
     renderSheet();
 

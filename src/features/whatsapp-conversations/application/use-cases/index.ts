@@ -1,4 +1,6 @@
 export * from './close-whatsapp-conversation-after-rejection';
+export * from './archive-whatsapp-conversation';
+export * from './change-whatsapp-conversation-department';
 export * from './close-whatsapp-conversation';
 export * from './forward-whatsapp-conversation';
 export * from './get-whatsapp-conversation-by-id';
@@ -9,3 +11,4 @@ export * from './send-human-whatsapp-message';
 export * from './search-whatsapp-messages';
 export * from './start-whatsapp-conversation';
 export * from './take-over-whatsapp-conversation';
+export * from './unarchive-whatsapp-conversation';
