@@ -192,6 +192,10 @@ duração, geometria, pedágios e custos. A Tenant API resolve endereços pelo P
 e calcula rotas pelo OpenRouteService; o navegador não chama a HeiGIT, banco ou
 agente de IA diretamente e não executa cálculos de negócio.
 
+O resultado é renderizado com MapLibre sobre um estilo configurado por
+`MAP_STYLE_URL`; o padrão é o OpenFreeMap Liberty. O mapa desenha ida, volta,
+origem, destino, paradas e pedágios sem alterar os cálculos autoritativos da API.
+
 O cadastro corporativo de clientes PF/PJ continua em `/clients`. As telas
 anteriores de contratos, colaboradores, pontos fixos, sugestões e exportações
 foram removidas; o novo núcleo é independente e poderá ser consumido pelos

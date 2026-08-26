@@ -35,6 +35,8 @@ para a imagem. Requisitos:
 - `LUME_TENANT_WHATSAPP_DATA_SOURCE=api`;
 - `LUME_TENANT_API_WHATSAPP_IMPORT_TIMEOUT_MS` compatível com o maior backup
   aceito pela API; o exemplo usa dez minutos.
+- `MAP_STYLE_URL` pode apontar para um estilo MapLibre HTTPS; o padrão público é
+  `https://tiles.openfreemap.org/styles/liberty` e não contém segredo.
 
 Nunca grave tokens, cookies, `SESSION_SECRET` ou o arquivo real de ambiente em
 logs, imagens ou repositórios.
@@ -59,8 +61,10 @@ reserva trinta segundos para cada upload multipart. Configure timeouts do proxy
 acima da janela do lote para não transformar um upload persistido em erro
 ambíguo no navegador.
 
-O Tenant Web precisa alcançar apenas a Tenant API e os destinos HTTPS dos anexos
-publicados por ela.
+O processo server-side do Tenant Web precisa alcançar apenas a Tenant API e os
+destinos HTTPS dos anexos publicados por ela. O navegador também acessa o host
+do estilo e os hosts de tiles, sprites e fontes referenciados por esse estilo;
+uma CSP futura deve permiti-los explicitamente em `connect-src` e `img-src`.
 
 Para a importação assistida, o proxy deve aceitar até 2 GiB mais o overhead
 multipart e manter streaming habilitado. Esse limite contempla tanto um ZIP
@@ -110,7 +114,8 @@ balanceador. Nenhuma sonda expõe segredos ou JWTs.
 11. Com um usuário autorizado, confirme **Roteirização** sob **Operacional** e
     execute um cálculo controlado. A requisição deve ir somente para a Tenant
     API e uma base de pedágios indisponível deve aparecer como cobertura parcial,
-    sem valores simulados.
+    sem valores simulados. O mapa deve enquadrar a rota, mostrar origem, destino,
+    paradas e pedágios e preservar a atribuição OpenStreetMap/OpenMapTiles.
 12. Direcione tráfego e acompanhe erros 401, 403, 409, 423, 5xx e falhas de
     readiness.
 

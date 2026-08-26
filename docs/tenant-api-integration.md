@@ -346,6 +346,10 @@ tipos validados com Zod. A tela futura poderá enviar um arquivo, consultar o
 progresso do lote, apresentar erros por registro e baixar o resultado
 autenticado; não poderá decidir formatos, estados ou permissões localmente.
 
+A geometria GeoJSON publicada pela Tenant API é desenhada localmente pelo
+MapLibre. `MAP_STYLE_URL` seleciona somente o mapa de fundo; o fornecedor de
+tiles não recebe a chave HeiGIT, não recalcula a rota e não altera os custos.
+
 Até que endpoints, DTOs e limites sejam estabilizados pela Tenant API, nenhum
 endpoint é presumido nesta aplicação. Esse desenho reserva a fronteira sem
 criar uma interface incompatível ou uma segunda implementação de conversão.

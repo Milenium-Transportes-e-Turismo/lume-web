@@ -1,6 +1,7 @@
 'use client';
 
 import { Calculator, CirclePlus, MapPinned, Trash2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
@@ -21,6 +22,11 @@ const INITIAL_ROUTE_PLANNER_STATE: RoutePlannerActionState = {
   message: null,
   code: null,
 };
+
+const RouteMap = dynamic(() => import('./route-map').then((module) => module.RouteMap), {
+  ssr: false,
+  loading: () => <div className="h-[420px] animate-pulse rounded-xl bg-muted md:h-[520px]" />,
+});
 
 function currency(value: number | null): string {
   return value === null
@@ -88,7 +94,13 @@ function TollTable({ tolls }: { readonly tolls: TollResult }) {
   );
 }
 
-export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: boolean }) {
+export function RoutePlannerForm({
+  canCalculate,
+  mapStyleUrl,
+}: {
+  readonly canCalculate: boolean;
+  readonly mapStyleUrl: string;
+}) {
   const [state, action] = useActionState(calculateRouteAction, INITIAL_ROUTE_PLANNER_STATE);
   const [waypoints, setWaypoints] = useState<number[]>([]);
   const result = state.result;
@@ -269,6 +281,16 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
+                <MapPinned aria-hidden="true" /> Mapa da rota
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RouteMap calculation={result} styleUrl={mapStyleUrl} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <MapPinned aria-hidden="true" /> Pedágios — ida
               </CardTitle>
             </CardHeader>
@@ -286,10 +308,6 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
               </CardContent>
             </Card>
           )}
-          <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-            A geometria GeoJSON já foi calculada e está pronta para o mapa. A renderização com
-            MapLibre será conectada após a definição do servidor de tiles de produção.
-          </div>
         </section>
       )}
     </div>
