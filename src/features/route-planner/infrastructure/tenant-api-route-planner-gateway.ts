@@ -12,7 +12,7 @@ const locationSchema = z.object({
   coordinates: coordinatesSchema,
   label: z.string(),
   address: z.string().nullable(),
-  source: z.enum(['coordinates', 'nominatim']),
+  source: z.enum(['coordinates', 'pelias', 'nominatim']),
 });
 const geometrySchema = z.object({
   type: z.literal('LineString'),

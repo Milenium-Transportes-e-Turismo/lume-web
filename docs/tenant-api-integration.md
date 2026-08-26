@@ -337,8 +337,10 @@ O frontend nunca contorna essas ausências chamando cache, Evolution,
 
 ## Contrato futuro de arquivos, importação e exportação genéricos
 
-O Tenant Web não converte documentos ou planilhas. Fora dos contratos já
-publicados para documentos e roteirização, quando a Tenant API publicar
+O Tenant Web não converte documentos ou planilhas. O contrato de roteirização
+aceita `pelias` como origem geográfica ativa e mantém `nominatim` somente para
+compatibilidade durante atualizações. Fora dos contratos já publicados para
+documentos e roteirização, quando a Tenant API publicar
 o contrato definitivo, a integração deve ser criada como gateway server-only e
 tipos validados com Zod. A tela futura poderá enviar um arquivo, consultar o
 progresso do lote, apresentar erros por registro e baixar o resultado

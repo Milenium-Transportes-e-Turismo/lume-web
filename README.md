@@ -188,8 +188,9 @@ planilhas continua proibida no navegador.
 
 `/routing` é a interface do Lume Routing Core. Ela envia origem, destino,
 paradas, veículo, data e combustível para a Tenant API e apresenta distância,
-duração, geometria, pedágios e custos. O navegador não chama Nominatim,
-Valhalla ou banco diretamente e não executa cálculos de negócio.
+duração, geometria, pedágios e custos. A Tenant API resolve endereços pelo Pelias
+e calcula rotas pelo OpenRouteService; o navegador não chama a HeiGIT, banco ou
+agente de IA diretamente e não executa cálculos de negócio.
 
 O cadastro corporativo de clientes PF/PJ continua em `/clients`. As telas
 anteriores de contratos, colaboradores, pontos fixos, sugestões e exportações

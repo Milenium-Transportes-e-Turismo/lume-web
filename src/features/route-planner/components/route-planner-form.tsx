@@ -11,9 +11,16 @@ import { Label } from '@/shared/ui/label';
 
 import {
   calculateRouteAction,
-  INITIAL_ROUTE_PLANNER_STATE,
+  type RoutePlannerActionState,
 } from '../actions/calculate-route-action';
 import type { TollResult } from '../domain/route-calculation';
+
+const INITIAL_ROUTE_PLANNER_STATE: RoutePlannerActionState = {
+  status: 'idle',
+  result: null,
+  message: null,
+  code: null,
+};
 
 function currency(value: number | null): string {
   return value === null

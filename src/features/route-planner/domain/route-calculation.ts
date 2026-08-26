@@ -7,7 +7,7 @@ export interface ResolvedRouteLocation {
   readonly coordinates: RoutePointCoordinates;
   readonly label: string;
   readonly address: string | null;
-  readonly source: 'coordinates' | 'nominatim';
+  readonly source: 'coordinates' | 'pelias' | 'nominatim';
 }
 
 export interface CalculatedRouteLeg {
