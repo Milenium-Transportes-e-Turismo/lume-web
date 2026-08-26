@@ -11,13 +11,6 @@ export type RoutePlannerActionState = {
   readonly code: string | null;
 };
 
-export const INITIAL_ROUTE_PLANNER_STATE: RoutePlannerActionState = {
-  status: 'idle',
-  result: null,
-  message: null,
-  code: null,
-};
-
 function text(data: FormData, key: string): string {
   const value = data.get(key);
   return typeof value === 'string' ? value.trim() : '';
