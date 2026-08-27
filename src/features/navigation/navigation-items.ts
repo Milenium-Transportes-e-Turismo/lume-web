@@ -11,6 +11,7 @@ import {
   Route,
   ContactRound,
   Building2,
+  ScanSearch,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,8 +40,8 @@ export interface InternalNavigationItem {
 
 export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
   {
-    label: 'Clientes',
-    href: '/clients',
+    label: 'Cadastro',
+    href: '/registrations',
     permission: 'clients:view',
     alternativePermissions: [
       'clients:create',
@@ -49,6 +50,14 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
       'clients:history',
     ],
     icon: Building2,
+    group: 'records',
+  },
+  {
+    label: 'Conciliação de Cadastros',
+    href: '/registration-reconciliation',
+    permission: 'clients:history',
+    alternativePermissions: ['clients:manage'],
+    icon: ScanSearch,
     group: 'records',
   },
   {

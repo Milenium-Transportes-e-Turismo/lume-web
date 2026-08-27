@@ -2,6 +2,22 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  async redirects() {
+    return [
+      { source: '/clients', destination: '/registrations', permanent: false },
+      { source: '/clients/new', destination: '/registrations/new', permanent: false },
+      {
+        source: '/clients/:clientId/edit',
+        destination: '/registrations/:clientId/edit',
+        permanent: false,
+      },
+      {
+        source: '/clients/:clientId',
+        destination: '/registrations/:clientId',
+        permanent: false,
+      },
+    ];
+  },
   logging: {
     serverFunctions: false,
   },
