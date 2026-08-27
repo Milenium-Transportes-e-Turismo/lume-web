@@ -214,6 +214,7 @@ export async function reviewRegistrationCandidateAction(data: FormData): Promise
 
 export async function promoteRegistrationCandidateAction(data: FormData): Promise<void> {
   const candidateId = text(data, 'candidateId');
+  let promotedRegistrationId = '';
   try {
     const candidate = await executeAuthenticatedRegistrationMutation((gateway) =>
       gateway.promoteCandidate(candidateId, Number(text(data, 'expectedVersion'))),
@@ -221,14 +222,15 @@ export async function promoteRegistrationCandidateAction(data: FormData): Promis
     if (!candidate.promotedRegistration) {
       throw new RegistrationGatewayError('invalid-response', 'A promoção não retornou o Cadastro.');
     }
-    revalidatePath('/registration-reconciliation');
-    revalidatePath('/registrations');
-    redirect(
-      `/registrations/${candidate.promotedRegistration.id}?success=${encodeURIComponent(
-        'Candidato promovido ao Cadastro oficial.',
-      )}`,
-    );
+    promotedRegistrationId = candidate.promotedRegistration.id;
   } catch (error) {
     fail(`/registration-reconciliation/${candidateId}`, error);
   }
+  revalidatePath('/registration-reconciliation');
+  revalidatePath('/registrations');
+  redirect(
+    `/registrations/${promotedRegistrationId}?success=${encodeURIComponent(
+      'Candidato promovido ao Cadastro oficial.',
+    )}`,
+  );
 }
