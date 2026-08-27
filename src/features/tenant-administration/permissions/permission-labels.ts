@@ -11,7 +11,7 @@ const RESOURCE_LABELS: Readonly<Record<string, string>> = {
   cleaning: 'Limpeza',
   drivers: 'Motoristas',
   financial: 'Financeiro',
-  clients: 'Clientes',
+  clients: 'Cadastro',
   'ai-agents': 'Agentes de IA',
   'whatsapp-conversations': 'Painel WhatsApp',
   manuals: 'Manuais',

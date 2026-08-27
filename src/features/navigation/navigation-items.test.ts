@@ -29,7 +29,7 @@ describe('getAuthorizedNavigationItems', () => {
     const items = getAuthorizedNavigationItems(createEmployee(['dashboard:view']));
 
     expect(items.map((item) => item.label)).toEqual(['Dashboard']);
-    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(12);
+    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(13);
   });
 
   it('shows License only with its explicit permission inside Management', () => {
@@ -57,10 +57,19 @@ describe('getAuthorizedNavigationItems', () => {
     'clients:update',
     'clients:manage',
     'clients:history',
-  ] as const)('shows Clients to any department with a related permission: %s', (permission) => {
+  ] as const)('shows Cadastro to any department with a related permission: %s', (permission) => {
     const items = getAuthorizedNavigationItems(createEmployee([permission], true, ['operations']));
 
-    expect(items.map((item) => item.label)).toContain('Clientes');
+    expect(items.map((item) => item.label)).toContain('Cadastro');
+  });
+
+  it('shows reconciliation only with history or management permission', () => {
+    expect(
+      getAuthorizedNavigationItems(createEmployee(['clients:view'])).map((item) => item.label),
+    ).not.toContain('Conciliação de Cadastros');
+    expect(
+      getAuthorizedNavigationItems(createEmployee(['clients:history'])).map((item) => item.label),
+    ).toContain('Conciliação de Cadastros');
   });
 
   it('shows Users to an explicit administrator even without department data', () => {

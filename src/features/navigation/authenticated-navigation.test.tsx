@@ -148,15 +148,18 @@ describe('AuthenticatedNavigation', () => {
     await waitFor(() => expect(mockedPendingCount).toHaveBeenCalledTimes(1));
   });
 
-  it('renders clients in the corporate Records group', () => {
-    mockedUsePathname.mockReturnValue('/clients');
+  it('renders Cadastro in the corporate Records group', () => {
+    mockedUsePathname.mockReturnValue('/registrations');
 
     renderNavigation(createEmployee(['clients:view'], true, ['operations']));
 
     expect(screen.getByText('Cadastros')).toBeInTheDocument();
     expect(screen.queryByText('Operacional')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Clientes' })).toHaveAttribute('href', '/clients');
-    expect(screen.getByRole('link', { name: 'Clientes' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Cadastro' })).toHaveAttribute(
+      'href',
+      '/registrations',
+    );
+    expect(screen.getByRole('link', { name: 'Cadastro' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('renders Users and document management in the People group', () => {
