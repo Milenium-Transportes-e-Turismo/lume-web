@@ -12,6 +12,8 @@ import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Switch } from '@/shared/ui/switch';
 import { Textarea } from '@/shared/ui/textarea';
+import { formatCnpjInput, formatCpfInput } from '@/shared/utils/brazilian-data';
+import { formatPersonName } from '@/shared/utils/person-name';
 
 export interface RelatedRegistrationInitialValue {
   readonly localId: string;
@@ -59,12 +61,12 @@ function draft(initial?: RelatedRegistrationInitialValue): RelatedDraft {
   return {
     localId: initial?.localId ?? crypto.randomUUID(),
     type: initial?.type ?? 'pf',
-    firstName: initial?.firstName ?? '',
-    lastName: initial?.lastName ?? '',
+    firstName: formatPersonName(initial?.firstName ?? ''),
+    lastName: formatPersonName(initial?.lastName ?? ''),
     legalName: initial?.legalName ?? '',
     tradeName: initial?.tradeName ?? '',
-    cpf: initial?.cpf ?? '',
-    cnpj: initial?.cnpj ?? '',
+    cpf: formatCpfInput(initial?.cpf ?? ''),
+    cnpj: formatCnpjInput(initial?.cnpj ?? ''),
     phone: initial?.phone ?? '',
     email: initial?.email ?? '',
     roleCodes: [...(initial?.roleCodes ?? [])],
@@ -138,7 +140,7 @@ export function RelatedRegistrationsFields({
   }
 
   return (
-    <Card>
+    <Card size="sm">
       <input
         type="hidden"
         name="relatedRegistrationGraph"
@@ -163,7 +165,7 @@ export function RelatedRegistrationsFields({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {values.length === 0 ? (
           <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
             Use esta seção somente quando a mesma revisão precisar criar outra pessoa ou organização
@@ -171,7 +173,7 @@ export function RelatedRegistrationsFields({
           </p>
         ) : null}
         {values.map((value, index) => (
-          <section className="space-y-4 rounded-xl border p-4" key={value.localId}>
+          <section className="space-y-3 rounded-lg border p-3" key={value.localId}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="flex items-center gap-2 font-medium">
                 <Link2 aria-hidden="true" className="size-4" /> Identidade relacionada {index + 1}
@@ -189,7 +191,7 @@ export function RelatedRegistrationsFields({
               </Button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Tipo</Label>
                 <Select
@@ -200,7 +202,9 @@ export function RelatedRegistrationsFields({
                     className="w-full"
                     aria-label={`Tipo da identidade relacionada ${index + 1}`}
                   >
-                    <SelectValue />
+                    <SelectValue>
+                      {value.type === 'pf' ? 'Pessoa física' : 'Pessoa jurídica'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pf">Pessoa física</SelectItem>
@@ -227,6 +231,7 @@ export function RelatedRegistrationsFields({
                       required
                       value={value.firstName}
                       onChange={(event) => update(index, { firstName: event.target.value })}
+                      onBlur={() => update(index, { firstName: formatPersonName(value.firstName) })}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -235,6 +240,7 @@ export function RelatedRegistrationsFields({
                       id={`related-last-name-${value.localId}`}
                       value={value.lastName}
                       onChange={(event) => update(index, { lastName: event.target.value })}
+                      onBlur={() => update(index, { lastName: formatPersonName(value.lastName) })}
                     />
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
@@ -243,7 +249,9 @@ export function RelatedRegistrationsFields({
                       id={`related-cpf-${value.localId}`}
                       inputMode="numeric"
                       value={value.cpf}
-                      onChange={(event) => update(index, { cpf: event.target.value })}
+                      onChange={(event) =>
+                        update(index, { cpf: formatCpfInput(event.target.value) })
+                      }
                       placeholder="Opcional"
                     />
                   </div>
@@ -272,9 +280,11 @@ export function RelatedRegistrationsFields({
                     <Input
                       id={`related-cnpj-${value.localId}`}
                       required
-                      inputMode="numeric"
+                      inputMode="text"
                       value={value.cnpj}
-                      onChange={(event) => update(index, { cnpj: event.target.value })}
+                      onChange={(event) =>
+                        update(index, { cnpj: formatCnpjInput(event.target.value) })
+                      }
                     />
                   </div>
                 </>
@@ -338,7 +348,7 @@ export function RelatedRegistrationsFields({
               </div>
             </details>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Direção do relacionamento</Label>
                 <Select
@@ -353,7 +363,11 @@ export function RelatedRegistrationsFields({
                     className="w-full"
                     aria-label={`Direção do relacionamento da identidade ${index + 1}`}
                   >
-                    <SelectValue />
+                    <SelectValue>
+                      {value.relationshipDirection === 'related-to-primary'
+                        ? 'Adicional → principal'
+                        : 'Principal → adicional'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="related-to-primary">Adicional → principal</SelectItem>

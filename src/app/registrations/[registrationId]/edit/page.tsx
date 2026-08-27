@@ -26,7 +26,7 @@ export default async function EditRegistrationPage({
   ]);
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-6xl space-y-5 p-4 md:p-8">
+      <main className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6">
         <PageFeedbackToast error={search.error} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>

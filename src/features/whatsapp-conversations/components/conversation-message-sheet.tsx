@@ -392,6 +392,7 @@ export interface ConversationMessageSheetProps {
   readonly onSendMessage: () => void;
   readonly feedbackMessage: string;
   readonly feedbackTone: 'neutral' | 'success' | 'error';
+  readonly readOnly?: boolean;
 }
 
 export function ConversationMessageSheet({
@@ -413,6 +414,7 @@ export function ConversationMessageSheet({
   onSendMessage,
   feedbackMessage,
   feedbackTone,
+  readOnly = false,
 }: ConversationMessageSheetProps) {
   const open = true;
   const historyRef = useRef<HTMLDivElement>(null);
@@ -805,7 +807,12 @@ export function ConversationMessageSheet({
         )}
       </div>
 
-      <div className="space-y-2 border-t bg-background p-2">
+      {readOnly ? (
+        <p className="border-t bg-muted/20 px-3 py-2 text-center text-xs text-muted-foreground">
+          Consulta em modo somente leitura
+        </p>
+      ) : null}
+      <div hidden={readOnly} className="space-y-2 border-t bg-background p-2">
         {selectedAttachment ? (
           <div className="flex min-w-0 items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2">
             <Paperclip aria-hidden="true" className="size-4 shrink-0" />

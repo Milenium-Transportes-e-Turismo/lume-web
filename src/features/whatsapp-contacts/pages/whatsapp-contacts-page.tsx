@@ -147,6 +147,14 @@ export function WhatsAppContactsPage({ canManage }: { readonly canManage: boolea
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
   function openCreate() {
     setEditing(null);
     setForm({ name: '', phone: '' });
@@ -288,7 +296,7 @@ export function WhatsAppContactsPage({ canManage }: { readonly canManage: boolea
       </header>
 
       {data.reviewTotal > 0 ? (
-        <Card className="border-warning-emphasis/30 bg-warning-soft/40">
+        <Card size="sm" className="border-warning-emphasis/30 bg-warning-soft/40">
           <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 size-5 text-warning-emphasis" aria-hidden="true" />
@@ -315,18 +323,18 @@ export function WhatsAppContactsPage({ canManage }: { readonly canManage: boolea
         </Card>
       ) : null}
 
-      <Card>
+      <Card size="sm">
         <CardHeader className="gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <form
-              className="flex flex-1 gap-2"
+              className="flex flex-1 flex-col gap-1"
               onSubmit={(event) => {
                 event.preventDefault();
                 setPage(1);
                 setSearch(searchInput.trim());
               }}
             >
-              <div className="relative flex-1">
+              <div className="relative">
                 <Search
                   aria-hidden="true"
                   className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
@@ -339,9 +347,9 @@ export function WhatsAppContactsPage({ canManage }: { readonly canManage: boolea
                   aria-label="Pesquisar contatos"
                 />
               </div>
-              <Button type="submit" variant="outline">
-                Pesquisar
-              </Button>
+              <span className="text-xs text-muted-foreground">
+                A pesquisa é atualizada automaticamente.
+              </span>
             </form>
             <div className="flex rounded-lg bg-muted p-1" aria-label="Filtro dos contatos">
               <Button

@@ -1,6 +1,8 @@
 import {
   formatCnpj,
+  formatCnpjInput,
   formatCpf,
+  formatCpfInput,
   formatPhone,
   normalizeCnh,
   normalizeCnpj,
@@ -29,6 +31,10 @@ describe('CPF', () => {
     expect(formatCpf('52998224725')).toBe('529.982.247-25');
   });
 
+  it('deve aplicar a máscara enquanto o CPF é digitado', () => {
+    expect(formatCpfInput('5299822')).toBe('529.982.2');
+  });
+
   it('deve aceitar um CPF válido', () => {
     expect(validateCpf('529.982.247-25')).toBe(true);
   });
@@ -53,6 +59,10 @@ describe('CNPJ', () => {
 
   it('deve formatar um CNPJ alfanumérico', () => {
     expect(formatCnpj('346NCD4E000192')).toBe('34.6NC.D4E/0001-92');
+  });
+
+  it('deve aplicar a máscara enquanto o CNPJ é digitado', () => {
+    expect(formatCnpjInput('346ncd4e0001')).toBe('34.6NC.D4E/0001');
   });
 
   it('deve aceitar um CNPJ numérico válido', () => {

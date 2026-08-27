@@ -28,6 +28,17 @@ export function formatCpf(value: string): string {
   return cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
 }
 
+/** Aplica a máscara progressivamente enquanto o CPF é digitado. */
+export function formatCpfInput(value: string): string {
+  const cpf = normalizeCpf(value).slice(0, 11);
+  if (cpf.length <= 3) return cpf;
+  if (cpf.length <= 6) return `${cpf.slice(0, 3)}.${cpf.slice(3)}`;
+  if (cpf.length <= 9) {
+    return `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6)}`;
+  }
+  return `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9)}`;
+}
+
 function calculateCheckDigit(cpf: string, factor: number): number {
   let total = 0;
 
