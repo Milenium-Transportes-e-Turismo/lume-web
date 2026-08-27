@@ -29,7 +29,7 @@ describe('getAuthorizedNavigationItems', () => {
     const items = getAuthorizedNavigationItems(createEmployee(['dashboard:view']));
 
     expect(items.map((item) => item.label)).toEqual(['Dashboard']);
-    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(13);
+    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(14);
   });
 
   it('shows License only with its explicit permission inside Management', () => {
