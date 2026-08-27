@@ -17,7 +17,9 @@ import type { RegistrationCandidateStatus } from '@/features/registrations/domai
 import { executeAuthenticatedRegistrationRequest } from '@/features/registrations/server';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
+import { DynamicFilterForm } from '@/shared/dynamic-filter-form';
 import { formatCnpj, formatCpf, formatPhone } from '@/shared/utils/brazilian-data';
+import { formatPersonName } from '@/shared/utils/person-name';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
@@ -84,6 +86,18 @@ function candidateDocument(value: string | null) {
   return value;
 }
 
+function candidateDisplayName(candidate: {
+  readonly displayName: string | null;
+  readonly confirmedType: 'pf' | 'pj' | null;
+  readonly suggestedType: 'pf' | 'pj' | null;
+}) {
+  if (!candidate.displayName) return 'Nome indisponível';
+  const value = candidate.displayName;
+  return (candidate.confirmedType ?? candidate.suggestedType) === 'pf'
+    ? formatPersonName(value)
+    : value;
+}
+
 function batchRowErrors(counts: Readonly<Record<string, unknown>>): string[] {
   const value = counts.rowErrors;
   return Array.isArray(value)
@@ -139,7 +153,7 @@ export default async function RegistrationReconciliationPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-[96rem] space-y-5 p-4 md:p-8">
+      <main className="mx-auto w-full max-w-[96rem] space-y-4 p-4 md:p-6">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-3xl">
@@ -156,8 +170,8 @@ export default async function RegistrationReconciliationPage({
         </header>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3 p-3">
               <Inbox aria-hidden="true" className="size-5 text-primary" />
               <div>
                 <p className="text-2xl font-semibold">{openCount}</p>
@@ -165,8 +179,8 @@ export default async function RegistrationReconciliationPage({
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3 p-3">
               <TriangleAlert
                 aria-hidden="true"
                 className="size-5 text-amber-600 dark:text-amber-400"
@@ -177,8 +191,8 @@ export default async function RegistrationReconciliationPage({
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3 p-3">
               <BadgeCheck
                 aria-hidden="true"
                 className="size-5 text-emerald-600 dark:text-emerald-400"
@@ -189,8 +203,8 @@ export default async function RegistrationReconciliationPage({
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3 p-3">
               <Database aria-hidden="true" className="size-5 text-primary" />
               <div>
                 <p className="text-2xl font-semibold">{batches.length}</p>
@@ -201,7 +215,7 @@ export default async function RegistrationReconciliationPage({
         </div>
 
         {hasPermission(session.user, 'clients:manage') ? (
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Importar nova análise</CardTitle>
               <CardDescription>
@@ -214,9 +228,18 @@ export default async function RegistrationReconciliationPage({
           </Card>
         ) : null}
 
-        <Card>
-          <CardContent className="p-4">
-            <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(18rem,1fr)_13rem_13rem_13rem_auto]">
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle>Fila para revisão</CardTitle>
+            <CardDescription>
+              Refine a lista abaixo; as alterações são aplicadas automaticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DynamicFilterForm
+              key={JSON.stringify(search)}
+              className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(18rem,1fr)_13rem_13rem_13rem]"
+            >
               <div className="relative md:col-span-2 xl:col-span-1">
                 <Search
                   aria-hidden="true"
@@ -268,12 +291,22 @@ export default async function RegistrationReconciliationPage({
                     </NativeSelectOption>
                   ))}
               </NativeSelect>
-              <Button type="submit" variant="outline">
-                Filtrar
-              </Button>
-              <details className="rounded-lg border p-3 md:col-span-2 xl:col-span-5">
+              <details className="rounded-lg border p-3 md:col-span-2 xl:col-span-4">
                 <summary className="cursor-pointer text-sm font-medium">Filtros avançados</summary>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <NativeSelect
+                    className="w-full"
+                    name="batchId"
+                    defaultValue={search.batchId}
+                    aria-label="Filtrar candidatos por lote de importação"
+                  >
+                    <NativeSelectOption value="">Todos os lotes</NativeSelectOption>
+                    {batches.map((batch) => (
+                      <NativeSelectOption value={batch.id} key={batch.id}>
+                        {new Date(batch.createdAt).toLocaleDateString('pt-BR')} · {batch.fileName}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
                   <NativeSelect
                     className="w-full"
                     name="hasDocument"
@@ -349,25 +382,21 @@ export default async function RegistrationReconciliationPage({
                   </NativeSelect>
                 </div>
               </details>
-              <NativeSelect
-                className="w-full"
-                name="batchId"
-                defaultValue={search.batchId}
-                aria-label="Filtrar candidatos por lote de importação"
-              >
-                <NativeSelectOption value="">Todos os lotes</NativeSelectOption>
-                {batches.map((batch) => (
-                  <NativeSelectOption value={batch.id} key={batch.id}>
-                    {new Date(batch.createdAt).toLocaleDateString('pt-BR')} · {batch.fileName}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </form>
+              <p className="flex items-center justify-between gap-3 text-xs text-muted-foreground md:col-span-2 xl:col-span-4">
+                <span>Digite ou selecione um valor para atualizar a fila.</span>
+                <Link
+                  className="font-medium text-primary hover:underline"
+                  href="/registration-reconciliation"
+                >
+                  Limpar filtros
+                </Link>
+              </p>
+            </DynamicFilterForm>
           </CardContent>
         </Card>
 
         {result.items.length === 0 ? (
-          <Card>
+          <Card size="sm">
             <CardContent className="p-0">
               <Empty className="min-h-72">
                 <EmptyHeader>
@@ -384,7 +413,7 @@ export default async function RegistrationReconciliationPage({
             </CardContent>
           </Card>
         ) : (
-          <Card className="overflow-hidden">
+          <Card size="sm" className="overflow-hidden">
             <CardContent className="p-0">
               <div className="hidden overflow-x-auto md:block">
                 <Table>
@@ -406,7 +435,7 @@ export default async function RegistrationReconciliationPage({
                             className="font-medium text-primary hover:underline"
                             href={`/registration-reconciliation/${candidate.id}`}
                           >
-                            {candidate.displayName || 'Nome indisponível'}
+                            {candidateDisplayName(candidate)}
                           </Link>
                           <p className="text-xs text-muted-foreground">
                             {[candidate.city, candidate.state].filter(Boolean).join(' / ') ||
@@ -457,13 +486,13 @@ export default async function RegistrationReconciliationPage({
               </div>
               <div className="divide-y md:hidden">
                 {result.items.map((candidate) => (
-                  <article className="space-y-3 p-4" key={candidate.id}>
+                  <article className="space-y-2 p-3" key={candidate.id}>
                     <div className="flex items-start justify-between gap-3">
                       <Link
                         className="font-semibold text-primary"
                         href={`/registration-reconciliation/${candidate.id}`}
                       >
-                        {candidate.displayName || 'Nome indisponível'}
+                        {candidateDisplayName(candidate)}
                       </Link>
                       <Badge variant={candidateStatus[candidate.status].variant}>
                         {candidateStatus[candidate.status].label}
@@ -509,14 +538,14 @@ export default async function RegistrationReconciliationPage({
         </nav>
 
         {batches.length ? (
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Lotes recentes</CardTitle>
               <CardDescription>Auditoria de arquivos importados.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {batches.slice(0, 6).map((batch) => (
-                <div className="rounded-xl border p-3" key={batch.id}>
+                <div className="rounded-lg border p-3" key={batch.id}>
                   <div className="flex items-start justify-between gap-2">
                     <p className="truncate font-medium" title={batch.fileName}>
                       {batch.fileName}

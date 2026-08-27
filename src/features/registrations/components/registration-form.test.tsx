@@ -30,6 +30,29 @@ const catalog = {
 } as const;
 
 describe('RegistrationForm', () => {
+  it('exibe situação, nomes e documento em formato amigável', () => {
+    const { container } = render(
+      <RegistrationForm
+        action={jest.fn()}
+        catalog={catalog}
+        initialValues={{
+          type: 'pf',
+          status: 'inactive',
+          firstName: 'MARIA',
+          lastName: 'DOS SANTOS',
+          cpf: '52998224725',
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Situação')).toHaveTextContent('Inativo');
+    expect(screen.getByLabelText('Situação')).not.toHaveTextContent('inactive');
+    expect(screen.getByLabelText('Nome')).toHaveValue('Maria');
+    expect(screen.getByLabelText('Sobrenome')).toHaveValue('Dos Santos');
+    expect(screen.getByLabelText('CPF')).toHaveValue('529.982.247-25');
+    expect(new FormData(container.querySelector('form')!).get('status')).toBe('inactive');
+  });
+
   it('renders only the fields that belong to the selected identity type', () => {
     const { rerender } = render(
       <RegistrationForm action={jest.fn()} catalog={catalog} initialValues={{ type: 'pf' }} />,

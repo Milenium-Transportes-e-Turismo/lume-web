@@ -101,6 +101,36 @@ function renderSheet() {
 }
 
 describe('pré-visualização de mídias no chat', () => {
+  it('remove os controles de envio no modo somente leitura', () => {
+    render(
+      <ConversationMessageSheet
+        conversation={createWhatsAppConversationFixture({ id: conversationId })}
+        isLoading={false}
+        isLoaded
+        detailError=""
+        onRetry={jest.fn()}
+        onLoadOlder={jest.fn()}
+        isLoadingOlder={false}
+        searchOpen={false}
+        onSearchOpenChange={jest.fn()}
+        messageDraft=""
+        onMessageDraftChange={jest.fn()}
+        selectedAttachment={null}
+        onSelectedAttachmentChange={jest.fn()}
+        canSendMessage
+        isSendingMessage={false}
+        onSendMessage={jest.fn()}
+        feedbackMessage=""
+        feedbackTone="neutral"
+        readOnly
+      />,
+    );
+
+    expect(screen.getByText('Consulta em modo somente leitura')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /mensagem para/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /enviar mensagem/i })).not.toBeInTheDocument();
+  });
+
   it('separa mensagens recebidas e enviadas pela data no fuso de São Paulo', () => {
     const messages: readonly WhatsAppMessage[] = [
       {

@@ -54,7 +54,7 @@ describe('WhatsApp polling route', () => {
     jest.clearAllMocks();
   });
 
-  it('rejects polling without whatsapp-conversations:manage', async () => {
+  it('rejects polling without permission to view WhatsApp conversations', async () => {
     mockedSession.mockResolvedValue(session(['dashboard:view']));
 
     const response = await GET(new Request('http://localhost/api/whatsapp-conversations'));
@@ -65,7 +65,7 @@ describe('WhatsApp polling route', () => {
 
   it('returns the tenant-scoped list through the authenticated server layer', async () => {
     const conversation = createWhatsAppConversationFixture();
-    mockedSession.mockResolvedValue(session(['whatsapp-conversations:manage']));
+    mockedSession.mockResolvedValue(session(['whatsapp-conversations:view']));
     mockedPollList.mockResolvedValue({
       conversations: [conversation],
       page: 1,
@@ -111,7 +111,7 @@ describe('WhatsApp polling route', () => {
   });
 
   it('forwards pagination and humanized filters without loading every page', async () => {
-    mockedSession.mockResolvedValue(session(['whatsapp-conversations:manage']));
+    mockedSession.mockResolvedValue(session(['whatsapp-conversations:view']));
     mockedPollList.mockResolvedValue({
       conversations: [],
       page: 4,

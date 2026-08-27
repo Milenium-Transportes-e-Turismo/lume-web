@@ -1,8 +1,8 @@
 export { containsOnlyDigits, onlyDigits } from './digits';
 
-export { formatCpf, normalizeCpf, validateCpf } from './cpf';
+export { formatCpf, formatCpfInput, normalizeCpf, validateCpf } from './cpf';
 
-export { formatCnpj, normalizeCnpj, validateCnpj } from './cnpj';
+export { formatCnpj, formatCnpjInput, normalizeCnpj, validateCnpj } from './cnpj';
 
 export { formatPhone, normalizePhone, validatePhone } from './phone';
 

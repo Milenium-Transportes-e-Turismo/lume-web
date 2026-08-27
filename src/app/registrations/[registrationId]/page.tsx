@@ -21,6 +21,7 @@ import { executeAuthenticatedRegistrationRequest } from '@/features/registration
 import { RemoveRelationshipButton } from '@/features/registrations/components';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
+import { DynamicFilterForm } from '@/shared/dynamic-filter-form';
 import { formatCnpj, formatCpf, formatPhone } from '@/shared/utils/brazilian-data';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -103,7 +104,7 @@ export default async function RegistrationDetailPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-8">
+      <main className="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-3xl">
@@ -149,9 +150,9 @@ export default async function RegistrationDetailPage({
             {canHistory ? <TabsTrigger value="history">Histórico</TabsTrigger> : null}
           </TabsList>
 
-          <TabsContent value="identity" className="space-y-5">
-            <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-              <Card>
+          <TabsContent value="identity" className="space-y-3">
+            <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
+              <Card size="sm">
                 <CardHeader>
                   <CardTitle>Dados oficiais</CardTitle>
                   <CardDescription>
@@ -159,7 +160,7 @@ export default async function RegistrationDetailPage({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {registration.type === 'pf' ? (
                       <>
                         <Field label="Nome" value={registration.firstName} />
@@ -181,7 +182,7 @@ export default async function RegistrationDetailPage({
                   </dl>
                 </CardContent>
               </Card>
-              <Card>
+              <Card size="sm">
                 <CardHeader>
                   <CardTitle>Papéis e Marcadores</CardTitle>
                 </CardHeader>
@@ -213,7 +214,7 @@ export default async function RegistrationDetailPage({
                 </CardContent>
               </Card>
             </div>
-            <Card>
+            <Card size="sm">
               <CardHeader>
                 <CardTitle>Integrações externas</CardTitle>
                 <CardDescription>
@@ -225,7 +226,7 @@ export default async function RegistrationDetailPage({
                 {registration.externalReferences.length ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {registration.externalReferences.map((reference) => (
-                      <div className="rounded-xl border p-3" key={reference.id}>
+                      <div className="rounded-lg border p-3" key={reference.id}>
                         <p className="font-medium">{reference.provider}</p>
                         <p className="text-sm text-muted-foreground">
                           {reference.resourceType} · {reference.externalResourceId}
@@ -243,8 +244,8 @@ export default async function RegistrationDetailPage({
             </Card>
           </TabsContent>
 
-          <TabsContent value="contacts" className="space-y-5">
-            <Card>
+          <TabsContent value="contacts" className="space-y-3">
+            <Card size="sm">
               <CardHeader>
                 <CardTitle>Telefones</CardTitle>
               </CardHeader>
@@ -252,7 +253,7 @@ export default async function RegistrationDetailPage({
                 {registration.phones.length ? (
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {registration.phones.map((phone) => (
-                      <div className="flex items-start gap-3 rounded-xl border p-4" key={phone.id}>
+                      <div className="flex items-start gap-3 rounded-lg border p-3" key={phone.id}>
                         <Phone aria-hidden="true" className="mt-0.5 size-4 text-primary" />
                         <div>
                           <p className="font-medium">
@@ -279,7 +280,7 @@ export default async function RegistrationDetailPage({
                 )}
               </CardContent>
             </Card>
-            <Card>
+            <Card size="sm">
               <CardHeader>
                 <CardTitle>E-mails</CardTitle>
               </CardHeader>
@@ -287,7 +288,7 @@ export default async function RegistrationDetailPage({
                 {registration.emails.length ? (
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {registration.emails.map((email) => (
-                      <div className="flex items-start gap-3 rounded-xl border p-4" key={email.id}>
+                      <div className="flex items-start gap-3 rounded-lg border p-3" key={email.id}>
                         <Mail aria-hidden="true" className="mt-0.5 size-4 text-primary" />
                         <div>
                           <p className="break-all font-medium">{email.address}</p>
@@ -305,9 +306,9 @@ export default async function RegistrationDetailPage({
             </Card>
           </TabsContent>
 
-          <TabsContent value="relationships" className="space-y-5">
+          <TabsContent value="relationships" className="space-y-3">
             {canUpdate ? (
-              <Card>
+              <Card size="sm">
                 <CardHeader>
                   <CardTitle>Novo relacionamento</CardTitle>
                   <CardDescription>
@@ -315,7 +316,7 @@ export default async function RegistrationDetailPage({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <form className="flex flex-col gap-2 sm:flex-row" method="get">
+                  <DynamicFilterForm key={search.relationshipSearch ?? ''} className="space-y-1.5">
                     <input type="hidden" name="tab" value="relationships" />
                     <Input
                       type="search"
@@ -324,13 +325,13 @@ export default async function RegistrationDetailPage({
                       placeholder="Pesquisar por nome, documento, telefone ou e-mail"
                       aria-label="Pesquisar Cadastro relacionado"
                     />
-                    <Button type="submit" variant="outline">
-                      Pesquisar
-                    </Button>
-                  </form>
+                    <p className="text-xs text-muted-foreground">
+                      Os resultados são atualizados automaticamente.
+                    </p>
+                  </DynamicFilterForm>
                   <form
                     action={createRegistrationRelationshipAction}
-                    className="grid gap-4 lg:grid-cols-2"
+                    className="grid gap-3 lg:grid-cols-2"
                   >
                     <input type="hidden" name="registrationId" value={registration.id} />
                     <div className="space-y-1.5">
@@ -385,10 +386,10 @@ export default async function RegistrationDetailPage({
                 </CardContent>
               </Card>
             ) : null}
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               {registration.relationships.length ? (
                 registration.relationships.map((relationship) => (
-                  <Card key={relationship.id}>
+                  <Card key={relationship.id} size="sm">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -433,16 +434,8 @@ export default async function RegistrationDetailPage({
                               action={updateRegistrationRelationshipAction}
                               className="mt-3 grid gap-3 sm:grid-cols-2"
                             >
-                              <input
-                                type="hidden"
-                                name="registrationId"
-                                value={registration.id}
-                              />
-                              <input
-                                type="hidden"
-                                name="relationshipId"
-                                value={relationship.id}
-                              />
+                              <input type="hidden" name="registrationId" value={registration.id} />
+                              <input type="hidden" name="relationshipId" value={relationship.id} />
                               <input
                                 type="hidden"
                                 name="targetRegistrationId"
@@ -531,7 +524,7 @@ export default async function RegistrationDetailPage({
                   </Card>
                 ))
               ) : (
-                <Card className="lg:col-span-2">
+                <Card size="sm" className="lg:col-span-2">
                   <CardContent className="flex min-h-36 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
                     <Building2 aria-hidden="true" className="size-6" />
                     Nenhum relacionamento cadastrado.
@@ -545,7 +538,7 @@ export default async function RegistrationDetailPage({
             <TabsContent value="history" className="space-y-3">
               {history.length ? (
                 history.map((entry) => (
-                  <Card key={entry.id}>
+                  <Card key={entry.id} size="sm">
                     <CardHeader className="py-4">
                       <CardTitle className="text-base">
                         {historyLabels[entry.action] || 'Alteração no Cadastro'}
@@ -558,7 +551,7 @@ export default async function RegistrationDetailPage({
                   </Card>
                 ))
               ) : (
-                <Card>
+                <Card size="sm">
                   <CardContent className="p-6 text-muted-foreground">
                     Nenhuma alteração registrada.
                   </CardContent>

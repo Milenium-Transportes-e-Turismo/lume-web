@@ -7,6 +7,7 @@ import type {
   ApiUsageSummary,
   TenantUserList,
 } from '../domain';
+import { DynamicFilterForm } from '@/shared/dynamic-filter-form';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Input } from '@/shared/ui/input';
@@ -111,7 +112,7 @@ export function ApiUsageDashboard({
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <header className="space-y-1">
         <p className="text-sm font-medium text-primary-emphasis">Administração da plataforma</p>
         <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -123,7 +124,10 @@ export function ApiUsageDashboard({
         </p>
       </header>
 
-      <form className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-5">
+      <DynamicFilterForm
+        key={JSON.stringify(filters)}
+        className="grid gap-3 rounded-xl border bg-card p-3 sm:grid-cols-2 lg:grid-cols-5"
+      >
         <label className="grid gap-1 text-sm font-medium">
           Data inicial
           <Input type="date" name="from" defaultValue={filters.from} />
@@ -160,15 +164,13 @@ export function ApiUsageDashboard({
             <option value="server-error">Falhas do serviço</option>
           </select>
         </label>
-        <div className="flex items-end gap-2">
-          <Button type="submit" className="flex-1">
-            Aplicar filtros
-          </Button>
-          <Button render={<Link href="/administration" />} variant="outline">
+        <div className="flex items-end justify-between gap-2">
+          <span className="text-xs text-muted-foreground">Aplicação automática</span>
+          <Button render={<Link href="/administration" />} variant="outline" size="sm">
             Limpar
           </Button>
         </div>
-      </form>
+      </DynamicFilterForm>
 
       <section aria-label="Resumo do uso" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map((metric) => (
@@ -185,7 +187,7 @@ export function ApiUsageDashboard({
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
+        <Card size="sm">
           <CardHeader>
             <CardTitle>Movimento diário</CardTitle>
             <CardDescription>Quantidade de ações registradas por dia.</CardDescription>
@@ -213,7 +215,7 @@ export function ApiUsageDashboard({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card size="sm">
           <CardHeader>
             <CardTitle>Ações mais realizadas</CardTitle>
             <CardDescription>Nomes humanizados; nenhuma rota técnica é exibida.</CardDescription>
@@ -237,7 +239,7 @@ export function ApiUsageDashboard({
         </Card>
       </div>
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Uso por usuário</CardTitle>
           <CardDescription>Maiores volumes no período selecionado.</CardDescription>
@@ -255,7 +257,7 @@ export function ApiUsageDashboard({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Atividade recente</CardTitle>
           <CardDescription>{requests.meta.total} registros encontrados.</CardDescription>

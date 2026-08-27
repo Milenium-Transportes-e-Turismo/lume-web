@@ -7,6 +7,7 @@ import { AuthenticatedShell } from '@/features/navigation';
 import { executeAuthenticatedRegistrationRequest } from '@/features/registrations/server';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
+import { DynamicFilterForm } from '@/shared/dynamic-filter-form';
 import { formatCnpj, formatCpf, formatPhone } from '@/shared/utils/brazilian-data';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -96,7 +97,7 @@ export default async function RegistrationsPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-[92rem] space-y-5 p-4 md:p-8">
+      <main className="mx-auto w-full max-w-[92rem] space-y-4 p-4 md:p-6">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-3xl">
@@ -120,9 +121,19 @@ export default async function RegistrationsPage({
           </div>
         </header>
 
-        <Card>
-          <CardContent className="p-4">
-            <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(17rem,1fr)_11rem_11rem_12rem_12rem_12rem_auto]">
+        <Card size="sm">
+          <CardContent>
+            <DynamicFilterForm
+              key={JSON.stringify({
+                search: search.search,
+                status: search.status,
+                type: search.type,
+                roleCodes: search.roleCodes,
+                tagCodes: search.tagCodes,
+                sort: search.sort,
+              })}
+              className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(17rem,1fr)_10rem_10rem_11rem_11rem_11rem]"
+            >
               <div className="relative md:col-span-2 xl:col-span-1">
                 <Search
                   aria-hidden="true"
@@ -196,15 +207,18 @@ export default async function RegistrationsPage({
                 <NativeSelectOption value="updated">Atualização recente</NativeSelectOption>
                 <NativeSelectOption value="status">Situação</NativeSelectOption>
               </NativeSelect>
-              <Button type="submit" variant="outline">
-                Filtrar
-              </Button>
-            </form>
+              <p className="flex items-center justify-between gap-3 text-xs text-muted-foreground md:col-span-2 xl:col-span-6">
+                <span>Os filtros são aplicados automaticamente.</span>
+                <Link className="font-medium text-primary hover:underline" href="/registrations">
+                  Limpar filtros
+                </Link>
+              </p>
+            </DynamicFilterForm>
           </CardContent>
         </Card>
 
         {result.items.length === 0 ? (
-          <Card>
+          <Card size="sm">
             <CardContent className="p-0">
               <Empty className="min-h-72">
                 <EmptyHeader>
@@ -225,7 +239,7 @@ export default async function RegistrationsPage({
             </CardContent>
           </Card>
         ) : (
-          <Card className="overflow-hidden">
+          <Card size="sm" className="overflow-hidden">
             <CardContent className="p-0">
               <div className="hidden overflow-x-auto md:block">
                 <Table>
@@ -311,7 +325,7 @@ export default async function RegistrationsPage({
               </div>
               <div className="divide-y md:hidden">
                 {result.items.map((registration) => (
-                  <article className="space-y-3 p-4" key={registration.id}>
+                  <article className="space-y-2 p-3" key={registration.id}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <Link

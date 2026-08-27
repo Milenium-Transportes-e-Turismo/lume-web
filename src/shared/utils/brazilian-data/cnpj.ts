@@ -43,6 +43,20 @@ export function formatCnpj(value: string): string {
   return cnpj.replace(/^(.{2})(.{3})(.{3})(.{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 }
 
+/** Aplica a máscara progressivamente ao CNPJ numérico ou alfanumérico. */
+export function formatCnpjInput(value: string): string {
+  const cnpj = normalizeCnpj(value).slice(0, 14);
+  if (cnpj.length <= 2) return cnpj;
+  if (cnpj.length <= 5) return `${cnpj.slice(0, 2)}.${cnpj.slice(2)}`;
+  if (cnpj.length <= 8) {
+    return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5)}`;
+  }
+  if (cnpj.length <= 12) {
+    return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8)}`;
+  }
+  return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}`;
+}
+
 /**
  * Converte um caractere do CNPJ para o valor usado no cálculo.
  *

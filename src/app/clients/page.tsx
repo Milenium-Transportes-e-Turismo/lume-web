@@ -10,6 +10,7 @@ import { AuthenticatedShell } from '@/features/navigation';
 import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
+import { DynamicFilterForm } from '@/shared/dynamic-filter-form';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
 import { Input } from '@/shared/ui/input';
@@ -63,7 +64,7 @@ export default async function ClientsPage({
   const pages = Math.max(1, Math.ceil(result.total / pageSize));
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-8">
+      <main className="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -77,9 +78,12 @@ export default async function ClientsPage({
             <Button render={<Link href="/clients/new" />}>Novo cliente</Button>
           ) : null}
         </header>
-        <Card>
+        <Card size="sm">
           <CardContent className="p-4">
-            <form className="grid gap-3 md:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem_auto]">
+            <DynamicFilterForm
+              key={JSON.stringify(search)}
+              className="grid gap-3 md:grid-cols-[minmax(16rem,1fr)_12rem_12rem_12rem]"
+            >
               <Input
                 name="search"
                 defaultValue={search.search}
@@ -112,13 +116,16 @@ export default async function ClientsPage({
                 <option value="status">Ordenar por situação</option>
                 <option value="avic">Ordenar por Código AVIC</option>
               </select>
-              <Button type="submit" variant="outline">
-                Pesquisar
-              </Button>
-            </form>
+              <p className="flex items-center justify-between gap-3 text-xs text-muted-foreground md:col-span-4">
+                <span>Os filtros são aplicados automaticamente.</span>
+                <Link className="font-medium text-primary hover:underline" href="/clients">
+                  Limpar filtros
+                </Link>
+              </p>
+            </DynamicFilterForm>
           </CardContent>
         </Card>
-        <Card>
+        <Card size="sm">
           <CardContent className="p-0">
             <Table>
               <TableHeader>

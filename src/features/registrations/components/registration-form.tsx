@@ -17,6 +17,8 @@ import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Switch } from '@/shared/ui/switch';
+import { formatCnpjInput, formatCpfInput } from '@/shared/utils/brazilian-data';
+import { formatPersonName } from '@/shared/utils/person-name';
 
 type MutablePhone = Omit<RegistrationPhone, 'id' | 'normalizedValue'>;
 type MutableEmail = Omit<RegistrationEmail, 'id'>;
@@ -129,7 +131,7 @@ function ContactPhones({
       <input type="hidden" name="phones" value={JSON.stringify(phones)} />
       {phones.map((phone, index) => (
         <div
-          className="grid gap-3 rounded-xl border bg-muted/20 p-3 lg:grid-cols-[minmax(12rem,1fr)_10rem_auto_auto_auto] lg:items-end"
+          className="grid gap-2 rounded-lg border bg-muted/20 p-2 sm:grid-cols-[minmax(0,1fr)_9rem]"
           key={`phone-${index}`}
         >
           <div className="space-y-1.5">
@@ -174,49 +176,51 @@ function ContactPhones({
               </SelectContent>
             </Select>
           </div>
-          <Label className="flex min-h-9 items-center gap-2 rounded-lg border px-3">
-            <Switch
-              checked={phone.isPrimary}
-              onCheckedChange={(checked) =>
-                checked &&
-                onChange(
-                  phones.map((item, itemIndex) => ({
-                    ...item,
-                    isPrimary: itemIndex === index,
-                  })),
-                )
-              }
-            />
-            Principal
-          </Label>
-          <Label className="flex min-h-9 items-center gap-2 rounded-lg border px-3">
-            <Switch
-              checked={phone.hasWhatsApp}
-              onCheckedChange={(checked) =>
-                onChange(
-                  phones.map((item, itemIndex) =>
-                    itemIndex === index ? { ...item, hasWhatsApp: checked } : item,
-                  ),
-                )
-              }
-            />
-            WhatsApp
-          </Label>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={`Remover telefone ${index + 1}`}
-            onClick={() => {
-              const next = phones.filter((_, itemIndex) => itemIndex !== index);
-              if (next.length > 0 && !next.some((item) => item.isPrimary)) {
-                next[0] = { ...next[0], isPrimary: true };
-              }
-              onChange(next);
-            }}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
+            <Label className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5">
+              <Switch
+                checked={phone.isPrimary}
+                onCheckedChange={(checked) =>
+                  checked &&
+                  onChange(
+                    phones.map((item, itemIndex) => ({
+                      ...item,
+                      isPrimary: itemIndex === index,
+                    })),
+                  )
+                }
+              />
+              Principal
+            </Label>
+            <Label className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5">
+              <Switch
+                checked={phone.hasWhatsApp}
+                onCheckedChange={(checked) =>
+                  onChange(
+                    phones.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, hasWhatsApp: checked } : item,
+                    ),
+                  )
+                }
+              />
+              WhatsApp
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={`Remover telefone ${index + 1}`}
+              onClick={() => {
+                const next = phones.filter((_, itemIndex) => itemIndex !== index);
+                if (next.length > 0 && !next.some((item) => item.isPrimary)) {
+                  next[0] = { ...next[0], isPrimary: true };
+                }
+                onChange(next);
+              }}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       ))}
       <Button
@@ -254,7 +258,7 @@ function ContactEmails({
       <input type="hidden" name="emails" value={JSON.stringify(emails)} />
       {emails.map((email, index) => (
         <div
-          className="grid gap-3 rounded-xl border bg-muted/20 p-3 lg:grid-cols-[minmax(12rem,1fr)_10rem_auto_auto] lg:items-end"
+          className="grid gap-2 rounded-lg border bg-muted/20 p-2 sm:grid-cols-[minmax(0,1fr)_9rem]"
           key={`email-${index}`}
         >
           <div className="space-y-1.5">
@@ -298,36 +302,38 @@ function ContactEmails({
               </SelectContent>
             </Select>
           </div>
-          <Label className="flex min-h-9 items-center gap-2 rounded-lg border px-3">
-            <Switch
-              checked={email.isPrimary}
-              onCheckedChange={(checked) =>
-                checked &&
-                onChange(
-                  emails.map((item, itemIndex) => ({
-                    ...item,
-                    isPrimary: itemIndex === index,
-                  })),
-                )
-              }
-            />
-            Principal
-          </Label>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={`Remover e-mail ${index + 1}`}
-            onClick={() => {
-              const next = emails.filter((_, itemIndex) => itemIndex !== index);
-              if (next.length > 0 && !next.some((item) => item.isPrimary)) {
-                next[0] = { ...next[0], isPrimary: true };
-              }
-              onChange(next);
-            }}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
+            <Label className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-lg border px-2.5">
+              <Switch
+                checked={email.isPrimary}
+                onCheckedChange={(checked) =>
+                  checked &&
+                  onChange(
+                    emails.map((item, itemIndex) => ({
+                      ...item,
+                      isPrimary: itemIndex === index,
+                    })),
+                  )
+                }
+              />
+              Principal
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={`Remover e-mail ${index + 1}`}
+              onClick={() => {
+                const next = emails.filter((_, itemIndex) => itemIndex !== index);
+                if (next.length > 0 && !next.some((item) => item.isPrimary)) {
+                  next[0] = { ...next[0], isPrimary: true };
+                }
+                onChange(next);
+              }}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       ))}
       <Button
@@ -365,6 +371,23 @@ export function RegistrationForm({
   const [type, setType] = useState<RegistrationType>(
     registration?.type ?? initialValues?.type ?? 'pf',
   );
+  const [status, setStatus] = useState<'active' | 'inactive'>(
+    registration?.status ?? initialValues?.status ?? 'active',
+  );
+  const [firstName, setFirstName] = useState(() =>
+    formatPersonName(
+      registration?.firstName ?? initialValues?.firstName ?? registration?.individualName ?? '',
+    ),
+  );
+  const [lastName, setLastName] = useState(() =>
+    formatPersonName(registration?.lastName ?? initialValues?.lastName ?? ''),
+  );
+  const [cpf, setCpf] = useState(() =>
+    formatCpfInput(registration?.cpf ?? initialValues?.cpf ?? ''),
+  );
+  const [cnpj, setCnpj] = useState(() =>
+    formatCnpjInput(registration?.cnpj ?? initialValues?.cnpj ?? ''),
+  );
   const [phones, setPhones] = useState<MutablePhone[]>(() =>
     initialPhones(registration, initialValues),
   );
@@ -380,7 +403,7 @@ export function RegistrationForm({
   );
 
   return (
-    <form id={formId} action={action} className="space-y-5">
+    <form id={formId} action={action} className="space-y-3">
       {registration ? (
         <>
           <input type="hidden" name="registrationId" value={registration.id} />
@@ -392,7 +415,7 @@ export function RegistrationForm({
       ))}
       <input type="hidden" name="type" value={type} />
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Identidade</CardTitle>
           <CardDescription>
@@ -400,8 +423,8 @@ export function RegistrationForm({
             pessoa ou empresa.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-3">
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Tipo de pessoa</Label>
               <Select value={type} onValueChange={(value) => setType(value as RegistrationType)}>
@@ -417,11 +440,12 @@ export function RegistrationForm({
             <div className="space-y-1.5">
               <Label htmlFor={`${instanceId}-status`}>Situação</Label>
               <Select
-                defaultValue={registration?.status ?? initialValues?.status ?? 'active'}
+                value={status}
+                onValueChange={(value) => setStatus(value as typeof status)}
                 name="status"
               >
                 <SelectTrigger id={`${instanceId}-status`} className="h-9 w-full">
-                  <SelectValue />
+                  <SelectValue>{status === 'active' ? 'Ativo' : 'Inativo'}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Ativo</SelectItem>
@@ -441,7 +465,7 @@ export function RegistrationForm({
           </div>
 
           {type === 'pf' ? (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={`${instanceId}-first-name`}>Nome</Label>
                 <Input
@@ -449,12 +473,9 @@ export function RegistrationForm({
                   name="firstName"
                   required
                   autoComplete="given-name"
-                  defaultValue={
-                    registration?.firstName ??
-                    initialValues?.firstName ??
-                    registration?.individualName ??
-                    ''
-                  }
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  onBlur={() => setFirstName((value) => formatPersonName(value))}
                 />
               </div>
               <div className="space-y-1.5">
@@ -463,7 +484,9 @@ export function RegistrationForm({
                   id={`${instanceId}-last-name`}
                   name="lastName"
                   autoComplete="family-name"
-                  defaultValue={registration?.lastName ?? initialValues?.lastName ?? ''}
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  onBlur={() => setLastName((value) => formatPersonName(value))}
                 />
               </div>
               <div className="space-y-1.5 md:col-span-2">
@@ -473,7 +496,8 @@ export function RegistrationForm({
                   name="cpf"
                   inputMode="numeric"
                   autoComplete="off"
-                  defaultValue={registration?.cpf ?? initialValues?.cpf ?? ''}
+                  value={cpf}
+                  onChange={(event) => setCpf(formatCpfInput(event.target.value))}
                   placeholder="Opcional"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -482,7 +506,7 @@ export function RegistrationForm({
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={`${instanceId}-legal-name`}>Razão social</Label>
                 <Input
@@ -507,9 +531,10 @@ export function RegistrationForm({
                   id={`${instanceId}-cnpj`}
                   name="cnpj"
                   required
-                  inputMode="numeric"
+                  inputMode="text"
                   autoComplete="off"
-                  defaultValue={registration?.cnpj ?? initialValues?.cnpj ?? ''}
+                  value={cnpj}
+                  onChange={(event) => setCnpj(formatCnpjInput(event.target.value))}
                 />
               </div>
             </div>
@@ -517,7 +542,7 @@ export function RegistrationForm({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Papéis e Marcadores</CardTitle>
           <CardDescription>
@@ -525,7 +550,7 @@ export function RegistrationForm({
             pesquisar.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-3">
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Papéis</legend>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -594,7 +619,7 @@ export function RegistrationForm({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card size="sm">
         <CardHeader>
           <CardTitle>Contatos</CardTitle>
           <CardDescription>
@@ -602,7 +627,7 @@ export function RegistrationForm({
             WhatsApp.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <section className="space-y-2" aria-labelledby={`${instanceId}-phones-title`}>
             <div className="flex items-center justify-between gap-3">
               <h3 id={`${instanceId}-phones-title`} className="text-sm font-medium">

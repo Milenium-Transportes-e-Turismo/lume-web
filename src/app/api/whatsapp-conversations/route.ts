@@ -29,7 +29,11 @@ function errorStatus(error: WhatsAppConversationRepositoryError): number {
 export async function GET(request: Request) {
   const session = await getCurrentAuthenticatedSession();
 
-  if (session === null || !hasPermission(session.user, 'whatsapp-conversations:manage')) {
+  if (
+    session === null ||
+    (!hasPermission(session.user, 'whatsapp-conversations:view') &&
+      !hasPermission(session.user, 'whatsapp-conversations:manage'))
+  ) {
     return NextResponse.json(
       { message: 'Acesso não autorizado ao painel de WhatsApp.' },
       { status: session === null ? 401 : 403 },
