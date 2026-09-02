@@ -49,6 +49,8 @@ import {
 
 type Fetcher = typeof fetch;
 
+const MAX_WHATSAPP_MEDIA_CONTENT_BYTES = 50 * 1024 * 1024;
+
 const isoDateSchema = z.string().refine((value) => Number.isFinite(Date.parse(value)));
 const nullableIsoDateSchema = isoDateSchema.nullable();
 const nullableCivilDateSchema = z
@@ -680,6 +682,57 @@ function responseStatusToErrorCode(status: number): WhatsAppConversationReposito
   return 'service-unavailable';
 }
 
+function invalidMediaResponse(message: string): never {
+  throw new WhatsAppConversationRepositoryError('invalid-response', message);
+}
+
+function declaredMediaContentLength(response: Response): number | null {
+  const rawContentLength = response.headers.get('content-length');
+  if (rawContentLength === null) return null;
+
+  if (!/^\d+$/u.test(rawContentLength)) {
+    return invalidMediaResponse('A Tenant API retornou um tamanho de mídia inválido.');
+  }
+
+  const contentLength = Number(rawContentLength);
+  if (
+    !Number.isSafeInteger(contentLength) ||
+    contentLength < 1 ||
+    contentLength > MAX_WHATSAPP_MEDIA_CONTENT_BYTES
+  ) {
+    return invalidMediaResponse('A Tenant API retornou um tamanho de mídia inválido.');
+  }
+
+  return contentLength;
+}
+
+function mediaMimeType(response: Response): string {
+  const mimeType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
+  if (!mimeType) {
+    return invalidMediaResponse('A Tenant API não informou o tipo da mídia.');
+  }
+  return mimeType;
+}
+
+function safeMediaFileName(encodedValue: string | null, messageId: string): string {
+  let decodedValue: string | null = null;
+  if (encodedValue) {
+    try {
+      decodedValue = decodeURIComponent(encodedValue);
+    } catch {
+      decodedValue = null;
+    }
+  }
+
+  const leaf = (decodedValue?.split(/[\\/]/u).pop() ?? '')
+    .normalize('NFC')
+    .replace(/[\u0000-\u001f\u007f]/gu, '_')
+    .replace(/["<>:|?*]/gu, '_')
+    .trim();
+
+  return (leaf || `midia-whatsapp-${messageId.slice(0, 8)}`).slice(0, 200);
+}
+
 function parseResponse<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
 
@@ -878,20 +931,29 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
       );
     }
 
-    const encodedFileName = response.headers.get('x-whatsapp-media-filename');
-    let fileName = 'midia-whatsapp';
-    if (encodedFileName) {
-      try {
-        fileName = decodeURIComponent(encodedFileName);
-      } catch {
-        fileName = 'midia-whatsapp';
-      }
+    const declaredLength = declaredMediaContentLength(response);
+    const mimeType = mediaMimeType(response);
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await response.arrayBuffer());
+    } catch {
+      return invalidMediaResponse('A Tenant API retornou uma mídia que não pôde ser lida.');
+    }
+
+    if (
+      bytes.byteLength < 1 ||
+      bytes.byteLength > MAX_WHATSAPP_MEDIA_CONTENT_BYTES ||
+      (declaredLength !== null && bytes.byteLength !== declaredLength)
+    ) {
+      return invalidMediaResponse(
+        'A Tenant API retornou uma mídia vazia, incompleta ou acima do limite.',
+      );
     }
 
     return {
-      bytes: new Uint8Array(await response.arrayBuffer()),
-      fileName,
-      mimeType: response.headers.get('content-type') ?? 'application/octet-stream',
+      bytes,
+      fileName: safeMediaFileName(response.headers.get('x-whatsapp-media-filename'), messageId),
+      mimeType,
     };
   }
 

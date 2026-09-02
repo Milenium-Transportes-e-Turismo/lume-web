@@ -12,7 +12,6 @@ import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 import { WhatsAppConversationRepositoryError } from '../application';
 import {
   closeWhatsAppConversationForDashboard,
-  closeWhatsAppConversationAfterRejectionForDashboard,
   changeWhatsAppConversationPriorityForDashboard,
   forwardWhatsAppConversationForDashboard,
   markWhatsAppConversationAsReadForDashboard,
@@ -26,7 +25,6 @@ import {
 import { createWhatsAppConversationFixture } from '../testing/whatsapp-conversation-fixture';
 import {
   closeWhatsAppConversationAction,
-  closeWhatsAppConversationAfterRejectionAction,
   changeWhatsAppConversationPriorityAction,
   forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
@@ -57,7 +55,6 @@ jest.mock('../server', () => ({
 
 const mockedSession = jest.mocked(getCurrentAuthenticatedSession);
 const mockedGeneralClose = jest.mocked(closeWhatsAppConversationForDashboard);
-const mockedClose = jest.mocked(closeWhatsAppConversationAfterRejectionForDashboard);
 const mockedTakeOver = jest.mocked(takeOverWhatsAppConversationForDashboard);
 const mockedReturn = jest.mocked(returnWhatsAppConversationToBotForDashboard);
 const mockedReturnToQueue = jest.mocked(returnWhatsAppConversationToQueueForDashboard);

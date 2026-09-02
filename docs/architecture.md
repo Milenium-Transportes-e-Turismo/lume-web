@@ -188,11 +188,12 @@ plataforma.
 
 `close` continua sendo o comando atual e distinto para colocar a conversa
 canônica no estado técnico temporário `closed`; nunca representa exclusão ou
-fechamento definitivo, e o próximo contato reabre a mesma conversa. Ele não é
-exposto pela interface nem por uma Server Action como encerramento do
-atendimento humano. O alias legado `close-after-rejection` permanece reconhecido
-no gateway e na projeção de históricos. Orçamentos e demais processos permanecem
-separados da conversa contínua.
+fechamento definitivo, e o próximo contato reabre a mesma conversa. A interface
+o expõe como **Encerrar conversa**, por uma Server Action distinta do retorno ao
+bot; ele não representa encerramento do atendimento humano. O alias legado
+`close-after-rejection` permanece reconhecido no gateway e na projeção de
+históricos. Orçamentos e demais processos permanecem separados da conversa
+contínua.
 
 ## Fronteira para importação e exportação
 

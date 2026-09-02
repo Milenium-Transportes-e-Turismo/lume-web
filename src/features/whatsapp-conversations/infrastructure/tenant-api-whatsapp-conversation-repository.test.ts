@@ -4,6 +4,7 @@ import { WhatsAppConversationRepositoryError } from '../application';
 import { LumeApiWhatsAppConversationRepository } from './tenant-api-whatsapp-conversation-repository';
 
 const conversationId = '00000000-0000-4000-8000-000000000101';
+const messageId = '00000000-0000-4000-8000-000000000501';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -204,6 +205,159 @@ function canonicalMutationFetcher() {
 }
 
 describe('LumeApiWhatsAppConversationRepository', () => {
+  it('downloads a valid media response and normalizes its filename safely', async () => {
+    const bytes = Uint8Array.from([37, 80, 68, 70]);
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(bytes, {
+        status: 200,
+        headers: {
+          'Content-Length': String(bytes.byteLength),
+          'Content-Type': 'application/pdf; charset=binary',
+          'X-WhatsApp-Media-Filename': encodeURIComponent('../orçamento\r\nfinal.pdf'),
+        },
+      }),
+    );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    await expect(repository.downloadMessageContent(conversationId, messageId)).resolves.toEqual({
+      bytes,
+      fileName: 'orçamento__final.pdf',
+      mimeType: 'application/pdf',
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      `https://tenant.example/api/v1/whatsapp/conversations/${conversationId}/messages/${messageId}/content`,
+      expect.objectContaining({
+        cache: 'no-store',
+        headers: expect.objectContaining({ Authorization: 'Bearer token' }),
+      }),
+    );
+  });
+
+  it('rejects declared and actual zero-byte media responses', async () => {
+    const declaredEmpty = jest.fn().mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: {
+          'Content-Length': '0',
+          'Content-Type': 'image/jpeg',
+        },
+      }),
+    );
+    const actualEmpty = jest.fn().mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: { 'Content-Type': 'image/jpeg' },
+      }),
+    );
+
+    for (const fetcher of [declaredEmpty, actualEmpty]) {
+      const repository = new LumeApiWhatsAppConversationRepository(
+        'https://tenant.example/api/v1',
+        'token',
+        fetcher,
+      );
+
+      await expect(
+        repository.downloadMessageContent(conversationId, messageId),
+      ).rejects.toMatchObject({ code: 'invalid-response' });
+    }
+  });
+
+  it('rejects declared and actual media content above the 50 MiB ceiling', async () => {
+    const oversizedLength = 50 * 1024 * 1024 + 1;
+    const declaredOversized = jest.fn().mockResolvedValue(
+      new Response(Uint8Array.from([1]), {
+        status: 200,
+        headers: {
+          'Content-Length': String(oversizedLength),
+          'Content-Type': 'image/jpeg',
+        },
+      }),
+    );
+    const actualOversized = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Type': 'image/jpeg' }),
+      arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(oversizedLength)),
+    } as unknown as Response);
+
+    for (const fetcher of [declaredOversized, actualOversized]) {
+      const repository = new LumeApiWhatsAppConversationRepository(
+        'https://tenant.example/api/v1',
+        'token',
+        fetcher,
+      );
+
+      await expect(
+        repository.downloadMessageContent(conversationId, messageId),
+      ).rejects.toMatchObject({ code: 'invalid-response' });
+    }
+  });
+
+  it('rejects a media body that does not match Content-Length', async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(Uint8Array.from([1, 2]), {
+        status: 200,
+        headers: {
+          'Content-Length': '5',
+          'Content-Type': 'image/jpeg',
+        },
+      }),
+    );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    await expect(
+      repository.downloadMessageContent(conversationId, messageId),
+    ).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('rejects media without an explicit MIME type', async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(Uint8Array.from([1, 2]), {
+        status: 200,
+        headers: { 'Content-Length': '2' },
+      }),
+    );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    await expect(
+      repository.downloadMessageContent(conversationId, messageId),
+    ).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('maps a binary read failure to an invalid Tenant API response', async () => {
+    const fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({
+        'Content-Length': '2',
+        'Content-Type': 'image/jpeg',
+      }),
+      arrayBuffer: jest.fn().mockRejectedValue(new Error('stream interrupted')),
+    } as unknown as Response);
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    await expect(
+      repository.downloadMessageContent(conversationId, messageId),
+    ).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
   it('loads assignment targets from the canonical ServiceSession catalog', async () => {
     const fetcher = jest.fn().mockResolvedValue(
       jsonResponse([

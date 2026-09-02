@@ -5,11 +5,12 @@
 O repositório documenta a construção da imagem Docker, mas não contém workflow
 de deploy automático nem arquivo Compose versionado. Portanto, o deploy atual é
 manual ou depende de configuração externa na VPS que deve ser auditada no
-servidor. A branch remota `staging` foi criada a partir da `main`.
+servidor. A branch `develop` concentra desenvolvimento e homologação; a `main`
+permanece reservada para produção.
 
 ## Regra obrigatória
 
-- staging recebe somente a branch `staging`;
+- staging recebe somente a branch `develop`;
 - produção recebe somente a branch `main`;
 - cada ambiente usa clone, imagem, porta, domínio, `SESSION_SECRET` e arquivo de
   variáveis próprios;
@@ -23,14 +24,14 @@ servidor. A branch remota `staging` foi criada a partir da `main`.
 Uma atualização da VPS só pode começar depois que:
 
 1. as mudanças revisadas do Tenant API e do Tenant Web estiverem commitadas e
-   integradas em `origin/staging`;
+   integradas em `origin/develop`;
 2. os dois SHAs esperados estiverem registrados;
 3. o repositório de staging da VPS estiver sem alterações locais;
 4. o backup recuperável da API, do banco e das mídias tiver sido concluído;
 5. `.env.staging` usar somente endpoints, credenciais, banco e volumes de
    staging.
 
-Não faça deploy direto de `staging-whatsapp` ou de outra branch de trabalho. A
+Não faça deploy direto de uma branch de trabalho. A
 Tenant API deve ser atualizada e ficar saudável antes do Tenant Web, porque ela
 é a fonte autoritativa dos contratos, migrations, permissões e estados.
 
@@ -59,10 +60,10 @@ sudo nginx -t
 sudo docker ps --all --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
 git fetch --prune origin
-git switch staging
-git merge --ff-only origin/staging
-test "$(git branch --show-current)" = "staging"
-test "$(git rev-parse HEAD)" = "$(git rev-parse origin/staging)"
+git switch develop
+git merge --ff-only origin/develop
+test "$(git branch --show-current)" = "develop"
+test "$(git rev-parse HEAD)" = "$(git rev-parse origin/develop)"
 web_sha=$(git rev-parse --short=12 HEAD)
 printf 'Tenant Web staging SHA: %s\n' "$web_sha"
 ```
@@ -249,7 +250,7 @@ em `production.md`.
 
 ## Produção
 
-Somente após aprovação e merge autorizado de `staging` em `main`:
+Somente após aprovação e merge autorizado de `develop` em `main`:
 
 ```bash
 cd /home/taiane/lume/lume-tenant-web

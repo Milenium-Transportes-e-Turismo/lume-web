@@ -99,7 +99,7 @@ quando `NODE_ENV=production`.
 Para homologação na VPS, use `.env.staging.example` e siga o canário, a troca
 controlada e o rollback descritos em
 [Ambientes e branches](docs/deployment-environments.md). A VPS consome somente
-`origin/staging`; branches de trabalho e alterações sem commit nunca chegam ao
+`origin/develop`; branches de trabalho e alterações sem commit nunca chegam ao
 ambiente.
 
 Os endpoints consumidos, o fluxo de renovação e os limites atuais do backend
@@ -157,10 +157,10 @@ de `isAdministrator`.
 
 `actions/close` permanece um comando distinto que move a conversa canônica para
 o estado técnico temporário `closed`. Ele não encerra nem elimina a conversa em
-definitivo: o próximo contato reabre o mesmo histórico. A rota não é exposta
-pela interface nem por uma Server Action como sinônimo de encerrar o atendimento
-humano; `close-after-rejection` permanece apenas como alias legado no gateway e
-na leitura do histórico.
+definitivo: o próximo contato reabre o mesmo histórico. A interface o expõe pela
+ação técnica separada **Encerrar conversa**, com uma Server Action própria; ele
+nunca é sinônimo de encerrar o atendimento humano. `close-after-rejection`
+permanece apenas como alias legado no gateway e na leitura do histórico.
 
 O atendente responsável pode alterar o status comercial no Painel WhatsApp.
 A ação recarrega a conversa autoritativa, exige motivo para recusa ou

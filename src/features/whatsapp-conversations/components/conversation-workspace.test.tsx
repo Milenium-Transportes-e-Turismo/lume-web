@@ -7,7 +7,6 @@ import {
   archiveWhatsAppConversationAction,
   changeWhatsAppConversationDepartmentAction,
   closeWhatsAppConversationAction,
-  forwardWhatsAppConversationAction,
   returnWhatsAppConversationToBotAction,
   returnWhatsAppConversationToQueueAction,
   sendHumanWhatsAppMessageAction,
@@ -78,7 +77,6 @@ jest.mock('../actions', () => ({
 const mockedArchive = jest.mocked(archiveWhatsAppConversationAction);
 const mockedChangeDepartment = jest.mocked(changeWhatsAppConversationDepartmentAction);
 const mockedClose = jest.mocked(closeWhatsAppConversationAction);
-const mockedForward = jest.mocked(forwardWhatsAppConversationAction);
 const mockedReturnToBot = jest.mocked(returnWhatsAppConversationToBotAction);
 const mockedReturnToQueue = jest.mocked(returnWhatsAppConversationToQueueAction);
 const mockedSendMessage = jest.mocked(sendHumanWhatsAppMessageAction);
@@ -653,6 +651,38 @@ describe('ConversationWorkspace', () => {
         queueId: '00000000-0000-4000-8000-000000000761',
       }),
     );
+  });
+
+  it('keeps return to AI disabled for a native session assigned to another user', () => {
+    const legacy = createWhatsAppConversationFixture({
+      conversationState: 'human-active',
+      flowStep: 'human-service',
+      assignedTo: { id: 'employee-002', name: 'Outro atendente' },
+      unreadCount: 0,
+    });
+    const conversation = {
+      ...legacy,
+      currentServiceSession: {
+        ...getCurrentWhatsAppServiceSession(legacy),
+        id: 'service-session-22',
+        status: 'OPEN' as const,
+        controlMode: 'HUMAN' as const,
+        projection: 'NATIVE' as const,
+        responsibleUserId: 'employee-002',
+        responsible: { id: 'employee-002', name: 'Outro atendente' },
+        availableActions: ['RETURN_TO_AI'] as const,
+      },
+    };
+    mockFetchDetail(conversation);
+
+    render(
+      <ConversationWorkspace initialConversations={[conversation]} currentUserId="employee-001" />,
+    );
+
+    const returnToAiButton = screen.getByRole('button', { name: 'Retornar à IA' });
+    expect(returnToAiButton).toBeDisabled();
+    fireEvent.click(returnToAiButton);
+    expect(mockedReturnToBot).not.toHaveBeenCalled();
   });
 
   it('permite assumir uma conversa que está com outro atendente', async () => {

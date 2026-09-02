@@ -822,12 +822,9 @@ export function ConversationWorkspace({
     );
     setManualCommercialStatusReason('');
     humanMessageSubmissionRef.current = null;
-    replaceRoute(
-      `/whatsapp-conversations?conversationId=${encodeURIComponent(conversation.id)}`,
-      {
-        scroll: false,
-      },
-    );
+    replaceRoute(`/whatsapp-conversations?conversationId=${encodeURIComponent(conversation.id)}`, {
+      scroll: false,
+    });
 
     if (conversation.unreadCount === 0 || !permissions.respond) return;
 
@@ -2336,7 +2333,7 @@ export function ConversationWorkspace({
               canAssume={permissions.assume}
               canTransfer={permissions.transfer}
               canChangePriority={permissions.priority}
-              canReturnToAi={permissions.transfer}
+              canReturnToAi={permissions.transfer && canCurrentUserReturnToBot}
               canClose={permissions.close}
               canArchive={permissions.legacyManagement}
             />
