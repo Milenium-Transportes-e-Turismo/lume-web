@@ -11,8 +11,6 @@ import {
   Bot,
   Building2,
   CircleStop,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   FileText,
   FileUp,
@@ -22,8 +20,8 @@ import {
   Inbox,
   MessageCircle,
   MessageSquarePlus,
+  PanelRightOpen,
   Phone,
-  Plus,
   RefreshCw,
   RotateCcw,
   Search,
@@ -33,7 +31,7 @@ import { findClientByPhoneAction } from '@/features/clients/actions/client-actio
 import { updateQuoteProposalStatusAction } from '@/features/quote-proposals/actions';
 import { cn } from '@/shared/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
-import { Button } from '@/shared/ui/button';
+import { Button, buttonVariants } from '@/shared/ui/button';
 import { userFacingMessage } from '@/shared/lib/user-facing-message';
 import {
   AlertDialog,
@@ -58,36 +56,26 @@ import { Textarea } from '@/shared/ui/textarea';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/shared/ui/dropdown-menu';
-
-import {
   archiveWhatsAppConversationAction,
+  changeWhatsAppConversationPriorityAction,
   changeWhatsAppConversationDepartmentAction,
   closeWhatsAppConversationAction,
-  forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
   returnWhatsAppConversationToBotAction,
+  returnWhatsAppConversationToQueueAction,
   sendHumanWhatsAppMessageAction,
   startWhatsAppConversationAction,
   takeOverWhatsAppConversationAction,
+  transferWhatsAppServiceSessionAction,
   unarchiveWhatsAppConversationAction,
   type SendHumanWhatsAppMessageActionResult,
   type WhatsAppConversationActionResult,
 } from '../actions';
 import { HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH } from '../application';
 import {
-  canCloseWhatsAppConversation,
-  canForwardWhatsAppConversation,
-  canReturnWhatsAppConversationToBot,
   canSendHumanWhatsAppMessage,
-  canTakeOverWhatsAppConversation,
   getWhatsAppConversationMetrics,
+  getCurrentWhatsAppServiceSession,
   isWhatsAppBotBlocked,
   isWhatsAppConversationDepartment,
   isWhatsAppHumanActive,
@@ -97,19 +85,21 @@ import {
   type WhatsAppConversationMetrics,
   type WhatsAppConversationDepartment,
   type WhatsAppRequestStatus,
+  type WhatsAppServiceSessionPriority,
+  type WhatsAppServiceAssignmentTarget,
 } from '../domain';
 import {
   CONVERSATION_STATE_LABELS,
   DEPARTMENT_LABELS,
   FLOW_STEP_LABELS,
   getConversationControl,
-  getConversationControlLabel,
-  getRequestStatusTone,
   REQUEST_STATUS_LABELS,
   type ConversationControl,
 } from './conversation-labels';
 import { ConversationMessageSheet } from './conversation-message-sheet';
+import { ConversationInboxList } from './conversation-inbox-list';
 import { ConversationQuoteActions } from './conversation-quote-actions';
+import { ConversationServiceContextPanel } from './conversation-service-context-panel';
 import { conversationWorkspaceStyles as styles } from './conversation-workspace.styles';
 
 export interface ConversationWorkspaceProps {
@@ -123,7 +113,29 @@ export interface ConversationWorkspaceProps {
   readonly initialMetrics?: WhatsAppConversationMetrics;
   readonly initialError?: string | null;
   readonly currentUserId?: string | null;
+  readonly initialAssignmentTargets?: readonly WhatsAppServiceAssignmentTarget[];
+  readonly canViewCustomerContext?: boolean;
+  readonly canRespondCustomerContext?: boolean;
+  readonly permissions?: Partial<ConversationWorkspacePermissions>;
 }
+
+export interface ConversationWorkspacePermissions {
+  readonly respond: boolean;
+  readonly assume: boolean;
+  readonly transfer: boolean;
+  readonly priority: boolean;
+  readonly close: boolean;
+  readonly legacyManagement: boolean;
+}
+
+const NO_WORKSPACE_PERMISSIONS: ConversationWorkspacePermissions = {
+  respond: false,
+  assume: false,
+  transfer: false,
+  priority: false,
+  close: false,
+  legacyManagement: false,
+};
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -305,8 +317,13 @@ export function ConversationWorkspace({
   initialMetrics,
   initialError = null,
   currentUserId = null,
+  initialAssignmentTargets = [],
+  canViewCustomerContext = false,
+  canRespondCustomerContext = false,
+  permissions: suppliedPermissions,
 }: ConversationWorkspaceProps) {
-  const router = useRouter();
+  const permissions = { ...NO_WORKSPACE_PERMISSIONS, ...suppliedPermissions };
+  const { push: pushRoute, replace: replaceRoute } = useRouter();
   const routeSearchParams = useSearchParams();
   const requestedConversationId = routeSearchParams.get('conversationId');
   const [conversations, setConversations] = useState(initialConversations);
@@ -318,6 +335,7 @@ export function ConversationWorkspace({
     requestedConversationId ?? initialConversations[0]?.id ?? null,
   );
   const [mobileDetailOpen, setMobileDetailOpen] = useState(Boolean(requestedConversationId));
+  const [mobileContextOpen, setMobileContextOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [inboxView, setInboxView] = useState<'all' | 'unread'>('all');
   const [archiveView, setArchiveView] = useState<'active' | 'archived'>('active');
@@ -347,6 +365,12 @@ export function ConversationWorkspace({
   const [isStartConversationDialogOpen, setIsStartConversationDialogOpen] = useState(false);
   const [newConversationPhone, setNewConversationPhone] = useState('');
   const [isForwardDialogOpen, setIsForwardDialogOpen] = useState(false);
+  const [isReturnQueueDialogOpen, setIsReturnQueueDialogOpen] = useState(false);
+  const [transferDepartmentId, setTransferDepartmentId] = useState('');
+  const [transferQueueId, setTransferQueueId] = useState('');
+  const [transferUserId, setTransferUserId] = useState('');
+  const [transferReason, setTransferReason] = useState('');
+  const [returnQueueId, setReturnQueueId] = useState('');
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
@@ -442,7 +466,7 @@ export function ConversationWorkspace({
         );
 
         if (response.status === 401) {
-          window.location.assign('/auth/session-expired');
+          pushRoute('/auth/session-expired');
           return;
         }
         if (!response.ok) throw new Error(await responseMessage(response));
@@ -491,7 +515,7 @@ export function ConversationWorkspace({
         else setIsLoadingOlderMessages(false);
       }
     },
-    [replaceConversation],
+    [pushRoute, replaceConversation],
   );
 
   const refreshList = useCallback(
@@ -520,7 +544,7 @@ export function ConversationWorkspace({
         });
 
         if (response.status === 401) {
-          window.location.assign('/auth/session-expired');
+          pushRoute('/auth/session-expired');
           return false;
         }
         if (!response.ok) throw new Error(await responseMessage(response));
@@ -601,6 +625,7 @@ export function ConversationWorkspace({
       pagination.pageSize,
       requestStatusFilter,
       requestedConversationId,
+      pushRoute,
     ],
   );
 
@@ -727,7 +752,13 @@ export function ConversationWorkspace({
     selectedConversation !== null && targetDepartment === selectedConversation.department
       ? getDefaultTargetDepartment(selectedConversation.department)
       : targetDepartment;
+  const selectedTransferTarget =
+    initialAssignmentTargets.find((target) => target.id === transferDepartmentId) ?? null;
+  const availableReturnQueues = initialAssignmentTargets.flatMap((target) =>
+    target.queues.map((queue) => ({ ...queue, departmentName: target.name })),
+  );
   const canCurrentUserSendMessage =
+    permissions.respond &&
     selectedConversation !== null &&
     canSendHumanWhatsAppMessage(selectedConversation) &&
     selectedConversation.assignedTo?.id === currentUserId;
@@ -738,7 +769,7 @@ export function ConversationWorkspace({
     startClientLookup(async () => {
       const result = await findClientByPhoneAction(selectedConversation.contact.phone);
       if (result.status === 'found') {
-        router.push(`/clients/${result.clientId}`);
+        pushRoute(`/clients/${result.clientId}`);
         return;
       }
       if (result.status === 'not-found') {
@@ -765,6 +796,7 @@ export function ConversationWorkspace({
   function handleConversationSelection(conversation: WhatsAppConversation) {
     setSelectedConversationId(conversation.id);
     setMobileDetailOpen(true);
+    setMobileContextOpen(false);
     setTargetDepartment(getDefaultTargetDepartment(conversation.department));
     setFeedbackMessage('');
     setFeedbackTone('neutral');
@@ -785,14 +817,14 @@ export function ConversationWorkspace({
     );
     setManualCommercialStatusReason('');
     humanMessageSubmissionRef.current = null;
-    router.replace(
+    replaceRoute(
       `/whatsapp-conversations?conversationId=${encodeURIComponent(conversation.id)}`,
       {
         scroll: false,
       },
     );
 
-    if (conversation.unreadCount === 0) return;
+    if (conversation.unreadCount === 0 || !permissions.respond) return;
 
     startReadTransition(async () => {
       const result = await markWhatsAppConversationAsReadAction({
@@ -806,7 +838,9 @@ export function ConversationWorkspace({
   function handleVersionedAction(
     action: (input: {
       readonly conversationId: unknown;
+      readonly serviceSessionId: unknown;
       readonly expectedVersion: unknown;
+      readonly commandId: unknown;
     }) => Promise<WhatsAppConversationActionResult>,
     successMessage: string,
   ) {
@@ -817,7 +851,9 @@ export function ConversationWorkspace({
     startConversationTransition(async () => {
       const result = await action({
         conversationId: selectedConversation.id,
-        expectedVersion: selectedConversation.version,
+        serviceSessionId: getCurrentWhatsAppServiceSession(selectedConversation).id,
+        expectedVersion: getCurrentWhatsAppServiceSession(selectedConversation).version,
+        commandId: globalThis.crypto.randomUUID(),
       });
       applyActionResult(result, successMessage);
     });
@@ -861,13 +897,79 @@ export function ConversationWorkspace({
     setFeedbackTone('neutral');
 
     startConversationTransition(async () => {
-      const result = await forwardWhatsAppConversationAction({
+      const serviceSession = getCurrentWhatsAppServiceSession(selectedConversation);
+      const result = await transferWhatsAppServiceSessionAction({
         conversationId: selectedConversation.id,
-        expectedVersion: selectedConversation.version,
-        targetDepartment: effectiveTargetDepartment,
+        serviceSessionId: serviceSession.id,
+        expectedVersion: serviceSession.version,
+        commandId: globalThis.crypto.randomUUID(),
+        departmentId: transferDepartmentId,
+        queueId: transferQueueId || undefined,
+        userId: transferUserId || undefined,
+        reason: transferReason.trim() || undefined,
       });
       applyActionResult(result, 'Atendimento encaminhado com sucesso.');
-      if (result.success) setIsForwardDialogOpen(false);
+      if (result.success) {
+        setIsForwardDialogOpen(false);
+        setTransferReason('');
+      }
+    });
+  }
+
+  function openTransferDialog() {
+    if (!selectedConversation) return;
+    const serviceSession = getCurrentWhatsAppServiceSession(selectedConversation);
+    const target =
+      initialAssignmentTargets.find(
+        (candidate) =>
+          candidate.id !== serviceSession.currentDepartmentId &&
+          candidate.code !== selectedConversation.department,
+      ) ?? initialAssignmentTargets[0];
+    setTransferDepartmentId(target?.id ?? '');
+    setTransferQueueId(target?.queues[0]?.id ?? '');
+    setTransferUserId('');
+    setTransferReason('');
+    setIsForwardDialogOpen(true);
+  }
+
+  function openReturnQueueDialog() {
+    if (!selectedConversation) return;
+    const serviceSession = getCurrentWhatsAppServiceSession(selectedConversation);
+    const queue =
+      availableReturnQueues.find((candidate) => candidate.id === serviceSession.queueId) ??
+      availableReturnQueues[0];
+    setReturnQueueId(queue?.id ?? '');
+    setIsReturnQueueDialogOpen(true);
+  }
+
+  function handleReturnToQueue() {
+    if (!selectedConversation || !returnQueueId) return;
+    const serviceSession = getCurrentWhatsAppServiceSession(selectedConversation);
+    startConversationTransition(async () => {
+      const result = await returnWhatsAppConversationToQueueAction({
+        conversationId: selectedConversation.id,
+        serviceSessionId: serviceSession.id,
+        commandId: globalThis.crypto.randomUUID(),
+        expectedVersion: serviceSession.version,
+        queueId: returnQueueId,
+      });
+      applyActionResult(result, 'Atendimento retornado à fila.');
+      if (result.success) setIsReturnQueueDialogOpen(false);
+    });
+  }
+
+  function handlePriorityChange(priority: WhatsAppServiceSessionPriority, reason: string) {
+    if (!selectedConversation) return;
+    startConversationTransition(async () => {
+      const result = await changeWhatsAppConversationPriorityAction({
+        conversationId: selectedConversation.id,
+        serviceSessionId: getCurrentWhatsAppServiceSession(selectedConversation).id,
+        commandId: globalThis.crypto.randomUUID(),
+        expectedVersion: getCurrentWhatsAppServiceSession(selectedConversation).version,
+        priority,
+        reason,
+      });
+      applyActionResult(result, 'Prioridade do atendimento atualizada.');
     });
   }
 
@@ -908,8 +1010,10 @@ export function ConversationWorkspace({
     startConversationTransition(async () => {
       const result = await closeWhatsAppConversationAction({
         conversationId: selectedConversation.id,
-        expectedVersion: selectedConversation.version,
-        reason: closeReason.trim() || undefined,
+        serviceSessionId: getCurrentWhatsAppServiceSession(selectedConversation).id,
+        commandId: globalThis.crypto.randomUUID(),
+        expectedVersion: getCurrentWhatsAppServiceSession(selectedConversation).version,
+        reason: closeReason.trim(),
       });
       const successMessage =
         'Atendimento encerrado. O próximo contato será iniciado pelo bot no menu principal.';
@@ -1209,33 +1313,28 @@ export function ConversationWorkspace({
                 >
                   <RefreshCw aria-hidden="true" />
                 </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="outline"
-                        aria-label="Ações das conversas"
-                      />
-                    }
+                {permissions.respond ? (
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label="Nova conversa"
+                    title="Nova conversa"
+                    onClick={() => setIsStartConversationDialogOpen(true)}
                   >
-                    <Plus aria-hidden="true" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => setIsStartConversationDialogOpen(true)}>
-                        <MessageSquarePlus aria-hidden="true" />
-                        Nova conversa
-                      </DropdownMenuItem>
-                      <DropdownMenuItem render={<Link href="/whatsapp-conversations/import" />}>
-                        <FileUp aria-hidden="true" />
-                        Importar históricos
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    <MessageSquarePlus aria-hidden="true" />
+                  </Button>
+                ) : null}
+                {permissions.legacyManagement ? (
+                  <Link
+                    href="/whatsapp-conversations/import"
+                    className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                    aria-label="Importar históricos"
+                    title="Importar históricos"
+                  >
+                    <FileUp aria-hidden="true" />
+                  </Link>
+                ) : null}
               </div>
             </div>
 
@@ -1317,27 +1416,23 @@ export function ConversationWorkspace({
                   <label htmlFor="department-filter" className={styles.filterLabel()}>
                     Departamento
                   </label>
-                  <Select
+                  <select
+                    id="department-filter"
+                    className={styles.filterSelect()}
                     value={departmentFilter}
-                    onValueChange={(value) => {
+                    onChange={(event) => {
+                      const value = event.target.value;
                       setListPage(1);
                       setDepartmentFilter(isWhatsAppConversationDepartment(value) ? value : 'all');
                     }}
                   >
-                    <SelectTrigger id="department-filter" className={styles.filterSelect()}>
-                      <span>
-                        {departmentFilter === 'all' ? 'Todos' : DEPARTMENT_LABELS[departmentFilter]}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {WHATSAPP_ROUTABLE_DEPARTMENTS.map((department) => (
-                        <SelectItem key={department} value={department}>
-                          {DEPARTMENT_LABELS[department]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <option value="all">Todos</option>
+                    {WHATSAPP_ROUTABLE_DEPARTMENTS.map((department) => (
+                      <option key={department} value={department}>
+                        {DEPARTMENT_LABELS[department]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -1418,139 +1513,24 @@ export function ConversationWorkspace({
             </details>
           </div>
 
-          <div className={styles.conversationList()}>
-            {filteredConversations.length > 0 ? (
-              filteredConversations.map((conversation) => {
-                const isSelected = conversation.id === selectedConversation?.id;
-                const control = getConversationControl(conversation.conversationState);
-
-                return (
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    onClick={() => handleConversationSelection(conversation)}
-                    className={styles.conversationButton({ selected: isSelected })}
-                    aria-pressed={isSelected}
-                  >
-                    <Avatar className={styles.avatar()}>
-                      {conversation.contact.profilePictureUrl ? (
-                        <AvatarImage
-                          src={conversation.contact.profilePictureUrl}
-                          alt={`Foto de ${conversation.contact.name}`}
-                        />
-                      ) : null}
-                      <AvatarFallback>
-                        {getContactInitial(conversation.contact.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className={styles.conversationSummary()}>
-                      <span className={styles.conversationHeading()}>
-                        <strong className={styles.contactName()}>
-                          {conversation.contact.name}
-                        </strong>
-                        <time className={styles.conversationTime()}>
-                          {formatDateTime(conversation.lastMessageAt)}
-                        </time>
-                      </span>
-                      <span className={styles.phonePreview()}>{conversation.contact.phone}</span>
-                      <span className={styles.previewRow()}>
-                        <span className={styles.preview()}>
-                          {conversation.lastMessagePreview || 'Sem prévia de mensagem'}
-                        </span>
-                        {conversation.unreadCount > 0 ? (
-                          <span
-                            className={styles.unreadBadge()}
-                            aria-label={
-                              conversation.unreadCount === 1
-                                ? '1 mensagem não lida'
-                                : `${conversation.unreadCount} mensagens não lidas`
-                            }
-                          >
-                            {conversation.unreadCount}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className={styles.listMetadata()}>
-                        <span className={styles.departmentBadge()}>
-                          {DEPARTMENT_LABELS[conversation.department]}
-                        </span>
-                        <span className={styles.controlBadge({ control })}>
-                          {getConversationControlLabel(conversation.conversationState)}
-                        </span>
-                        {conversation.department === 'commercial' ? (
-                          <span
-                            className={styles.requestBadge({
-                              tone: getRequestStatusTone(conversation.requestStatus),
-                            })}
-                          >
-                            {REQUEST_STATUS_LABELS[conversation.requestStatus]}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <div className={styles.emptyList()}>
-                <Inbox aria-hidden="true" className={styles.emptyIcon()} />
-                <p className={styles.emptyTitle()}>Nenhuma conversa encontrada</p>
-                <p className={styles.emptyDescription()}>
-                  {listError
-                    ? 'A lista será restaurada quando a conexão for retomada.'
-                    : 'Altere a busca ou os filtros selecionados.'}
-                </p>
-              </div>
-            )}
-          </div>
-          {pagination.totalPages > 1 ? (
-            <nav className={styles.pagination()} aria-label="Paginação das conversas">
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="outline"
-                onClick={() => setListPage((current) => Math.max(1, current - 1))}
-                disabled={isRefreshing || pagination.page <= 1}
-                aria-label="Página anterior"
-              >
-                <ChevronLeft aria-hidden="true" />
-              </Button>
-              <span>
-                <span className="sr-only">
-                  Página atual {pagination.page} de {pagination.totalPages}
-                </span>
-              </span>
-              {paginationNumbers.map((pageNumber) => (
-                <Button
-                  key={pageNumber}
-                  type="button"
-                  size="icon-sm"
-                  variant={pageNumber === pagination.page ? 'default' : 'outline'}
-                  onClick={() => setListPage(pageNumber)}
-                  disabled={isRefreshing}
-                  aria-current={pageNumber === pagination.page ? 'page' : undefined}
-                  aria-label={`Ir para a página ${pageNumber}`}
-                >
-                  {pageNumber}
-                </Button>
-              ))}
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="outline"
-                onClick={() =>
-                  setListPage((current) => Math.min(pagination.totalPages, current + 1))
-                }
-                disabled={isRefreshing || pagination.page >= pagination.totalPages}
-                aria-label="Próxima página"
-              >
-                <ChevronRight aria-hidden="true" />
-              </Button>
-            </nav>
-          ) : null}
+          <ConversationInboxList
+            conversations={filteredConversations}
+            selectedConversationId={selectedConversation?.id ?? null}
+            isRefreshing={isRefreshing}
+            hasError={Boolean(listError)}
+            pagination={pagination}
+            paginationNumbers={paginationNumbers}
+            onSelect={handleConversationSelection}
+            onPageChange={setListPage}
+          />
         </aside>
 
-        <div className={cn(styles.detail(), mobileDetailOpen ? 'flex' : 'hidden lg:flex')}>
+        <div
+          className={cn(
+            styles.detail(),
+            mobileContextOpen ? 'hidden xl:flex' : mobileDetailOpen ? 'flex' : 'hidden lg:flex',
+          )}
+        >
           {selectedConversation !== null ? (
             <>
               <header className={styles.detailHeader()}>
@@ -1598,6 +1578,17 @@ export function ConversationWorkspace({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
+                    className="xl:hidden"
+                    onClick={() => setMobileContextOpen(true)}
+                    aria-label="Abrir contexto do atendimento"
+                    title="Contexto do atendimento"
+                  >
+                    <PanelRightOpen aria-hidden="true" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => setIsQuoteDialogOpen(true)}
                     aria-label="Abrir orçamentos"
                     title="Orçamentos"
@@ -1617,11 +1608,12 @@ export function ConversationWorkspace({
                 </div>
               </header>
 
-              <div className={styles.dimensionGrid()}>
+              <div className={cn(styles.dimensionGrid(), 'xl:hidden')}>
                 <button
                   type="button"
                   className={styles.dimensionItem()}
                   onClick={() => setIsDepartmentDialogOpen(true)}
+                  disabled={!permissions.transfer}
                   aria-label="Alterar departamento"
                   title="Alterar departamento"
                 >
@@ -1665,14 +1657,17 @@ export function ConversationWorkspace({
                 ) : null}
               </div>
 
-              <div className={styles.actionsPanel()}>
+              <section
+                className={cn(styles.actionsPanel(), 'xl:hidden')}
+                aria-label="Ações compactas do atendimento"
+              >
                 <p className={styles.actionsTitle()}>Ações do atendimento</p>
                 <div className={styles.actionColumns()}>
                   <div className={styles.actions()}>
                     <button
                       type="button"
                       onClick={handleArchiveToggle}
-                      disabled={isUpdatingConversation}
+                      disabled={isUpdatingConversation || !permissions.legacyManagement}
                       className={styles.actionButton({ action: 'read' })}
                     >
                       {selectedConversation.archivedAt ? (
@@ -1692,8 +1687,11 @@ export function ConversationWorkspace({
                       }
                       disabled={
                         isUpdatingConversation ||
+                        !permissions.assume ||
                         selectedConversation.conversationState === 'closed' ||
-                        !canTakeOverWhatsAppConversation(selectedConversation)
+                        !getCurrentWhatsAppServiceSession(
+                          selectedConversation,
+                        ).availableActions.includes('ASSUME')
                       }
                       className={styles.actionButton({ action: 'human' })}
                     >
@@ -1710,7 +1708,10 @@ export function ConversationWorkspace({
                       }
                       disabled={
                         isUpdatingConversation ||
-                        !canReturnWhatsAppConversationToBot(selectedConversation)
+                        !permissions.transfer ||
+                        !getCurrentWhatsAppServiceSession(
+                          selectedConversation,
+                        ).availableActions.includes('RETURN_TO_AI')
                       }
                       className={styles.actionButton({ action: 'bot' })}
                     >
@@ -1729,8 +1730,13 @@ export function ConversationWorkspace({
                       }
                       disabled={
                         isUpdatingConversation ||
+                        (selectedConversation.conversationState === 'closed'
+                          ? !permissions.assume
+                          : !permissions.close) ||
                         (selectedConversation.conversationState !== 'closed' &&
-                          !canCloseWhatsAppConversation(selectedConversation))
+                          !getCurrentWhatsAppServiceSession(
+                            selectedConversation,
+                          ).availableActions.includes('CLOSE'))
                       }
                       className={styles.actionButton({ action: 'close' })}
                     >
@@ -1745,10 +1751,13 @@ export function ConversationWorkspace({
                   <div className={styles.actions()}>
                     <button
                       type="button"
-                      onClick={() => setIsForwardDialogOpen(true)}
+                      onClick={openTransferDialog}
                       disabled={
                         isUpdatingConversation ||
-                        !canForwardWhatsAppConversation(selectedConversation)
+                        !permissions.transfer ||
+                        !getCurrentWhatsAppServiceSession(
+                          selectedConversation,
+                        ).availableActions.includes('TRANSFER_DEPARTMENT')
                       }
                       className={styles.actionButton({ action: 'forward' })}
                     >
@@ -1760,6 +1769,7 @@ export function ConversationWorkspace({
                       onClick={() => setIsStatusDialogOpen(true)}
                       disabled={
                         isUpdatingConversation ||
+                        !permissions.respond ||
                         selectedConversation.department !== 'commercial' ||
                         selectedConversation.currentQuoteRequest === null ||
                         selectedConversation.conversationState === 'closed' ||
@@ -1776,40 +1786,189 @@ export function ConversationWorkspace({
                 <Dialog open={isForwardDialogOpen} onOpenChange={setIsForwardDialogOpen}>
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                      <DialogTitle>Encaminhar atendimento</DialogTitle>
+                      <DialogTitle>Transferir atendimento</DialogTitle>
                       <DialogDescription>
-                        Selecione um departamento diferente do atual.
+                        Escolha um destino publicado pela Tenant API. Fila e responsável são
+                        opcionais na transferência.
                       </DialogDescription>
                     </DialogHeader>
-                    <Select
-                      value={effectiveTargetDepartment}
-                      onValueChange={(value) => {
-                        if (isWhatsAppConversationDepartment(value)) setTargetDepartment(value);
-                      }}
-                      disabled={isUpdatingConversation}
-                    >
-                      <SelectTrigger className="w-full" aria-label="Departamento de destino">
-                        <span>{DEPARTMENT_LABELS[effectiveTargetDepartment]}</span>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        {WHATSAPP_ROUTABLE_DEPARTMENTS.filter(
-                          (department) => department !== selectedConversation.department,
-                        ).map((department) => (
-                          <SelectItem key={department} value={department}>
-                            {DEPARTMENT_LABELS[department]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {initialAssignmentTargets.length ? (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label htmlFor="transfer-department" className="text-sm font-medium">
+                            Departamento
+                          </label>
+                          <select
+                            id="transfer-department"
+                            className="h-8 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                            aria-label="Departamento de destino"
+                            value={transferDepartmentId}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              const target = initialAssignmentTargets.find(
+                                (candidate) => candidate.id === value,
+                              );
+                              setTransferDepartmentId(value);
+                              setTransferQueueId(target?.queues[0]?.id ?? '');
+                              setTransferUserId('');
+                            }}
+                            disabled={isUpdatingConversation}
+                          >
+                            <option value="">Selecione</option>
+                            {initialAssignmentTargets
+                              .filter(
+                                (target) =>
+                                  target.id !==
+                                    getCurrentWhatsAppServiceSession(selectedConversation)
+                                      .currentDepartmentId &&
+                                  target.code !== selectedConversation.department,
+                              )
+                              .map((target) => (
+                                <option key={target.id} value={target.id}>
+                                  {target.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label htmlFor="transfer-queue" className="text-sm font-medium">
+                              Fila
+                            </label>
+                            <Select
+                              value={transferQueueId || 'none'}
+                              onValueChange={(value) =>
+                                setTransferQueueId(value === 'none' ? '' : (value ?? ''))
+                              }
+                              disabled={isUpdatingConversation || !selectedTransferTarget}
+                            >
+                              <SelectTrigger id="transfer-queue" className="w-full">
+                                <span>
+                                  {selectedTransferTarget?.queues.find(
+                                    (queue) => queue.id === transferQueueId,
+                                  )?.name ?? 'Sem fila específica'}
+                                </span>
+                              </SelectTrigger>
+                              <SelectContent alignItemWithTrigger={false}>
+                                <SelectItem value="none">Sem fila específica</SelectItem>
+                                {selectedTransferTarget?.queues.map((queue) => (
+                                  <SelectItem key={queue.id} value={queue.id}>
+                                    {queue.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label htmlFor="transfer-user" className="text-sm font-medium">
+                              Responsável
+                            </label>
+                            <Select
+                              value={transferUserId || 'none'}
+                              onValueChange={(value) =>
+                                setTransferUserId(value === 'none' ? '' : (value ?? ''))
+                              }
+                              disabled={isUpdatingConversation || !selectedTransferTarget}
+                            >
+                              <SelectTrigger id="transfer-user" className="w-full">
+                                <span>
+                                  {selectedTransferTarget?.users.find(
+                                    (user) => user.id === transferUserId,
+                                  )?.name ?? 'Sem responsável específico'}
+                                </span>
+                              </SelectTrigger>
+                              <SelectContent alignItemWithTrigger={false}>
+                                <SelectItem value="none">Sem responsável específico</SelectItem>
+                                {selectedTransferTarget?.users.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label htmlFor="transfer-reason" className="text-sm font-medium">
+                            Motivo (opcional)
+                          </label>
+                          <Textarea
+                            id="transfer-reason"
+                            value={transferReason}
+                            onChange={(event) => setTransferReason(event.target.value)}
+                            minLength={3}
+                            maxLength={500}
+                            rows={2}
+                            disabled={isUpdatingConversation}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="rounded-lg bg-warning/10 p-3 text-sm text-warning-emphasis">
+                        Nenhum destino elegível foi publicado para este usuário. Atualize as
+                        permissões ou tente novamente mais tarde.
+                      </p>
+                    )}
                     <DialogFooter>
                       <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
                       <Button
                         type="button"
                         onClick={handleForward}
-                        disabled={isUpdatingConversation}
+                        disabled={
+                          isUpdatingConversation ||
+                          !transferDepartmentId ||
+                          (transferReason.trim().length > 0 && transferReason.trim().length < 3)
+                        }
                       >
                         <Forward aria-hidden="true" />
-                        Confirmar encaminhamento
+                        Confirmar transferência
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isReturnQueueDialogOpen} onOpenChange={setIsReturnQueueDialogOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Retornar atendimento à fila</DialogTitle>
+                      <DialogDescription>
+                        O responsável atual será removido e o atendimento seguirá a estratégia da
+                        fila selecionada.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {availableReturnQueues.length ? (
+                      <Select
+                        value={returnQueueId}
+                        onValueChange={(value) => setReturnQueueId(value ?? '')}
+                        disabled={isUpdatingConversation}
+                      >
+                        <SelectTrigger className="w-full" aria-label="Fila de retorno">
+                          <span>
+                            {availableReturnQueues.find((queue) => queue.id === returnQueueId)
+                              ?.name ?? 'Selecione uma fila'}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          {availableReturnQueues.map((queue) => (
+                            <SelectItem key={queue.id} value={queue.id}>
+                              {queue.departmentName} · {queue.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="rounded-lg bg-warning/10 p-3 text-sm text-warning-emphasis">
+                        Nenhuma fila elegível foi publicada para este usuário.
+                      </p>
+                    )}
+                    <DialogFooter>
+                      <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
+                      <Button
+                        type="button"
+                        onClick={handleReturnToQueue}
+                        disabled={isUpdatingConversation || !returnQueueId}
+                      >
+                        Retornar à fila
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -1823,26 +1982,24 @@ export function ConversationWorkspace({
                         Corrija a classificação sem encaminhar nem alterar o responsável atual.
                       </DialogDescription>
                     </DialogHeader>
-                    <Select
+                    <select
+                      className="h-8 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                      aria-label="Novo departamento"
                       value={effectiveTargetDepartment}
-                      onValueChange={(value) => {
+                      onChange={(event) => {
+                        const value = event.target.value;
                         if (isWhatsAppConversationDepartment(value)) setTargetDepartment(value);
                       }}
                       disabled={isUpdatingConversation}
                     >
-                      <SelectTrigger className="w-full" aria-label="Novo departamento">
-                        <span>{DEPARTMENT_LABELS[effectiveTargetDepartment]}</span>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        {WHATSAPP_ROUTABLE_DEPARTMENTS.filter(
-                          (department) => department !== selectedConversation.department,
-                        ).map((department) => (
-                          <SelectItem key={department} value={department}>
-                            {DEPARTMENT_LABELS[department]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {WHATSAPP_ROUTABLE_DEPARTMENTS.filter(
+                        (department) => department !== selectedConversation.department,
+                      ).map((department) => (
+                        <option key={department} value={department}>
+                          {DEPARTMENT_LABELS[department]}
+                        </option>
+                      ))}
+                    </select>
                     <DialogFooter>
                       <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
                       <Button
@@ -1932,8 +2089,7 @@ export function ConversationWorkspace({
                     </DialogHeader>
                     <div className="space-y-2">
                       <label htmlFor="close-reason" className="text-sm font-medium">
-                        Motivo do encerramento
-                        {selectedConversation.requestStatus === 'rejected' ? ' (obrigatório)' : ''}
+                        Motivo do encerramento (obrigatório)
                       </label>
                       <Textarea
                         id="close-reason"
@@ -1941,11 +2097,11 @@ export function ConversationWorkspace({
                         onChange={(event) => setCloseReason(event.target.value)}
                         minLength={3}
                         maxLength={500}
-                        required={selectedConversation.requestStatus === 'rejected'}
+                        required
                         placeholder={
                           selectedConversation.requestStatus === 'rejected'
                             ? 'Informe por que a proposta foi recusada.'
-                            : 'Opcional: registre uma observação sobre o encerramento.'
+                            : 'Registre o motivo para manter a auditoria completa.'
                         }
                       />
                       <p className="text-xs text-muted-foreground">
@@ -1958,18 +2114,14 @@ export function ConversationWorkspace({
                         type="button"
                         variant="destructive"
                         onClick={handleClose}
-                        disabled={
-                          isUpdatingConversation ||
-                          (selectedConversation.requestStatus === 'rejected' &&
-                            closeReason.trim().length < 3)
-                        }
+                        disabled={isUpdatingConversation || closeReason.trim().length < 3}
                       >
                         {isUpdatingConversation ? 'Encerrando...' : 'Confirmar encerramento'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-              </div>
+              </section>
 
               <Dialog open={isQuoteDialogOpen} onOpenChange={setIsQuoteDialogOpen}>
                 <DialogContent className="sm:max-w-2xl">
@@ -2021,17 +2173,14 @@ export function ConversationWorkspace({
                     <AlertDialogClose render={<Button variant="outline" />}>
                       Fechar
                     </AlertDialogClose>
-                    <Button
-                      render={
-                        <Link
-                          href={`/clients/new?name=${encodeURIComponent(selectedConversation.contact.name)}&phone=${encodeURIComponent(selectedConversation.contact.phone)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        />
-                      }
+                    <Link
+                      href={`/clients/new?name=${encodeURIComponent(selectedConversation.contact.name)}&phone=${encodeURIComponent(selectedConversation.contact.phone)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonVariants()}
                     >
                       Cadastrar
-                    </Button>
+                    </Link>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -2060,8 +2209,9 @@ export function ConversationWorkspace({
                 canSendMessage={canCurrentUserSendMessage}
                 isSendingMessage={isSendingMessage}
                 onSendMessage={handleSendHumanMessage}
-                feedbackMessage={feedbackTone === 'error' ? '' : feedbackMessage}
+                feedbackMessage=""
                 feedbackTone={feedbackTone}
+                canManageMedia={permissions.respond}
               />
 
               <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
@@ -2140,6 +2290,55 @@ export function ConversationWorkspace({
             </div>
           )}
         </div>
+        {selectedConversation ? (
+          <div
+            className={cn('h-full min-h-0 min-w-0', mobileContextOpen ? 'flex' : 'hidden xl:flex')}
+          >
+            <ConversationServiceContextPanel
+              key={`${selectedConversation.id}:${getCurrentWhatsAppServiceSession(selectedConversation).version}`}
+              conversation={selectedConversation}
+              isBusy={isUpdatingConversation}
+              onBack={() => setMobileContextOpen(false)}
+              onAssume={() =>
+                handleVersionedAction(
+                  takeOverWhatsAppConversationAction,
+                  'Atendimento assumido com sucesso.',
+                )
+              }
+              onTransfer={openTransferDialog}
+              onReturnToQueue={openReturnQueueDialog}
+              onChangePriority={handlePriorityChange}
+              onReturnToAi={() =>
+                handleVersionedAction(
+                  returnWhatsAppConversationToBotAction,
+                  'Controle retornado explicitamente à IA.',
+                )
+              }
+              onClose={() => setIsCloseDialogOpen(true)}
+              onArchiveToggle={handleArchiveToggle}
+              onCommercialStatus={() => setIsStatusDialogOpen(true)}
+              canChangeCommercialStatus={
+                permissions.respond &&
+                selectedConversation.department === 'commercial' &&
+                selectedConversation.currentQuoteRequest !== null &&
+                selectedConversation.conversationState !== 'closed' &&
+                selectedConversation.assignedTo?.id === currentUserId
+              }
+              canViewCustomerContext={canViewCustomerContext}
+              canRespondCustomerContext={canRespondCustomerContext}
+              canAssume={permissions.assume}
+              canTransfer={permissions.transfer}
+              canChangePriority={permissions.priority}
+              canReturnToAi={permissions.transfer}
+              canClose={permissions.close}
+              canArchive={permissions.legacyManagement}
+            />
+          </div>
+        ) : (
+          <aside className="hidden h-full items-center justify-center border-l border-border bg-card px-5 text-center text-xs text-muted-foreground xl:flex">
+            Selecione uma conversa para consultar o contexto do atendimento.
+          </aside>
+        )}
       </section>
     </>
   );

@@ -58,6 +58,8 @@ describe('user authorization contracts', () => {
       'clients',
       'ai-agents',
       'whatsapp-conversations',
+      'whatsapp-channels',
+      'knowledge',
       'manuals',
       'reports',
       'settings',
@@ -82,6 +84,7 @@ describe('user authorization contracts', () => {
       'manage',
       'use',
       'approve',
+      'publish',
       'export',
       'calculate',
     ]);

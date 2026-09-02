@@ -10,7 +10,10 @@ import {
 import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 import { WhatsAppConversationRepositoryError } from '@/features/whatsapp-conversations/application';
 import { WhatsAppConversationsPage } from '@/features/whatsapp-conversations/pages';
-import { getWhatsAppConversationPageForDashboard } from '@/features/whatsapp-conversations/server';
+import {
+  getWhatsAppConversationPageForDashboard,
+  getWhatsAppServiceAssignmentTargetsForDashboard,
+} from '@/features/whatsapp-conversations/server';
 
 import Page from './page';
 
@@ -24,10 +27,12 @@ jest.mock('@/features/auth/server', () => ({
 
 jest.mock('@/features/whatsapp-conversations/server', () => ({
   getWhatsAppConversationPageForDashboard: jest.fn(),
+  getWhatsAppServiceAssignmentTargetsForDashboard: jest.fn(),
 }));
 
 const mockedGetCurrentAuthenticatedSession = jest.mocked(getCurrentAuthenticatedSession);
 const mockedGetConversations = jest.mocked(getWhatsAppConversationPageForDashboard);
+const mockedGetAssignmentTargets = jest.mocked(getWhatsAppServiceAssignmentTargetsForDashboard);
 const mockedRedirect = jest.mocked(redirect);
 
 function createSession(
@@ -57,6 +62,7 @@ describe('WhatsApp conversations page route', () => {
     mockedRedirect.mockImplementation(() => {
       throw new Error('NEXT_REDIRECT');
     });
+    mockedGetAssignmentTargets.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -81,19 +87,36 @@ describe('WhatsApp conversations page route', () => {
     expect(mockedGetConversations).not.toHaveBeenCalled();
   });
 
-  it('redirects a non-commercial user even if a legacy permission is present', async () => {
+  it('loads the workspace for an operations employee with service:view', async () => {
     mockedGetCurrentAuthenticatedSession.mockResolvedValue(
-      createSession(['whatsapp-conversations:manage'], ['operations']),
+      createSession(['service:view'], ['operations']),
     );
+    mockedGetConversations.mockResolvedValue({
+      conversations: [],
+      page: 1,
+      pageSize: 25,
+      total: 0,
+      totalPages: 0,
+      metrics: {
+        total: 0,
+        botActive: 0,
+        attendantActive: 0,
+        automationPaused: 0,
+        unreadMessages: 0,
+        unreadConversations: 0,
+        awaitingProposal: 0,
+      },
+    });
 
-    await expect(Page()).rejects.toThrow('NEXT_REDIRECT');
+    await Page();
 
-    expect(mockedRedirect).toHaveBeenCalledWith('/dashboard');
-    expect(mockedGetConversations).not.toHaveBeenCalled();
+    expect(mockedRedirect).not.toHaveBeenCalled();
+    expect(mockedGetConversations).toHaveBeenCalledTimes(1);
+    expect(mockedGetAssignmentTargets).not.toHaveBeenCalled();
   });
 
   it('loads data through the server layer for an authorized user', async () => {
-    const session = createSession(['dashboard:view', 'whatsapp-conversations:manage']);
+    const session = createSession(['dashboard:view', 'service:view', 'service:transfer']);
     mockedGetCurrentAuthenticatedSession.mockResolvedValue(session);
     mockedGetConversations.mockResolvedValue({
       conversations: [],
@@ -115,6 +138,7 @@ describe('WhatsApp conversations page route', () => {
     const page = await Page();
 
     expect(mockedGetConversations).toHaveBeenCalledTimes(1);
+    expect(mockedGetAssignmentTargets).toHaveBeenCalledTimes(1);
     expect(page.type).toBe(WhatsAppConversationsPage);
     expect(page.props).toEqual({
       session,
@@ -130,6 +154,7 @@ describe('WhatsApp conversations page route', () => {
         awaitingProposal: 0,
       },
       initialError: null,
+      assignmentTargets: [],
     });
     expect(mockedRedirect).not.toHaveBeenCalled();
   });
@@ -157,6 +182,7 @@ describe('WhatsApp conversations page route', () => {
         awaitingProposal: 0,
       },
       initialError: 'Tenant API indisponível.',
+      assignmentTargets: [],
     });
   });
 });

@@ -1,8 +1,16 @@
-import type { AuthenticatedSession } from '@/features/auth/domain';
+import {
+  hasLegacyWhatsAppManagement,
+  hasServiceCapability,
+  type AuthenticatedSession,
+} from '@/features/auth/domain';
 import { AuthenticatedShell } from '@/features/navigation';
 
 import { ConversationWorkspace } from '../components';
-import type { WhatsAppConversation, WhatsAppConversationMetrics } from '../domain';
+import type {
+  WhatsAppConversation,
+  WhatsAppConversationMetrics,
+  WhatsAppServiceAssignmentTarget,
+} from '../domain';
 import { whatsAppConversationsPageStyles as styles } from './whatsapp-conversations-page.styles';
 
 export interface WhatsAppConversationsPageProps {
@@ -16,6 +24,7 @@ export interface WhatsAppConversationsPageProps {
   };
   readonly metrics?: WhatsAppConversationMetrics;
   readonly initialError?: string | null;
+  readonly assignmentTargets?: readonly WhatsAppServiceAssignmentTarget[];
 }
 
 export function WhatsAppConversationsPage({
@@ -24,6 +33,7 @@ export function WhatsAppConversationsPage({
   pagination,
   metrics,
   initialError = null,
+  assignmentTargets = [],
 }: WhatsAppConversationsPageProps) {
   return (
     <AuthenticatedShell user={session.user}>
@@ -34,6 +44,17 @@ export function WhatsAppConversationsPage({
           initialMetrics={metrics}
           initialError={initialError}
           currentUserId={session.user.id}
+          initialAssignmentTargets={assignmentTargets}
+          canViewCustomerContext={hasServiceCapability(session.user, 'view')}
+          canRespondCustomerContext={hasServiceCapability(session.user, 'respond')}
+          permissions={{
+            respond: hasServiceCapability(session.user, 'respond'),
+            assume: hasServiceCapability(session.user, 'assume'),
+            transfer: hasServiceCapability(session.user, 'transfer'),
+            priority: hasServiceCapability(session.user, 'priority'),
+            close: hasServiceCapability(session.user, 'close'),
+            legacyManagement: hasLegacyWhatsAppManagement(session.user),
+          }}
         />
       </div>
     </AuthenticatedShell>

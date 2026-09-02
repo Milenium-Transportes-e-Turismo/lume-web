@@ -5,6 +5,8 @@ export function closeWhatsAppConversation(
   conversationId: unknown,
   expectedVersion: unknown,
   reason?: unknown,
+  commandId?: unknown,
+  serviceSessionId?: unknown,
 ) {
   const normalizedReason =
     reason === null || reason === undefined
@@ -20,10 +22,30 @@ export function closeWhatsAppConversation(
     !Number.isInteger(expectedVersion) ||
     expectedVersion < 1 ||
     normalizedReason === undefined ||
-    (normalizedReason !== null && (normalizedReason.length < 3 || normalizedReason.length > 500))
+    normalizedReason === null ||
+    normalizedReason.length < 3 ||
+    normalizedReason.length > 500 ||
+    (commandId !== undefined &&
+      (typeof commandId !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          commandId,
+        ))) ||
+    (serviceSessionId !== undefined &&
+      (typeof serviceSessionId !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+          serviceSessionId,
+        )))
   ) {
     return Promise.resolve(null);
   }
 
-  return repository.closeConversation(conversationId.trim(), expectedVersion, normalizedReason);
+  return commandId === undefined
+    ? repository.closeConversation(conversationId.trim(), expectedVersion, normalizedReason)
+    : repository.closeConversation(
+        conversationId.trim(),
+        expectedVersion,
+        normalizedReason,
+        commandId as string,
+        serviceSessionId as string | undefined,
+      );
 }

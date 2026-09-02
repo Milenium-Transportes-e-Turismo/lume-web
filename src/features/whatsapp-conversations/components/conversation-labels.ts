@@ -4,6 +4,7 @@ import type {
   WhatsAppConversationState,
   WhatsAppMessageDeliveryStatus,
   WhatsAppMessageKind,
+  WhatsAppMessage,
   WhatsAppRequestStatus,
 } from '../domain';
 
@@ -101,4 +102,41 @@ export function getRequestStatusTone(status: WhatsAppRequestStatus): RequestStat
   if (status === 'waiting-for-customer') return 'waiting';
   if (status === 'collecting-information' || status === 'under-review') return 'progress';
   return 'neutral';
+}
+
+export function getWhatsAppMessageActorLabel(
+  message: WhatsAppMessage,
+  customerName: string,
+): string {
+  if (message.actor?.type === 'EXTERNAL_HUMAN') {
+    return message.actor.name
+      ? `${message.actor.name} (externo no WhatsApp)`
+      : 'Atendente externo (WhatsApp)';
+  }
+  if (message.actor?.name) return message.actor.name;
+
+  const actorLabel: Readonly<Record<string, string>> = {
+    CUSTOMER: customerName,
+    HUMAN_USER: message.sentBy?.name ?? 'Atendente Lume',
+    EXTERNAL_HUMAN: 'Atendente externo (WhatsApp)',
+    AI_AGENT: 'IA Lume',
+    SYSTEM: 'Sistema Lume',
+  };
+
+  if (message.actor?.type && actorLabel[message.actor.type]) return actorLabel[message.actor.type];
+  if (message.sentBy?.name) return message.sentBy.name;
+  if (message.direction === 'inbound') return customerName;
+  return 'Autoria não informada';
+}
+
+export function getWhatsAppMessageSourceLabel(message: WhatsAppMessage): string | null {
+  if (!message.source) return null;
+
+  return (
+    {
+      LUME_WEB: 'Lume Web',
+      WHATSAPP_APP: 'aplicativo WhatsApp',
+      AUTOMATION: 'automação',
+    }[message.source] ?? message.source
+  );
 }

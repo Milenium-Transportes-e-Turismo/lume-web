@@ -40,9 +40,11 @@ async function authenticatedRequest(
 
 describe('tenant session proxy', () => {
   const originalSessionSecret = process.env.SESSION_SECRET;
+  const originalSimulationFlag = process.env.AUTH_SIMULATION_ENABLED;
 
   beforeEach(() => {
     process.env.SESSION_SECRET = SESSION_SECRET;
+    process.env.AUTH_SIMULATION_ENABLED = 'false';
   });
 
   afterAll(() => {
@@ -50,6 +52,12 @@ describe('tenant session proxy', () => {
       delete process.env.SESSION_SECRET;
     } else {
       process.env.SESSION_SECRET = originalSessionSecret;
+    }
+
+    if (originalSimulationFlag === undefined) {
+      delete process.env.AUTH_SIMULATION_ENABLED;
+    } else {
+      process.env.AUTH_SIMULATION_ENABLED = originalSimulationFlag;
     }
   });
 
@@ -66,6 +74,15 @@ describe('tenant session proxy', () => {
     expect(config.matcher).toContain('/quote-proposals/:path*');
   });
 
+  it('protects the WhatsApp channel administration with the session proxy', () => {
+    expect(config.matcher).toContain('/whatsapp-channels/:path*');
+  });
+
+  it('protects knowledge and registration review workspaces with the session proxy', () => {
+    expect(config.matcher).toContain('/knowledge/:path*');
+    expect(config.matcher).toContain('/registration-data-reviews/:path*');
+  });
+
   it('redirects an expiring access token to the refresh Route Handler', async () => {
     const request = await authenticatedRequest(new Date(Date.now() + 10_000).toISOString());
 
@@ -79,6 +96,33 @@ describe('tenant session proxy', () => {
 
   it('does not intercept a Server Action POST', async () => {
     const request = await authenticatedRequest(new Date(Date.now() - 10_000).toISOString(), 'POST');
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('keeps simulated authentication independent from stale API credentials', async () => {
+    process.env.AUTH_SIMULATION_ENABLED = 'true';
+    const request = new NextRequest('http://localhost:3000/dashboard', {
+      headers: {
+        Cookie: `${API_TOKEN_COOKIE_NAME}=invalid-token`,
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('ignores the empty token cookie emitted while simulated login clears prior credentials', async () => {
+    const request = new NextRequest('http://localhost:3000/dashboard', {
+      headers: {
+        Cookie: `${API_TOKEN_COOKIE_NAME}=`,
+      },
+    });
 
     const response = await proxy(request);
 

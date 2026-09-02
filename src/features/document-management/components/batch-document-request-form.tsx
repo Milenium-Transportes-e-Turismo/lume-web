@@ -11,17 +11,6 @@ import {
 import type { TenantUser } from '@/features/tenant-administration/domain';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
-import {
-  Combobox,
-  ComboboxClear,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxInputGroup,
-  ComboboxItem,
-  ComboboxList,
-  ComboboxTrigger,
-} from '@/shared/ui/combobox';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Textarea } from '@/shared/ui/textarea';
@@ -47,6 +36,7 @@ export function BatchDocumentRequestForm({
     [documentTypes],
   );
   const [candidateUserId, setCandidateUserId] = useState('');
+  const [candidateUserLabel, setCandidateUserLabel] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedDocumentTypeIds, setSelectedDocumentTypeIds] = useState<string[]>([]);
 
@@ -57,8 +47,6 @@ export function BatchDocumentRequestForm({
   const candidateOptions = availableUsers
     .filter((user) => !selectedUserIds.includes(user.id))
     .map((user) => ({ value: user.id, label: userLabel(user) }));
-  const candidateOption =
-    candidateOptions.find((option) => option.value === candidateUserId) ?? null;
   const allDocumentsSelected =
     availableDocumentTypes.length > 0 &&
     selectedDocumentTypeIds.length === availableDocumentTypes.length;
@@ -68,6 +56,7 @@ export function BatchDocumentRequestForm({
     if (!candidateUserId || selectedUserIds.includes(candidateUserId)) return;
     setSelectedUserIds((current) => [...current, candidateUserId]);
     setCandidateUserId('');
+    setCandidateUserLabel('');
   }
 
   function toggleDocument(documentTypeId: string, checked: boolean) {
@@ -117,30 +106,27 @@ export function BatchDocumentRequestForm({
       <fieldset className="space-y-3 rounded-xl border p-4">
         <legend className="px-1 font-semibold">Usuários que receberão a solicitação</legend>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Combobox
-            items={candidateOptions}
-            value={candidateOption}
-            onValueChange={(option) => setCandidateUserId(option?.value ?? '')}
-          >
-            <ComboboxInputGroup className="min-w-0 flex-1">
-              <ComboboxInput
-                aria-label="Usuário a adicionar"
-                placeholder="Pesquise por nome, usuário ou e-mail"
-              />
-              <ComboboxClear />
-              <ComboboxTrigger />
-            </ComboboxInputGroup>
-            <ComboboxContent>
-              <ComboboxEmpty>Nenhum usuário encontrado.</ComboboxEmpty>
-              <ComboboxList>
-                {(option: { value: string; label: string }) => (
-                  <ComboboxItem key={option.value} value={option}>
-                    {option.label}
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
+          <div className="min-w-0 flex-1">
+            <Input
+              list="batch-document-request-users"
+              aria-label="Usuário a adicionar"
+              placeholder="Pesquise por nome, usuário ou e-mail"
+              value={candidateUserLabel}
+              onChange={(event) => {
+                const label = event.target.value;
+                setCandidateUserLabel(label);
+                setCandidateUserId(
+                  candidateOptions.find((option) => option.label === label)?.value ?? '',
+                );
+              }}
+              autoComplete="off"
+            />
+            <datalist id="batch-document-request-users">
+              {candidateOptions.map((option) => (
+                <option key={option.value} value={option.label} />
+              ))}
+            </datalist>
+          </div>
           <Button type="button" variant="outline" onClick={addUser} disabled={!candidateUserId}>
             <Plus /> Adicionar usuário
           </Button>

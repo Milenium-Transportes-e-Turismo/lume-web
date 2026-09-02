@@ -1,3 +1,5 @@
+import { getServerEnv } from '@/env.server';
+
 import type { SessionStorage } from '../../application';
 import type { AuthenticatedSession } from '../../domain';
 import {
@@ -50,7 +52,7 @@ export class CookieSessionStorage implements SessionStorage {
     assertSessionSecret(sessionSecret);
 
     this.cookieName = options.cookieName ?? SESSION_COOKIE_NAME;
-    this.secure = options.secure ?? process.env.NODE_ENV === 'production';
+    this.secure = options.secure ?? getServerEnv().NODE_ENV === 'production';
   }
 
   async save(session: AuthenticatedSession): Promise<void> {

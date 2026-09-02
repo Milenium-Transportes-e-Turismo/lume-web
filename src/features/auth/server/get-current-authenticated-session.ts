@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { getServerEnv } from '@/env.server';
+
 import {
   getAuthenticatedSession,
   type ApiTokenStorage,
@@ -12,7 +14,6 @@ import {
   createCookieSessionStorage,
   createTenantApiAuthenticationGateway,
 } from '../infrastructure';
-import { isSimulatedLoginEnabled } from '../simulation';
 
 export async function getCurrentAuthenticatedSession(): Promise<AuthenticatedSession | null> {
   let sessionStorage: SessionStorage;
@@ -27,7 +28,8 @@ export async function getCurrentAuthenticatedSession(): Promise<AuthenticatedSes
 
   if (session === null) return null;
 
-  if (isSimulatedLoginEnabled(process.env.NODE_ENV, process.env.AUTH_SIMULATION_ENABLED)) {
+  const environment = getServerEnv();
+  if (environment.AUTH_SIMULATION_ENABLED) {
     return session;
   }
 

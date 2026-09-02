@@ -43,6 +43,8 @@ export const PERMISSION_RESOURCES = [
   'clients',
   'ai-agents',
   'whatsapp-conversations',
+  'whatsapp-channels',
+  'knowledge',
   'manuals',
   'reports',
   'settings',
@@ -67,6 +69,7 @@ export const PERMISSION_ACTIONS = [
   'manage',
   'use',
   'approve',
+  'publish',
   'export',
   'calculate',
 ] as const;

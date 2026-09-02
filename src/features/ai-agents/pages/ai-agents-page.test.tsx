@@ -22,8 +22,8 @@ const session: AuthenticatedSession = {
     id: 'employee-001',
     name: 'Maria Silva',
     type: 'employee',
-    departments: [],
-    permissions: ['dashboard:view', 'ai-agents:use'],
+    departments: ['management'],
+    permissions: ['dashboard:view', 'ai-agents:view'],
     clientCategory: null,
     isActive: true,
   },
@@ -42,11 +42,10 @@ describe('AiAgentsPage', () => {
   });
 
   it('presents the protected catalog and marks its navigation item as current', () => {
-    render(<AiAgentsPage session={session} />);
+    render(<AiAgentsPage session={session} initialAgents={[]} initialExecutions={null} />);
 
-    expect(document.querySelector('main div.mx-auto')).toHaveClass('py-5', 'sm:py-6');
+    expect(document.querySelector('main div.mx-auto')).toHaveClass('max-w-[1800px]');
     expect(screen.getByRole('heading', { name: 'Agentes de IA' })).toBeInTheDocument();
-    expect(screen.getByText('Integração em preparação')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Agentes de IA' })[0]).toHaveAttribute(
       'aria-current',
       'page',

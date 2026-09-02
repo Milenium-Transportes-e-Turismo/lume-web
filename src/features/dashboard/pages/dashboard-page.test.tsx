@@ -113,7 +113,7 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Olá, Maria Silva/)).toBeInTheDocument();
     expect(screen.getAllByText('Atendente ativo')).toHaveLength(2);
-    expect(screen.getAllByText('Automação pausada')).toHaveLength(3);
+    expect(screen.getAllByText('Automação pausada')).toHaveLength(2);
     expect(screen.getAllByText('Conversas não lidas')).toHaveLength(2);
     expect(screen.queryByText(/Mensagens não lidas/i)).not.toBeInTheDocument();
     expect(screen.getByText('Condução das conversas')).toBeInTheDocument();

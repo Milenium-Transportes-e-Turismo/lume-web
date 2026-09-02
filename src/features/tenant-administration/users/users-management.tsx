@@ -89,6 +89,7 @@ import {
   FieldSet,
 } from '@/shared/ui/field';
 import { Input } from '@/shared/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/shared/ui/native-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { Textarea } from '@/shared/ui/textarea';
@@ -1361,38 +1362,23 @@ function UsersFiltersState({
         </Field>
         <Field>
           <FieldLabel htmlFor="user-permission-filter">Permissão efetiva</FieldLabel>
-          <Select
+          <NativeSelect
+            id="user-permission-filter"
             name="permission"
             value={values.permission}
-            onValueChange={(value) => updateFilter('permission', value)}
+            onChange={(event) => updateFilter('permission', event.currentTarget.value)}
+            className="w-full [&>select]:h-10"
           >
-            <SelectTrigger id="user-permission-filter" className="h-10 w-full">
-              <SelectValue>
-                {(value) => {
-                  const code = String(value ?? '');
-                  return !code || code === '__all__' ? (
-                    'Todas as permissões'
-                  ) : (
-                    <PermissionFilterLabel
-                      code={code}
-                      isImplicit={permissionCatalog.implicitPermissions.includes(code)}
-                    />
-                  );
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas as permissões</SelectItem>
-              {permissionCatalog.permissions.map((permission) => (
-                <SelectItem key={permission} value={permission}>
-                  <PermissionFilterLabel
-                    code={permission}
-                    isImplicit={permissionCatalog.implicitPermissions.includes(permission)}
-                  />
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <NativeSelectOption value="__all__">Todas as permissões</NativeSelectOption>
+            {permissionCatalog.permissions.map((permission) => (
+              <NativeSelectOption key={permission} value={permission}>
+                <PermissionFilterLabel
+                  code={permission}
+                  isImplicit={permissionCatalog.implicitPermissions.includes(permission)}
+                />
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
         </Field>
         <Field>
           <FieldLabel htmlFor="user-status-filter">Estado</FieldLabel>

@@ -1,16 +1,13 @@
 import 'server-only';
 
-function normalizeBaseUrl(value: string): string {
-  return value.replace(/\/+$/, '');
-}
+import { getTenantApiConfig } from '@/env.server';
 
 export async function proxyWhatsAppMediaMessage(
   accessToken: string,
   conversationId: string,
   request: Request,
 ): Promise<Response> {
-  const baseUrl = process.env.LUME_TENANT_API_URL;
-  if (!baseUrl) throw new Error('LUME_TENANT_API_URL is required.');
+  const tenantApi = getTenantApiConfig('LUME_TENANT_API_URL is required.');
   if (request.body === null) throw new Error('A mensagem não contém um arquivo.');
 
   const headers = new Headers({
@@ -30,7 +27,7 @@ export async function proxyWhatsAppMediaMessage(
   };
 
   return fetch(
-    `${normalizeBaseUrl(baseUrl)}/whatsapp/conversations/${encodeURIComponent(conversationId)}/media-messages`,
+    `${tenantApi.baseUrl}/whatsapp/conversations/${encodeURIComponent(conversationId)}/media-messages`,
     init,
   );
 }

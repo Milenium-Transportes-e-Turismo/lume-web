@@ -14,6 +14,12 @@ Navegador
 O plano de controle não participa de login, autorização ou operação diária.
 Sessão, cookies e segredos deste frontend são exclusivos da instalação.
 
+Configuração passa pelos schemas Zod de `src/env.ts`. `src/env.server.ts`
+mantém leitura privada server-only e lazy para aceitar injeção no início do
+contêiner; `src/env.public.ts` expõe somente as duas variáveis textuais
+`NEXT_PUBLIC_*`. Detalhes de build, `.env` e rotação estão em
+[environment-configuration.md](environment-configuration.md).
+
 As permissões são strings opacas no formato `recurso:ação`. O backend é a
 autoridade do catálogo e pode introduzir novas permissões sem exigir uma
 publicação imediata do frontend.
@@ -58,6 +64,15 @@ destino. A matriz e o isolamento por `companyId` permanecem sob autoridade da
 Tenant API. Em conflito 409, o frontend recarrega a conversa antes de permitir
 uma nova tentativa. O frontend nunca chama cache, Evolution ou o edge
 diretamente.
+
+O workspace usa três regiões no desktop: caixa de entrada paginada, conversa e
+contexto operacional. No mobile, a mesma informação vira navegação progressiva
+entre lista, conversa e contexto. O domínio projeta a `ServiceSession` atual sem
+fundir lifecycle, controle, responsável, fila e prioridade. A projeção legada é
+explicitamente identificada; ações não suportadas pela façade ficam
+desabilitadas. Comandos de assumir, transferir e retornar à IA carregam
+`commandId` e a versão da sessão desde a interação do usuário, e um 409 sempre
+substitui o estado exibido pelo snapshot autoritativo recarregado.
 
 A rota `/whatsapp-conversations/import` prepara importações em massa sem criar
 uma segunda regra de persistência. O navegador envia um ZIP por vez a uma Route

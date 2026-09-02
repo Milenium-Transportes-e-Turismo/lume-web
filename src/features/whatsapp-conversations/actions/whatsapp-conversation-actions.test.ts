@@ -13,10 +13,12 @@ import { WhatsAppConversationRepositoryError } from '../application';
 import {
   closeWhatsAppConversationForDashboard,
   closeWhatsAppConversationAfterRejectionForDashboard,
+  changeWhatsAppConversationPriorityForDashboard,
   forwardWhatsAppConversationForDashboard,
   markWhatsAppConversationAsReadForDashboard,
   pollWhatsAppConversationForDashboard,
   returnWhatsAppConversationToBotForDashboard,
+  returnWhatsAppConversationToQueueForDashboard,
   sendHumanWhatsAppMessageForDashboard,
   startWhatsAppConversationForDashboard,
   takeOverWhatsAppConversationForDashboard,
@@ -25,9 +27,11 @@ import { createWhatsAppConversationFixture } from '../testing/whatsapp-conversat
 import {
   closeWhatsAppConversationAction,
   closeWhatsAppConversationAfterRejectionAction,
+  changeWhatsAppConversationPriorityAction,
   forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
   returnWhatsAppConversationToBotAction,
+  returnWhatsAppConversationToQueueAction,
   sendHumanWhatsAppMessageAction,
   startWhatsAppConversationAction,
   takeOverWhatsAppConversationAction,
@@ -40,10 +44,12 @@ jest.mock('@/features/auth/server', () => ({
 jest.mock('../server', () => ({
   closeWhatsAppConversationForDashboard: jest.fn(),
   closeWhatsAppConversationAfterRejectionForDashboard: jest.fn(),
+  changeWhatsAppConversationPriorityForDashboard: jest.fn(),
   forwardWhatsAppConversationForDashboard: jest.fn(),
   markWhatsAppConversationAsReadForDashboard: jest.fn(),
   pollWhatsAppConversationForDashboard: jest.fn(),
   returnWhatsAppConversationToBotForDashboard: jest.fn(),
+  returnWhatsAppConversationToQueueForDashboard: jest.fn(),
   sendHumanWhatsAppMessageForDashboard: jest.fn(),
   startWhatsAppConversationForDashboard: jest.fn(),
   takeOverWhatsAppConversationForDashboard: jest.fn(),
@@ -54,6 +60,8 @@ const mockedGeneralClose = jest.mocked(closeWhatsAppConversationForDashboard);
 const mockedClose = jest.mocked(closeWhatsAppConversationAfterRejectionForDashboard);
 const mockedTakeOver = jest.mocked(takeOverWhatsAppConversationForDashboard);
 const mockedReturn = jest.mocked(returnWhatsAppConversationToBotForDashboard);
+const mockedReturnToQueue = jest.mocked(returnWhatsAppConversationToQueueForDashboard);
+const mockedChangePriority = jest.mocked(changeWhatsAppConversationPriorityForDashboard);
 const mockedForward = jest.mocked(forwardWhatsAppConversationForDashboard);
 const mockedMarkRead = jest.mocked(markWhatsAppConversationAsReadForDashboard);
 const mockedSendMessage = jest.mocked(sendHumanWhatsAppMessageForDashboard);
@@ -104,7 +112,7 @@ describe('WhatsApp conversation server actions', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/whatsapp-conversations');
   });
 
-  it('enforces whatsapp-conversations:manage before every write', async () => {
+  it('denies a write when no canonical capability or legacy alias is present', async () => {
     mockedSession.mockResolvedValue(createSession(['dashboard:view']));
 
     await expect(
@@ -115,6 +123,68 @@ describe('WhatsApp conversation server actions', () => {
     ).resolves.toMatchObject({ success: false, code: 'forbidden' });
 
     expect(mockedTakeOver).not.toHaveBeenCalled();
+  });
+
+  it('enforces each canonical capability independently', async () => {
+    const conversation = createWhatsAppConversationFixture({ version: 4 });
+    mockedStartConversation.mockResolvedValue(conversation);
+    mockedMarkRead.mockResolvedValue(conversation);
+    mockedTakeOver.mockResolvedValue(conversation);
+    mockedReturn.mockResolvedValue(conversation);
+    mockedChangePriority.mockResolvedValue(conversation);
+    mockedGeneralClose.mockResolvedValue(conversation);
+
+    mockedSession.mockResolvedValue(createSession(['service:respond']));
+    await expect(
+      startWhatsAppConversationAction({ phone: '5534987654321' }),
+    ).resolves.toMatchObject({
+      success: true,
+    });
+    await expect(
+      markWhatsAppConversationAsReadAction({ conversationId: conversation.id, expectedVersion: 3 }),
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      takeOverWhatsAppConversationAction({ conversationId: conversation.id, expectedVersion: 3 }),
+    ).resolves.toMatchObject({ success: false, code: 'forbidden' });
+
+    mockedSession.mockResolvedValue(createSession(['service:assume']));
+    await expect(
+      takeOverWhatsAppConversationAction({ conversationId: conversation.id, expectedVersion: 3 }),
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      returnWhatsAppConversationToBotAction({
+        conversationId: conversation.id,
+        expectedVersion: 3,
+      }),
+    ).resolves.toMatchObject({ success: false, code: 'forbidden' });
+
+    mockedSession.mockResolvedValue(createSession(['service:transfer']));
+    await expect(
+      returnWhatsAppConversationToBotAction({
+        conversationId: conversation.id,
+        expectedVersion: 3,
+      }),
+    ).resolves.toMatchObject({ success: true });
+
+    mockedSession.mockResolvedValue(createSession(['service:priority']));
+    await expect(
+      changeWhatsAppConversationPriorityAction({
+        conversationId: conversation.id,
+        serviceSessionId: '00000000-0000-4000-8000-000000000731',
+        commandId: '00000000-0000-4000-8000-000000000722',
+        expectedVersion: 3,
+        priority: 'HIGH',
+        reason: 'Prazo próximo',
+      }),
+    ).resolves.toMatchObject({ success: true });
+
+    mockedSession.mockResolvedValue(createSession(['service:close']));
+    await expect(
+      closeWhatsAppConversationAction({ conversationId: conversation.id, expectedVersion: 3 }),
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      markWhatsAppConversationAsReadAction({ conversationId: conversation.id, expectedVersion: 3 }),
+    ).resolves.toMatchObject({ success: false, code: 'forbidden' });
   });
 
   it('passes expectedVersion to takeover and return-to-bot', async () => {
@@ -371,6 +441,63 @@ describe('WhatsApp conversation server actions', () => {
       success: false,
       code: 'conflict',
       conversation: latest,
+    });
+  });
+
+  it('forwards commandId and expectedVersion when returning the ServiceSession to its queue', async () => {
+    const queued = createWhatsAppConversationFixture({
+      conversationState: 'sent-to-human',
+      assignedTo: null,
+      version: 14,
+    });
+    mockedReturnToQueue.mockResolvedValue(queued);
+    const input = {
+      conversationId: queued.id,
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000721',
+      expectedVersion: 13,
+      queueId: '00000000-0000-4000-8000-000000000732',
+    };
+
+    await expect(returnWhatsAppConversationToQueueAction(input)).resolves.toEqual({
+      success: true,
+      conversation: queued,
+    });
+    expect(mockedReturnToQueue).toHaveBeenCalledWith(queued.id, {
+      commandId: input.commandId,
+      expectedVersion: input.expectedVersion,
+      serviceSessionId: input.serviceSessionId,
+      queueId: input.queueId,
+    });
+  });
+
+  it('reloads the authoritative snapshot after a priority conflict', async () => {
+    const latest = createWhatsAppConversationFixture({ version: 18 });
+    mockedChangePriority.mockRejectedValue(
+      new WhatsAppConversationRepositoryError('conflict', 'Versão divergente.', 18),
+    );
+    mockedPoll.mockResolvedValue(latest);
+
+    await expect(
+      changeWhatsAppConversationPriorityAction({
+        conversationId: latest.id,
+        serviceSessionId: '00000000-0000-4000-8000-000000000731',
+        commandId: '00000000-0000-4000-8000-000000000722',
+        expectedVersion: 17,
+        priority: 'URGENT',
+        reason: 'Risco operacional',
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      code: 'conflict',
+      conversation: latest,
+    });
+    expect(mockedChangePriority).toHaveBeenCalledWith(latest.id, {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000722',
+      expectedVersion: 17,
+      priority: 'URGENT',
+      reason: 'Risco operacional',
     });
   });
 });

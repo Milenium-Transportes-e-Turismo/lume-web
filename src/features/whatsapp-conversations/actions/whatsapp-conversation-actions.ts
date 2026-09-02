@@ -7,27 +7,37 @@ import type {
   WhatsAppConversation,
   WhatsAppConversationDepartment,
   WhatsAppMessage,
+  WhatsAppServiceSessionPriority,
 } from '../domain';
 import {
   archiveWhatsAppConversationForDashboard,
   changeWhatsAppConversationDepartmentForDashboard,
+  changeWhatsAppConversationPriorityForDashboard,
   closeWhatsAppConversationForDashboard,
   closeWhatsAppConversationAfterRejectionForDashboard,
   forwardWhatsAppConversationForDashboard,
   markWhatsAppConversationAsReadForDashboard,
   pollWhatsAppConversationForDashboard,
   returnWhatsAppConversationToBotForDashboard,
+  returnWhatsAppConversationToQueueForDashboard,
   sendHumanWhatsAppMessageForDashboard,
   startWhatsAppConversationForDashboard,
   takeOverWhatsAppConversationForDashboard,
+  transferWhatsAppServiceSessionForDashboard,
   unarchiveWhatsAppConversationForDashboard,
 } from '../server';
-import { hasPermission } from '@/features/auth/domain';
+import {
+  hasLegacyWhatsAppManagement,
+  hasServiceCapability,
+  type ServiceCapability,
+} from '@/features/auth/domain';
 import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 
 export interface VersionedWhatsAppConversationActionInput {
   readonly conversationId: unknown;
+  readonly serviceSessionId?: unknown;
   readonly expectedVersion: unknown;
+  readonly commandId?: unknown;
 }
 
 export interface ForwardWhatsAppConversationActionInput extends VersionedWhatsAppConversationActionInput {
@@ -36,6 +46,27 @@ export interface ForwardWhatsAppConversationActionInput extends VersionedWhatsAp
 
 export interface CloseWhatsAppConversationActionInput extends VersionedWhatsAppConversationActionInput {
   readonly reason?: unknown;
+}
+
+export interface ChangeWhatsAppConversationPriorityActionInput extends VersionedWhatsAppConversationActionInput {
+  readonly commandId: unknown;
+  readonly priority: unknown;
+  readonly reason?: unknown;
+}
+
+export interface TransferWhatsAppServiceSessionActionInput extends VersionedWhatsAppConversationActionInput {
+  readonly serviceSessionId: unknown;
+  readonly commandId: unknown;
+  readonly departmentId: unknown;
+  readonly queueId?: unknown;
+  readonly userId?: unknown;
+  readonly reason?: unknown;
+}
+
+export interface ReturnWhatsAppConversationToQueueActionInput extends VersionedWhatsAppConversationActionInput {
+  readonly serviceSessionId: unknown;
+  readonly commandId: unknown;
+  readonly queueId: unknown;
 }
 
 export interface SendHumanWhatsAppMessageActionInput extends VersionedWhatsAppConversationActionInput {
@@ -84,7 +115,7 @@ export type SendHumanWhatsAppMessageActionResult =
 export async function startWhatsAppConversationAction(input: {
   readonly phone: unknown;
 }): Promise<WhatsAppConversationActionResult> {
-  if (!(await isAuthorized())) {
+  if (!(await isAuthorized('respond'))) {
     return {
       success: false,
       code: 'forbidden',
@@ -107,9 +138,14 @@ export async function startWhatsAppConversationAction(input: {
   }
 }
 
-async function isAuthorized(): Promise<boolean> {
+async function isAuthorized(capability: ServiceCapability): Promise<boolean> {
   const session = await getCurrentAuthenticatedSession();
-  return session !== null && hasPermission(session.user, 'whatsapp-conversations:manage');
+  return session !== null && hasServiceCapability(session.user, capability);
+}
+
+async function isLegacyManagementAuthorized(): Promise<boolean> {
+  const session = await getCurrentAuthenticatedSession();
+  return session !== null && hasLegacyWhatsAppManagement(session.user);
 }
 
 async function reloadAfterConflict(
@@ -212,12 +248,19 @@ async function reconcileMarkReadAfterConflict(
 
 async function executeAction(
   input: VersionedWhatsAppConversationActionInput,
+  capability: ServiceCapability | 'legacy-management',
   operation: (
     conversationId: unknown,
     expectedVersion: unknown,
+    commandId?: unknown,
+    serviceSessionId?: unknown,
   ) => Promise<WhatsAppConversation | null>,
 ): Promise<WhatsAppConversationActionResult> {
-  if (!(await isAuthorized())) {
+  const authorized =
+    capability === 'legacy-management'
+      ? await isLegacyManagementAuthorized()
+      : await isAuthorized(capability);
+  if (!authorized) {
     return {
       success: false,
       code: 'forbidden',
@@ -226,7 +269,15 @@ async function executeAction(
   }
 
   try {
-    const conversation = await operation(input.conversationId, input.expectedVersion);
+    const conversation =
+      input.commandId === undefined
+        ? await operation(input.conversationId, input.expectedVersion)
+        : await operation(
+            input.conversationId,
+            input.expectedVersion,
+            input.commandId,
+            input.serviceSessionId,
+          );
 
     if (conversation === null) {
       return invalidVersionedAction();
@@ -252,19 +303,84 @@ async function executeAction(
 export async function takeOverWhatsAppConversationAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, takeOverWhatsAppConversationForDashboard);
+  return executeAction(input, 'assume', takeOverWhatsAppConversationForDashboard);
 }
 
 export async function returnWhatsAppConversationToBotAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, returnWhatsAppConversationToBotForDashboard);
+  return executeAction(input, 'transfer', returnWhatsAppConversationToBotForDashboard);
+}
+
+export async function returnWhatsAppConversationToQueueAction(
+  input: ReturnWhatsAppConversationToQueueActionInput,
+): Promise<WhatsAppConversationActionResult> {
+  return executeAction(input, 'transfer', (conversationId, expectedVersion, commandId) =>
+    returnWhatsAppConversationToQueueForDashboard(conversationId, {
+      commandId,
+      expectedVersion,
+      serviceSessionId: input.serviceSessionId,
+      queueId: input.queueId,
+    }),
+  );
+}
+
+export async function transferWhatsAppServiceSessionAction(
+  input: TransferWhatsAppServiceSessionActionInput,
+): Promise<WhatsAppConversationActionResult> {
+  if (!(await isAuthorized('transfer'))) {
+    return {
+      success: false,
+      code: 'forbidden',
+      message: 'Você não tem permissão para transferir este atendimento.',
+    };
+  }
+
+  try {
+    const conversation = await transferWhatsAppServiceSessionForDashboard(input.conversationId, {
+      serviceSessionId: input.serviceSessionId,
+      commandId: input.commandId,
+      expectedVersion: input.expectedVersion,
+      departmentId: input.departmentId,
+      queueId: input.queueId,
+      userId: input.userId,
+      reason: input.reason,
+    });
+    if (conversation === null) return invalidVersionedAction();
+    return completeAction(conversation);
+  } catch (error) {
+    if (error instanceof WhatsAppConversationRepositoryError && error.code === 'conflict') {
+      const conversation = await reloadAfterConflict(input.conversationId);
+      return {
+        success: false,
+        code: 'conflict',
+        message:
+          'Conflito: o atendimento foi alterado e recarregado. Revise os destinos antes de transferir novamente.',
+        ...(conversation ? { conversation } : {}),
+      };
+    }
+    return standardActionFailure(error);
+  }
+}
+
+export async function changeWhatsAppConversationPriorityAction(
+  input: ChangeWhatsAppConversationPriorityActionInput,
+): Promise<WhatsAppConversationActionResult> {
+  return executeAction(input, 'priority', (conversationId, expectedVersion, commandId) =>
+    changeWhatsAppConversationPriorityForDashboard(conversationId, {
+      commandId,
+      expectedVersion,
+      serviceSessionId: input.serviceSessionId,
+      priority: input.priority as WhatsAppServiceSessionPriority,
+      reason: input.reason,
+    }),
+  );
 }
 
 export async function markWhatsAppConversationAsReadAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  if (!(await isAuthorized())) {
+  if (!(await isAuthorized('respond'))) {
     return {
       success: false,
       code: 'forbidden',
@@ -295,21 +411,32 @@ export async function markWhatsAppConversationAsReadAction(
 export async function closeWhatsAppConversationAfterRejectionAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, closeWhatsAppConversationAfterRejectionForDashboard);
+  return executeAction(input, 'close', closeWhatsAppConversationAfterRejectionForDashboard);
 }
 
 export async function closeWhatsAppConversationAction(
   input: CloseWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, (conversationId, expectedVersion) =>
-    closeWhatsAppConversationForDashboard(conversationId, expectedVersion, input.reason),
+  return executeAction(
+    input,
+    'close',
+    (conversationId, expectedVersion, commandId, serviceSessionId) =>
+      commandId === undefined
+        ? closeWhatsAppConversationForDashboard(conversationId, expectedVersion, input.reason)
+        : closeWhatsAppConversationForDashboard(
+            conversationId,
+            expectedVersion,
+            input.reason,
+            commandId,
+            serviceSessionId,
+          ),
   );
 }
 
 export async function forwardWhatsAppConversationAction(
   input: ForwardWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  if (!(await isAuthorized())) {
+  if (!(await isAuthorized('transfer'))) {
     return {
       success: false,
       code: 'forbidden',
@@ -318,11 +445,19 @@ export async function forwardWhatsAppConversationAction(
   }
 
   try {
-    const conversation = await forwardWhatsAppConversationForDashboard(
-      input.conversationId,
-      input.targetDepartment as WhatsAppConversationDepartment,
-      input.expectedVersion,
-    );
+    const conversation =
+      input.commandId === undefined
+        ? await forwardWhatsAppConversationForDashboard(
+            input.conversationId,
+            input.targetDepartment as WhatsAppConversationDepartment,
+            input.expectedVersion,
+          )
+        : await forwardWhatsAppConversationForDashboard(
+            input.conversationId,
+            input.targetDepartment as WhatsAppConversationDepartment,
+            input.expectedVersion,
+            input.commandId,
+          );
 
     if (conversation === null) {
       return {
@@ -368,7 +503,7 @@ export async function forwardWhatsAppConversationAction(
 export async function changeWhatsAppConversationDepartmentAction(
   input: ForwardWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  if (!(await isAuthorized())) {
+  if (!(await isAuthorized('transfer'))) {
     return {
       success: false,
       code: 'forbidden',
@@ -376,7 +511,7 @@ export async function changeWhatsAppConversationDepartmentAction(
     };
   }
 
-  return executeAction(input, (conversationId, expectedVersion) =>
+  return executeAction(input, 'transfer', (conversationId, expectedVersion) =>
     changeWhatsAppConversationDepartmentForDashboard(
       conversationId,
       input.targetDepartment,
@@ -388,19 +523,19 @@ export async function changeWhatsAppConversationDepartmentAction(
 export async function archiveWhatsAppConversationAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, archiveWhatsAppConversationForDashboard);
+  return executeAction(input, 'legacy-management', archiveWhatsAppConversationForDashboard);
 }
 
 export async function unarchiveWhatsAppConversationAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, unarchiveWhatsAppConversationForDashboard);
+  return executeAction(input, 'legacy-management', unarchiveWhatsAppConversationForDashboard);
 }
 
 export async function sendHumanWhatsAppMessageAction(
   input: SendHumanWhatsAppMessageActionInput,
 ): Promise<SendHumanWhatsAppMessageActionResult> {
-  if (!(await isAuthorized())) {
+  if (!(await isAuthorized('respond'))) {
     return {
       success: false,
       code: 'forbidden',

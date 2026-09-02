@@ -1,15 +1,17 @@
 import 'server-only';
 
-import { resolveTenantApiBaseUrl, resolveTenantApiTimeout } from '@/features/auth/infrastructure';
+import { getTenantApiConfig } from '@/env.server';
 
 import type { RegistrationGateway } from '../application';
 import { TenantApiRegistrationGateway } from './tenant-api-registration-gateway';
 
 export function createRegistrationGateway(accessToken: string): RegistrationGateway {
+  const tenantApi = getTenantApiConfig();
+
   return new TenantApiRegistrationGateway(
-    resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL),
+    tenantApi.baseUrl,
     accessToken,
     fetch,
-    resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS),
+    tenantApi.timeoutMs,
   );
 }

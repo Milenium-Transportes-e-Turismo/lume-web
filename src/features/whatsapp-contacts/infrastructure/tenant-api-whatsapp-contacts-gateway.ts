@@ -1,16 +1,13 @@
 import 'server-only';
 
-function baseUrl(value: string): string {
-  return value.replace(/\/+$/, '');
-}
+import { getTenantApiConfig } from '@/env.server';
 
 export async function proxyWhatsAppContactsRequest(
   accessToken: string,
   request: Request,
   upstreamPath: string,
 ): Promise<Response> {
-  const tenantApiUrl = process.env.LUME_TENANT_API_URL;
-  if (!tenantApiUrl) throw new Error('LUME_TENANT_API_URL is required.');
+  const tenantApi = getTenantApiConfig('LUME_TENANT_API_URL is required.');
   const headers = new Headers({
     Accept: 'application/json',
     Authorization: `Bearer ${accessToken}`,
@@ -30,7 +27,7 @@ export async function proxyWhatsAppContactsRequest(
     init.duplex = 'half';
   }
   const upstream = await fetch(
-    `${baseUrl(tenantApiUrl)}/whatsapp/contacts${upstreamPath}${url.search}`,
+    `${tenantApi.baseUrl}/whatsapp/contacts${upstreamPath}${url.search}`,
     init,
   );
   if (upstream.status < 500) return upstream;

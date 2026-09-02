@@ -139,7 +139,110 @@ function apiTransition() {
   };
 }
 
+function apiServiceSession(overrides: Record<string, unknown> = {}) {
+  return {
+    id: '00000000-0000-4000-8000-000000000731',
+    companyId: '00000000-0000-4000-8000-000000000001',
+    threadId: '00000000-0000-4000-8000-000000000741',
+    sourceChannelId: '00000000-0000-4000-8000-000000000201',
+    currentDepartmentId: '00000000-0000-4000-8000-000000000751',
+    responsibleUserId: null,
+    queueId: '00000000-0000-4000-8000-000000000732',
+    relatedServiceSessionId: null,
+    status: 'waiting-human',
+    controlMode: 'human',
+    priority: 'normal',
+    priorityReason: null,
+    prioritySource: 'human-user',
+    isForeground: true,
+    version: 14,
+    responsible: null,
+    queue: { id: '00000000-0000-4000-8000-000000000732', name: 'Fila principal' },
+    availableActions: ['ASSUME', 'RETURN_TO_QUEUE', 'CHANGE_PRIORITY', 'RETURN_TO_AI', 'CLOSE'],
+    publicContinuationCode: null,
+    continuationCodeExpiresAt: null,
+    closingStartedAt: null,
+    closingDeadlineAt: null,
+    closedAt: null,
+    ...overrides,
+  };
+}
+
+function canonicalMutationFetcher() {
+  return jest.fn(async (request: Parameters<typeof fetch>[0], input?: RequestInit) => {
+    const url = String(request);
+    if (url.endsWith('/service/sessions/assignment-targets')) {
+      return jsonResponse([
+        {
+          id: '00000000-0000-4000-8000-000000000751',
+          code: 'operations',
+          name: 'Operações',
+          isDefault: false,
+          queues: [],
+          users: [],
+        },
+      ]);
+    }
+    if (url.includes('/service/sessions/') && input?.method === 'POST') {
+      const body = JSON.parse(String(input.body)) as { expectedVersion: number };
+      return jsonResponse(
+        apiServiceSession({
+          aiClosingStartedAt: '2026-07-21T13:40:00.000Z',
+          closingStartedAt: undefined,
+          version: body.expectedVersion + 1,
+        }),
+      );
+    }
+    if (url.includes('/messages?') || url.includes('/transitions?')) {
+      return jsonResponse({
+        data: [],
+        meta: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
+      });
+    }
+    return jsonResponse(apiConversation({ version: 14 }));
+  });
+}
+
 describe('LumeApiWhatsAppConversationRepository', () => {
+  it('loads assignment targets from the canonical ServiceSession catalog', async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      jsonResponse([
+        {
+          id: '00000000-0000-4000-8000-000000000751',
+          code: 'operations',
+          name: 'Operações',
+          isDefault: false,
+          queues: [
+            {
+              id: '00000000-0000-4000-8000-000000000761',
+              name: 'Fila operacional',
+              assignmentStrategy: 'least-load',
+              maxConcurrentAttendances: 12,
+            },
+          ],
+          users: [{ id: '00000000-0000-4000-8000-000000000771', name: 'Ana Operadora' }],
+        },
+      ]),
+    );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    await expect(repository.getServiceAssignmentTargets()).resolves.toEqual([
+      expect.objectContaining({
+        code: 'operations',
+        queues: [expect.objectContaining({ assignmentStrategy: 'least-load' })],
+        users: [expect.objectContaining({ name: 'Ana Operadora' })],
+      }),
+    ]);
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://tenant.example/api/v1/service/sessions/assignment-targets',
+      expect.any(Object),
+    );
+  });
+
   it('maps and validates the paginated list returned by the Tenant API', async () => {
     const fetcher = jest.fn().mockResolvedValue(
       jsonResponse({
@@ -522,7 +625,7 @@ describe('LumeApiWhatsAppConversationRepository', () => {
   });
 
   it('sends expectedVersion and a unique commandId in every real panel action', async () => {
-    const fetcher = jest.fn().mockResolvedValue(jsonResponse(apiConversation({ version: 8 })));
+    const fetcher = canonicalMutationFetcher();
     const repository = new LumeApiWhatsAppConversationRepository(
       'https://tenant.example/api/v1',
       'token',
@@ -536,19 +639,22 @@ describe('LumeApiWhatsAppConversationRepository', () => {
     await repository.closeConversationAfterRejection(conversationId, 11);
     await repository.closeConversation(conversationId, 12, 'Solicitação concluída.');
 
-    const requests = fetcher.mock.calls.map(
-      ([url, init]) => [url, JSON.parse((init as RequestInit).body as string)] as const,
-    );
+    const requests = fetcher.mock.calls
+      .filter(([, init]) => (init as RequestInit).method === 'POST')
+      .map(([url, init]) => [url, JSON.parse((init as RequestInit).body as string)] as const);
     expect(requests.map(([url]) => url)).toEqual([
-      expect.stringContaining('/actions/take-over'),
-      expect.stringContaining('/actions/return-to-bot'),
-      expect.stringContaining('/actions/forward'),
+      expect.stringContaining('/service/sessions/'),
+      expect.stringContaining('/actions/return-to-ai'),
+      expect.stringContaining('/actions/transfer'),
       expect.stringContaining('/actions/mark-read'),
       expect.stringContaining('/actions/close-after-rejection'),
-      expect.stringContaining('/actions/close'),
+      expect.stringContaining('/service/sessions/'),
     ]);
     expect(requests.map(([, body]) => body.expectedVersion)).toEqual([7, 8, 9, 10, 11, 12]);
-    expect(requests[2][1]).toMatchObject({ targetDepartment: 'operations' });
+    expect(requests[0][0]).toContain('/actions/assume');
+    expect(requests[2][1]).toMatchObject({
+      departmentId: '00000000-0000-4000-8000-000000000751',
+    });
     expect(requests[5][1]).toMatchObject({ reason: 'Solicitação concluída.' });
     expect(requests.every(([, body]) => /^[0-9a-f-]{36}$/.test(body.commandId))).toBe(true);
   });
@@ -696,6 +802,267 @@ describe('LumeApiWhatsAppConversationRepository', () => {
 
     await expect(repository.getConversations()).rejects.toMatchObject({
       code: 'invalid-response',
+    });
+  });
+
+  it('maps the native ServiceSession and operational evidence without merging lifecycle and control', async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      jsonResponse({
+        data: [
+          apiConversation({
+            sourceChannel: {
+              id: 'channel-whatsapp-1',
+              name: 'WhatsApp Matriz',
+              type: 'WHATSAPP',
+              address: '5531999990000',
+            },
+            currentServiceSession: {
+              id: 'service-session-1',
+              companyId: '00000000-0000-4000-8000-000000000001',
+              threadId: 'thread-1',
+              sourceChannelId: 'channel-whatsapp-1',
+              currentDepartmentId: 'commercial',
+              responsibleUserId: 'user-1',
+              queueId: 'queue-1',
+              relatedServiceSessionId: null,
+              status: 'WAITING_CUSTOMER',
+              controlMode: 'HUMAN',
+              priority: 'HIGH',
+              priorityReason: 'Prazo próximo',
+              prioritySource: 'HUMAN_USER',
+              isForeground: true,
+              version: 13,
+              responsible: { id: 'user-1', name: 'Maria Souza' },
+              queue: { id: 'queue-1', name: 'Comercial prioritário' },
+              availableActions: [
+                'TRANSFER_DEPARTMENT',
+                'RETURN_TO_QUEUE',
+                'CHANGE_PRIORITY',
+                'RETURN_TO_AI',
+              ],
+              closingStartedAt: null,
+              closingDeadlineAt: null,
+              closedAt: null,
+            },
+            evidence: {
+              agentExecutions: [
+                {
+                  id: 'execution-1',
+                  name: 'Agente comercial',
+                  status: 'SUCCEEDED',
+                  summary: 'Classificou intenção comercial.',
+                  createdAt: '2026-07-21T13:41:00.000Z',
+                  metadata: {
+                    decision: { route: 'commercial' },
+                    apiKey: 'must-not-reach-the-browser',
+                  },
+                },
+              ],
+              knowledgeSources: [
+                {
+                  id: 'source-1',
+                  title: 'Política comercial v4',
+                  url: 'https://docs.example.test/politica-v4',
+                },
+              ],
+              toolExecutions: [
+                { id: 'tool-1', name: 'consultar_disponibilidade', status: 'SUCCEEDED' },
+              ],
+              mediaInterpretations: [],
+              registrationDataReviews: [],
+            },
+          }),
+        ],
+        meta: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+      }),
+    );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    const [conversation] = await repository.getConversations();
+
+    expect(conversation.currentServiceSession).toMatchObject({
+      id: 'service-session-1',
+      status: 'WAITING_CUSTOMER',
+      controlMode: 'HUMAN',
+      priority: 'HIGH',
+      projection: 'NATIVE',
+      responsible: { name: 'Maria Souza' },
+      queue: { name: 'Comercial prioritário' },
+    });
+    expect(conversation.sourceChannel).toMatchObject({ name: 'WhatsApp Matriz' });
+    expect(conversation.evidence?.knowledgeSources[0]).toMatchObject({
+      name: 'Política comercial v4',
+    });
+    expect(conversation.evidence?.toolExecutions[0]).toMatchObject({
+      name: 'consultar_disponibilidade',
+      status: 'SUCCEEDED',
+    });
+    expect(conversation.evidence?.agentExecutions[0].metadata).toEqual({
+      decision: { route: 'commercial' },
+    });
+  });
+
+  it('preserves real message actor and source when the provider reports external human activity', async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      jsonResponse({
+        data: [
+          apiMessage({
+            actor: { type: 'EXTERNAL_HUMAN', id: null, name: null },
+            source: 'WHATSAPP_APP',
+          }),
+        ],
+        meta: { page: 1, pageSize: 50, total: 1, totalPages: 1 },
+      }),
+    );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    const result = await repository.searchMessages(conversationId, 'proposta');
+
+    expect(result.messages[0]).toMatchObject({
+      actor: { type: 'EXTERNAL_HUMAN', id: null, name: null },
+      source: 'WHATSAPP_APP',
+    });
+  });
+
+  it('forwards caller commandId and expectedVersion for the future queue and priority commands', async () => {
+    const fetcher = canonicalMutationFetcher();
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    await repository.returnConversationToQueue(conversationId, {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000711',
+      expectedVersion: 12,
+      queueId: '00000000-0000-4000-8000-000000000732',
+    });
+    await repository.changeConversationPriority(conversationId, {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000712',
+      expectedVersion: 13,
+      priority: 'URGENT',
+      reason: 'Risco operacional',
+    });
+
+    const requests = fetcher.mock.calls
+      .filter(([, input]) => (input as RequestInit).method === 'POST')
+      .map(([url, input]) => [url, JSON.parse((input as RequestInit).body as string)]);
+    expect(requests).toEqual([
+      [
+        expect.stringContaining('/actions/return-to-queue'),
+        {
+          commandId: '00000000-0000-4000-8000-000000000711',
+          expectedVersion: 12,
+          queueId: '00000000-0000-4000-8000-000000000732',
+        },
+      ],
+      [
+        expect.stringContaining('/actions/change-priority'),
+        {
+          commandId: '00000000-0000-4000-8000-000000000712',
+          expectedVersion: 13,
+          priority: 'urgent',
+          reason: 'Risco operacional',
+        },
+      ],
+    ]);
+  });
+
+  it('reconciles a canonical ServiceSession action envelope with the authoritative conversation', async () => {
+    const serviceSession = {
+      id: 'service-session-1',
+      companyId: '00000000-0000-4000-8000-000000000001',
+      threadId: 'thread-1',
+      sourceChannelId: '00000000-0000-4000-8000-000000000201',
+      currentDepartmentId: 'commercial',
+      responsibleUserId: null,
+      queueId: 'queue-1',
+      relatedServiceSessionId: null,
+      status: 'waiting-human',
+      controlMode: 'human',
+      priority: 'urgent',
+      priorityReason: 'Risco operacional',
+      prioritySource: 'HUMAN_USER',
+      isForeground: true,
+      version: 22,
+      responsible: null,
+      queue: { id: 'queue-1', name: 'Fila urgente' },
+      availableActions: ['ASSUME', 'RETURN_TO_QUEUE', 'CHANGE_PRIORITY', 'CLOSE'],
+      closingStartedAt: null,
+      closingDeadlineAt: null,
+      closedAt: null,
+    };
+    const fetcher = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ snapshot: serviceSession, resultingVersion: 22 }))
+      .mockResolvedValueOnce(jsonResponse(apiConversation({ version: 22 })))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [],
+          meta: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [],
+          meta: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
+        }),
+      );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    const conversation = await repository.changeConversationPriority(conversationId, {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000713',
+      expectedVersion: 21,
+      priority: 'URGENT',
+      reason: 'Risco operacional',
+    });
+
+    expect(conversation.currentServiceSession).toMatchObject({
+      status: 'WAITING_HUMAN',
+      controlMode: 'HUMAN',
+      priority: 'URGENT',
+      version: 22,
+      projection: 'NATIVE',
+      queue: { name: 'Fila urgente' },
+    });
+  });
+
+  it('accepts the direct ServiceSession returned by the current canonical controller', async () => {
+    const fetcher = canonicalMutationFetcher();
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    const conversation = await repository.takeOverConversation(
+      conversationId,
+      14,
+      '00000000-0000-4000-8000-000000000714',
+      '00000000-0000-4000-8000-000000000731',
+    );
+
+    expect(conversation.currentServiceSession).toMatchObject({
+      status: 'WAITING_HUMAN',
+      controlMode: 'HUMAN',
+      version: 15,
+      projection: 'NATIVE',
+      closingStartedAt: '2026-07-21T13:40:00.000Z',
     });
   });
 });

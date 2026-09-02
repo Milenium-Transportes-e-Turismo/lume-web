@@ -1,12 +1,12 @@
+import { getServerEnv } from '@/env.server';
 import { RoutePlannerForm } from '@/features/route-planner/components/route-planner-form';
 import { hasPermission } from '@/features/auth/domain';
 import { AuthenticatedShell } from '@/features/navigation';
 import { requireTenantSession } from '@/features/tenant-administration/server';
 
-const DEFAULT_MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
-
 export default async function RoutingPage() {
   const session = await requireTenantSession(['route-planner:view', 'route-planner:calculate']);
+  const environment = getServerEnv();
   return (
     <AuthenticatedShell user={session.user}>
       <main className="mx-auto w-full max-w-[1600px] space-y-6 p-4 md:p-6">
@@ -21,7 +21,7 @@ export default async function RoutingPage() {
         </header>
         <RoutePlannerForm
           canCalculate={hasPermission(session.user, 'route-planner:calculate')}
-          mapStyleUrl={process.env.MAP_STYLE_URL?.trim() || DEFAULT_MAP_STYLE_URL}
+          mapStyleUrl={environment.MAP_STYLE_URL}
         />
       </main>
     </AuthenticatedShell>

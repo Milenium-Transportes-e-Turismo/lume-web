@@ -6,7 +6,9 @@ autenticada e respostas são validadas com Zod. Consulte
 [`document-management.md`](document-management.md).
 
 O frontend acessa apenas a URL server-side configurada em
-`LUME_TENANT_API_URL`. Tokens da API ficam em cookie `httpOnly` criptografado e
+`LUME_TENANT_API_URL`. A URL, os timeouts e as travas de produção passam pelos
+schemas Zod centralizados em `src/env.ts`; a leitura server-only é feita apenas
+em runtime. Tokens da API ficam em cookie `httpOnly` criptografado e
 não são expostos a componentes client-side.
 
 ## Endpoints integrados
@@ -161,6 +163,24 @@ As quatro dimensões canônicas consumidas são:
   `cancelled`; esta dimensão é exibida e filtrada como status exclusivamente
   Comercial.
 
+O contrato aceita também `currentServiceSession` sem remover os campos legados.
+Nessa projeção, lifecycle (`status`), controle (`controlMode`) e assignment
+(`responsibleUserId`/`queueId`) permanecem dimensões independentes. O painel
+preserva ainda `priority`, `priorityReason`, `prioritySource`,
+`sourceChannelId`, a versão própria da sessão e `availableActions`. Enquanto a
+Tenant API não publicar a sessão nativa, o adapter cria uma projeção marcada
+como `LEGACY_CONVERSATION`; ela não inventa fila ou prioridade e só habilita os
+comandos que a façade atual realmente suporta.
+
+Quando presentes, `agentExecutions`, `knowledgeSources`, `toolExecutions`,
+`mediaInterpretations` e `registrationDataReviews` são validados e exibidos no
+painel de contexto. Provider e modelo aparecem somente como evidência efetiva
+de uma execução; não existe seletor de provider no workspace. Mensagens podem
+publicar `actor.type` (`CUSTOMER`, `HUMAN_USER`, `EXTERNAL_HUMAN`, `AI_AGENT` ou
+`SYSTEM`) e `source` (`LUME_WEB`, `WHATSAPP_APP` ou `AUTOMATION`). O frontend
+mantém esses valores reais; em particular, `EXTERNAL_HUMAN` nunca é atribuído a
+um usuário interno por inferência.
+
 O adapter agrega todas as páginas da lista de conversas, evitando limitar as
 filas aos primeiros 100 registros. O detalhe carrega as 100 mensagens mais
 recentes e permite buscar páginas anteriores sob demanda, preservando a posição
@@ -196,6 +216,12 @@ Toda escrita envia:
 atual ao painel. Nenhuma ação sobrescreve silenciosamente uma versão divergente.
 Na interface, o departamento atual é removido das opções de destino, evitando
 um encaminhamento sem mudança de fila.
+
+Os contratos preparados de ServiceSession usam o mesmo envelope para
+`return-to-queue` e `change-priority`; prioridade acrescenta `priority` e
+`reason`. A UI só os habilita se `availableActions` os anunciar. Na façade
+legada eles permanecem visíveis como indisponíveis: o frontend não atualiza o
+snapshot local nem simula sucesso enquanto os endpoints não existirem.
 
 O envio pelo atendente exige que a conversa esteja em `human-active` e atribuída ao
 usuário autenticado. O corpo é:
@@ -260,8 +286,9 @@ configurado com `api` sem conhecer consumidores internos.
 
 ## Ações e limites reais do contrato WhatsApp
 
-A Tenant API publica cinco comandos de estado do painel — assumir, devolver ao
-bot, encaminhar, marcar como lida e encerrar — além do envio de texto pelo
+A Tenant API publica atualmente cinco comandos de estado do painel — assumir,
+devolver explicitamente o controle à IA pela façade `return-to-bot`, encaminhar,
+marcar como lida e encerrar — além do envio de texto pelo
 atendente. O frontend usa a rota canônica `actions/close`; a rota
 `close-after-rejection` existe somente como alias legado no backend e não é
 emitida pelo painel.
@@ -609,3 +636,47 @@ foto no provider do shell. Sidebar, histórico de mensagens e demais superfície
 podem consumir o componente compartilhado `CurrentUserAvatar`; isso evita
 duplicar cache ou alterar `avatar.tsx`/`message.tsx`, que permanecem como bases
 instaladas do shadcn/ui.
+
+## Knowledge, revisões cadastrais e interpretação de mídia
+
+`/knowledge` consome somente o controller versionado da Tenant API. Bases,
+documentos, detalhes, sugestões e lacunas são consultas `no-store`; criação de
+base, artigo, upload, novo draft, edição, publicação, arquivamento e decisões de
+revisão carregam `commandId`. As mutações de documento que o contrato define
+como concorrentes também enviam `expectedVersion`; a edição de draft acrescenta
+`expectedContentHash`. Um conflito nunca é tratado como sucesso: a Server Action
+recarrega o detalhe autoritativo quando possível.
+
+O upload multipart preserva o original e limita o navegador a 10 MiB. A Tenant
+API extrai conteúdo de PDFs textuais; PDFs compostos somente por imagens exigem
+OCR antes do envio para produzir conteúdo pesquisável. O download usa a Route Handler
+autenticada `/api/knowledge/documents/:documentId/versions/:versionId/original`,
+repassa apenas headers seguros e mantém `private, no-store`, `nosniff`, política
+same-origin e CSP sandbox. O access token nunca é serializado no cliente.
+
+Escopo, visibilidade e vigência são enviados conforme o contrato. O catálogo
+de `GET /knowledge/departments`, protegido pelas permissões `knowledge:*`,
+alimenta o seletor único e a lista múltipla acessível; UUIDs não são digitados
+manualmente nem obtidos de um endpoint com autoridade diferente.
+
+`/registration-data-reviews` usa `GET /registration-data-reviews` e
+`POST /registration-data-reviews/:reviewId/decision`, ambos sob
+`clients:manage`. Rejeições exigem motivo. A interface só atualiza a fila depois
+que a decisão foi confirmada e uma nova lista autoritativa foi lida; ela não
+aplica o valor proposto de forma otimista.
+
+Anexos do workspace de WhatsApp carregam interpretação sob demanda para evitar
+N+1, usando exatamente `GET .../media-interpretation`,
+`POST .../actions/analyze-media` e `POST .../media-interpretation/correction`.
+Confidence, erro, contexto efetivo e proveniência são exibidos, mas chaves de
+credencial, tokens e segredos são removidos na fronteira de apresentação. Uma
+correção humana imutável passa a ser o contexto efetivo e não dispara uma nova
+análise.
+
+Para sessões nativas, o painel carrega CustomerContext somente sob demanda via
+`GET /customer-context/sessions/:serviceSessionId`, consulta cada seção detalhada
+apenas quando solicitada e lista sugestões pelo endpoint público filtrado pela
+sessão. Leitura exige `service:view`; decisões exigem `service:respond` e enviam
+`commandId` mais `expectedUpdatedAt`. Aprovação e descarte só atualizam a tela
+após recarga autoritativa; conflitos também tentam devolver esse snapshot. O
+campo de proveniência é exibido com remoção recursiva de chaves sensíveis.

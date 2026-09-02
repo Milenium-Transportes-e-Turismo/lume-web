@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { resolveTenantApiBaseUrl, resolveTenantApiTimeout } from '@/features/auth/infrastructure';
+import { getTenantApiConfig } from '@/env.server';
 
 import type { QuoteProposalRepository } from '../application';
 import { LumeApiQuoteProposalRepository } from './tenant-api-quote-proposal-repository';
@@ -10,10 +10,12 @@ export function createQuoteProposalRepository(accessToken: string): QuoteProposa
     throw new Error('An authenticated Tenant API access token is required.');
   }
 
+  const tenantApi = getTenantApiConfig();
+
   return new LumeApiQuoteProposalRepository(
-    resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL),
+    tenantApi.baseUrl,
     accessToken,
     fetch,
-    resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS),
+    tenantApi.timeoutMs,
   );
 }

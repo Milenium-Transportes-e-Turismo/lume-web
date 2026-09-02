@@ -1,7 +1,6 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Popover } from '@base-ui/react/popover';
 
 import {
   AlertCircle,
@@ -26,14 +25,6 @@ import { CurrentUserAvatar } from '@/shared/current-user-avatar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 import { Bubble, BubbleContent } from '@/shared/ui/bubble';
 import { Button } from '@/shared/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/shared/ui/dropdown-menu';
 import { Input } from '@/shared/ui/input';
 import { Message, MessageAvatar, MessageContent } from '@/shared/ui/message';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -47,7 +38,12 @@ import type {
   WhatsAppMessageKind,
 } from '../domain';
 import { resolveConversationHistoryScrollTop } from './conversation-history-scroll';
-import { MESSAGE_KIND_LABELS } from './conversation-labels';
+import {
+  getWhatsAppMessageActorLabel,
+  getWhatsAppMessageSourceLabel,
+  MESSAGE_KIND_LABELS,
+} from './conversation-labels';
+import { MessageMediaInterpretation } from './message-media-interpretation';
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -393,6 +389,7 @@ export interface ConversationMessageSheetProps {
   readonly feedbackMessage: string;
   readonly feedbackTone: 'neutral' | 'success' | 'error';
   readonly readOnly?: boolean;
+  readonly canManageMedia?: boolean;
 }
 
 export function ConversationMessageSheet({
@@ -415,10 +412,13 @@ export function ConversationMessageSheet({
   feedbackMessage,
   feedbackTone,
   readOnly = false,
+  canManageMedia = false,
 }: ConversationMessageSheetProps) {
   const open = true;
   const historyRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const attachmentMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const emojiPickerTriggerRef = useRef<HTMLButtonElement>(null);
   const attachmentPickerKindRef = useRef<AttachmentPickerKind>('auto');
   const initialScrollFrameRef = useRef<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -427,6 +427,8 @@ export function ConversationMessageSheet({
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [emojiSearch, setEmojiSearch] = useState('');
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const previousHistoryRef = useRef({
     open: false,
     loaded: false,
@@ -450,6 +452,7 @@ export function ConversationMessageSheet({
       if (!input) return;
       attachmentPickerKindRef.current = kind;
       input.accept = accept;
+      setAttachmentMenuOpen(false);
       input.click();
     },
     [],
@@ -640,7 +643,7 @@ export function ConversationMessageSheet({
                   </p>
                   <small className="text-muted-foreground">
                     {formatDateTime(message.occurredAt)} ·{' '}
-                    {message.direction === 'outbound' ? 'Atendimento' : conversation.contact.name}
+                    {getWhatsAppMessageActorLabel(message, conversation.contact.name)}
                   </small>
                 </article>
               ))}
@@ -711,8 +714,15 @@ export function ConversationMessageSheet({
                 .reverse()
                 .find((attempt) => attempt.status === 'failed');
               const messageTime = TIME_FORMATTER.format(new Date(message.occurredAt));
-              const messageSender =
-                message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendente';
+              const messageSender = getWhatsAppMessageActorLabel(
+                message,
+                conversation.contact.name,
+              );
+              const messageSource = getWhatsAppMessageSourceLabel(message);
+              const usesGenericOutboundAvatar =
+                message.actor?.type === 'EXTERNAL_HUMAN' ||
+                message.actor?.type === 'AI_AGENT' ||
+                message.actor?.type === 'SYSTEM';
               const previousMessage = conversation.messages[messageIndex - 1];
               const startsNewDay =
                 !previousMessage ||
@@ -737,12 +747,19 @@ export function ConversationMessageSheet({
                   <Message align={isOutbound ? 'end' : 'start'}>
                     <MessageAvatar>
                       {isOutbound ? (
-                        <CurrentUserAvatar
-                          name={
-                            message.sentBy?.name ?? conversation.assignedTo?.name ?? 'Atendimento'
-                          }
-                          imageAlt="Foto do atendente"
-                        />
+                        usesGenericOutboundAvatar ? (
+                          <Avatar aria-label={messageSender} title={messageSender}>
+                            <AvatarFallback>
+                              {message.actor?.type === 'EXTERNAL_HUMAN'
+                                ? 'WA'
+                                : message.actor?.type === 'AI_AGENT'
+                                  ? 'IA'
+                                  : 'SI'}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <CurrentUserAvatar name={messageSender} imageAlt="Foto do atendente" />
+                        )
                       ) : (
                         <Avatar>
                           {conversation.contact.profilePictureUrl ? (
@@ -768,10 +785,17 @@ export function ConversationMessageSheet({
                               </p>
                             ) : null}
                             {message.attachment ? (
-                              <MessageAttachmentPreview
-                                kind={message.kind}
-                                attachment={message.attachment}
-                              />
+                              <>
+                                <MessageAttachmentPreview
+                                  kind={message.kind}
+                                  attachment={message.attachment}
+                                />
+                                <MessageMediaInterpretation
+                                  conversationId={conversation.id}
+                                  message={message}
+                                  canManage={canManageMedia}
+                                />
+                              </>
                             ) : null}
                             {failedAttempt ? (
                               <p className="flex items-start gap-1 text-xs text-destructive-emphasis">
@@ -783,9 +807,8 @@ export function ConversationMessageSheet({
                               className="ml-auto block w-fit text-[10px] leading-none text-muted-foreground/80"
                               data-occurred-at={message.occurredAt}
                             >
-                              {isOutbound
-                                ? `Enviada por ${messageSender} · ${messageTime}`
-                                : messageTime}
+                              {isOutbound ? `Enviada por ${messageSender}` : messageSender}
+                              {messageSource ? ` via ${messageSource}` : ''} · {messageTime}
                             </small>
                           </div>
                         </BubbleContent>
@@ -834,110 +857,151 @@ export function ConversationMessageSheet({
             </Button>
           </div>
         ) : null}
+        {canSendMessage && attachmentMenuOpen ? (
+          <section
+            id="message-attachment-options"
+            aria-label="Tipos de anexo"
+            className="grid grid-cols-2 gap-1 rounded-xl border bg-popover p-2 text-popover-foreground shadow-sm sm:grid-cols-3"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setAttachmentMenuOpen(false);
+                attachmentMenuTriggerRef.current?.focus();
+              }
+            }}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                openAttachmentPicker(
+                  'application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar,.7z,application/zip,application/x-zip-compressed,application/vnd.rar,application/x-rar-compressed,application/x-7z-compressed',
+                )
+              }
+            >
+              <FileText aria-hidden="true" /> Documento
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => openAttachmentPicker('image/*,video/*')}
+            >
+              <ImageIcon aria-hidden="true" /> Fotos e vídeos
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => openAttachmentPicker('audio/*')}
+            >
+              <Music aria-hidden="true" /> Áudio
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => openAttachmentPicker('.vcf,text/vcard,text/x-vcard')}
+            >
+              <Contact aria-hidden="true" /> Contato
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => openAttachmentPicker('image/gif,.gif')}
+            >
+              <ImagePlay aria-hidden="true" /> GIF do dispositivo
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => openAttachmentPicker('image/webp,.webp', 'sticker')}
+            >
+              <Sticker aria-hidden="true" /> Figurinha WebP
+            </Button>
+          </section>
+        ) : null}
+        {canSendMessage && emojiPickerOpen ? (
+          <section
+            id="message-emoji-picker"
+            aria-labelledby="message-emoji-picker-title"
+            className="rounded-xl border bg-popover p-3 text-popover-foreground shadow-sm"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setEmojiPickerOpen(false);
+                emojiPickerTriggerRef.current?.focus();
+              }
+            }}
+          >
+            <h4 id="message-emoji-picker-title" className="font-semibold">
+              Emojis
+            </h4>
+            <Input
+              value={emojiSearch}
+              onChange={(event) => setEmojiSearch(event.target.value)}
+              aria-label="Pesquisar emoji"
+              placeholder="Pesquisar emoji"
+              className="mt-2"
+            />
+            <div className="mt-2 grid max-h-52 grid-cols-7 gap-1 overflow-y-auto sm:grid-cols-8">
+              {visibleEmojis.map(([emoji, keywords]) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="flex size-9 items-center justify-center rounded-md text-xl hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Inserir ${keywords}`}
+                  onClick={() => {
+                    onMessageDraftChange(
+                      `${messageDraft}${emoji}`.slice(0, HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH),
+                    );
+                    setEmojiPickerOpen(false);
+                    emojiPickerTriggerRef.current?.focus();
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
         <div className="flex min-h-12 min-w-0 items-end gap-1 rounded-2xl border bg-card p-1 shadow-xs focus-within:ring-2 focus-within:ring-ring/25">
           {canSendMessage ? (
             <div className="flex shrink-0 items-center" aria-label="Opções da mensagem">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Adicionar anexo"
-                      disabled={isSendingMessage}
-                    />
-                  }
-                >
-                  <Paperclip aria-hidden="true" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="start" className="w-56">
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>Adicionar</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        openAttachmentPicker(
-                          'application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar,.7z,application/zip,application/x-zip-compressed,application/vnd.rar,application/x-rar-compressed,application/x-7z-compressed',
-                        )
-                      }
-                    >
-                      <FileText aria-hidden="true" /> Documento
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openAttachmentPicker('image/*,video/*')}>
-                      <ImageIcon aria-hidden="true" /> Fotos e vídeos
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openAttachmentPicker('audio/*')}>
-                      <Music aria-hidden="true" /> Áudio
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => openAttachmentPicker('.vcf,text/vcard,text/x-vcard')}
-                    >
-                      <Contact aria-hidden="true" /> Contato
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openAttachmentPicker('image/gif,.gif')}>
-                      <ImagePlay aria-hidden="true" /> GIF do dispositivo
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => openAttachmentPicker('image/webp,.webp', 'sticker')}
-                    >
-                      <Sticker aria-hidden="true" /> Figurinha WebP
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button
+                ref={attachmentMenuTriggerRef}
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Adicionar anexo"
+                aria-controls="message-attachment-options"
+                aria-expanded={attachmentMenuOpen}
+                disabled={isSendingMessage}
+                onClick={() => {
+                  setAttachmentMenuOpen((current) => !current);
+                  setEmojiPickerOpen(false);
+                }}
+              >
+                <Paperclip aria-hidden="true" />
+              </Button>
 
-              <Popover.Root>
-                <Popover.Trigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Adicionar emoji"
-                      disabled={isSendingMessage}
-                    />
-                  }
-                >
-                  <Smile aria-hidden="true" />
-                </Popover.Trigger>
-                <Popover.Portal>
-                  <Popover.Positioner side="top" align="start" sideOffset={8} className="z-50">
-                    <Popover.Popup className="w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg outline-none">
-                      <Popover.Title className="font-semibold">Emojis</Popover.Title>
-                      <Input
-                        value={emojiSearch}
-                        onChange={(event) => setEmojiSearch(event.target.value)}
-                        placeholder="Pesquisar emoji"
-                        className="mt-2"
-                      />
-                      <div className="mt-2 grid max-h-52 grid-cols-7 gap-1 overflow-y-auto sm:grid-cols-8">
-                        {visibleEmojis.map(([emoji, keywords]) => (
-                          <Popover.Close
-                            key={emoji}
-                            render={
-                              <button
-                                type="button"
-                                className="flex size-9 items-center justify-center rounded-md text-xl hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                aria-label={`Inserir ${keywords}`}
-                                onClick={() =>
-                                  onMessageDraftChange(
-                                    `${messageDraft}${emoji}`.slice(
-                                      0,
-                                      HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH,
-                                    ),
-                                  )
-                                }
-                              />
-                            }
-                          >
-                            {emoji}
-                          </Popover.Close>
-                        ))}
-                      </div>
-                    </Popover.Popup>
-                  </Popover.Positioner>
-                </Popover.Portal>
-              </Popover.Root>
+              <Button
+                ref={emojiPickerTriggerRef}
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Adicionar emoji"
+                aria-controls="message-emoji-picker"
+                aria-expanded={emojiPickerOpen}
+                disabled={isSendingMessage}
+                onClick={() => {
+                  setEmojiPickerOpen((current) => !current);
+                  setAttachmentMenuOpen(false);
+                }}
+              >
+                <Smile aria-hidden="true" />
+              </Button>
             </div>
           ) : null}
           <Textarea

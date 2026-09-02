@@ -24,7 +24,7 @@ const employee: EmployeeUser = {
   name: 'Maria Silva',
   type: 'employee',
   departments: ['commercial'],
-  permissions: ['dashboard:view', 'ai-agents:use'],
+  permissions: ['dashboard:view', 'ai-agents:view'],
   clientCategory: null,
   isActive: true,
 };

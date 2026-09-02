@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { getServerEnv, getSessionSecret } from '@/env.server';
 import { shouldRefreshApiToken } from '@/features/auth/application';
 import {
   API_TOKEN_COOKIE_NAME,
@@ -19,15 +20,20 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  const encryptedTokens = request.cookies.get(API_TOKEN_COOKIE_NAME)?.value;
-
-  if (encryptedTokens === undefined) {
+  if (getServerEnv().AUTH_SIMULATION_ENABLED) {
     return NextResponse.next();
   }
 
-  const sessionSecret = process.env.SESSION_SECRET;
+  const encryptedTokens = request.cookies.get(API_TOKEN_COOKIE_NAME)?.value;
 
-  if (sessionSecret === undefined) {
+  if (encryptedTokens === undefined || encryptedTokens.trim().length === 0) {
+    return NextResponse.next();
+  }
+
+  let sessionSecret: string;
+  try {
+    sessionSecret = getSessionSecret();
+  } catch {
     return redirectTo(request, SESSION_EXPIRED_PATH);
   }
 
@@ -53,7 +59,10 @@ export const config = {
     '/users/:path*',
     '/license/:path*',
     '/ai-agents/:path*',
+    '/whatsapp-channels/:path*',
     '/whatsapp-conversations/:path*',
+    '/knowledge/:path*',
+    '/registration-data-reviews/:path*',
     '/quote-proposals/:path*',
     '/profile/:path*',
     '/support/:path*',

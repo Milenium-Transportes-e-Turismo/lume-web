@@ -29,7 +29,7 @@ describe('getAuthorizedNavigationItems', () => {
     const items = getAuthorizedNavigationItems(createEmployee(['dashboard:view']));
 
     expect(items.map((item) => item.label)).toEqual(['Dashboard']);
-    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(14);
+    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(17);
   });
 
   it('shows License only with its explicit permission inside Management', () => {
@@ -70,6 +70,29 @@ describe('getAuthorizedNavigationItems', () => {
     expect(
       getAuthorizedNavigationItems(createEmployee(['clients:history'])).map((item) => item.label),
     ).toContain('Conciliação de Cadastros');
+  });
+
+  it('shows knowledge with any authoritative knowledge permission without an extra department gate', () => {
+    for (const permission of ['knowledge:view', 'knowledge:manage', 'knowledge:publish'] as const) {
+      expect(
+        getAuthorizedNavigationItems(createEmployee([permission], true, ['purchasing'])).map(
+          (item) => item.label,
+        ),
+      ).toContain('Knowledge Base');
+    }
+  });
+
+  it('shows registration reviews only with clients management permission', () => {
+    expect(
+      getAuthorizedNavigationItems(createEmployee(['clients:manage'], true, ['operations'])).map(
+        (item) => item.label,
+      ),
+    ).toContain('Revisões cadastrais');
+    expect(
+      getAuthorizedNavigationItems(createEmployee(['clients:view'], true, ['operations'])).map(
+        (item) => item.label,
+      ),
+    ).not.toContain('Revisões cadastrais');
   });
 
   it('shows route planning only inside an operational employee scope', () => {
@@ -147,20 +170,31 @@ describe('getAuthorizedNavigationItems', () => {
     expect(items.find((item) => item.label === 'Orçamentos')?.href).toBe('/quote-proposals');
   });
 
-  it('does not grant administration or commercial navigation outside the linked department', () => {
+  it('grants the service workspace across internal departments but keeps other commercial routes scoped', () => {
     const commercialAdministrator = getAuthorizedNavigationItems(
       createEmployee(['dashboard:view', 'users:view'], true, ['commercial']),
     );
-    const operationsWithWhatsAppPermission = getAuthorizedNavigationItems(
-      createEmployee(['dashboard:view', 'whatsapp-conversations:manage'], true, ['operations']),
+    const operationsWithServicePermission = getAuthorizedNavigationItems(
+      createEmployee(['dashboard:view', 'service:view'], true, ['operations']),
     );
 
     expect(commercialAdministrator.map((item) => item.label)).toContain('Usuários');
     expect(commercialAdministrator.map((item) => item.label)).not.toContain('Licença');
-    expect(operationsWithWhatsAppPermission.map((item) => item.label)).not.toContain(
-      'Painel WhatsApp',
-    );
-    expect(operationsWithWhatsAppPermission.map((item) => item.label)).not.toContain('Orçamentos');
+    expect(operationsWithServicePermission.map((item) => item.label)).toContain('Painel WhatsApp');
+    expect(operationsWithServicePermission.map((item) => item.label)).not.toContain('Orçamentos');
+  });
+
+  it('keeps legacy WhatsApp permissions as navigation aliases without granting by default', () => {
+    expect(
+      getAuthorizedNavigationItems(
+        createEmployee(['whatsapp-conversations:view'], true, ['operations']),
+      ).map((item) => item.label),
+    ).toContain('Painel WhatsApp');
+    expect(
+      getAuthorizedNavigationItems(createEmployee([], true, ['operations'])).map(
+        (item) => item.label,
+      ),
+    ).not.toContain('Painel WhatsApp');
   });
 
   it('does not expose destinations to an inactive user', () => {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { hasPermission } from '@/features/auth/domain';
+import { hasServiceCapability } from '@/features/auth/domain';
 import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 import { WhatsAppConversationRepositoryError } from '@/features/whatsapp-conversations/application';
 import { downloadWhatsAppMessageContentForDashboard } from '@/features/whatsapp-conversations/server';
@@ -24,10 +24,7 @@ function contentDisposition(fileName: string, disposition: 'inline' | 'attachmen
 
 export async function GET(request: Request, context: RouteContext) {
   const session = await getCurrentAuthenticatedSession();
-  const canRead =
-    session !== null &&
-    (hasPermission(session.user, 'whatsapp-conversations:view') ||
-      hasPermission(session.user, 'whatsapp-conversations:manage'));
+  const canRead = session !== null && hasServiceCapability(session.user, 'view');
 
   if (!canRead) {
     return NextResponse.json(

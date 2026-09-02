@@ -9,10 +9,13 @@ import {
   LifeBuoy,
   MessageCircle,
   Route,
+  RadioTower,
   ContactRound,
   Building2,
   ScanSearch,
   Users,
+  BookOpenCheck,
+  ListChecks,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -61,6 +64,13 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
     group: 'records',
   },
   {
+    label: 'Revisões cadastrais',
+    href: '/registration-data-reviews',
+    permission: 'clients:manage',
+    icon: ListChecks,
+    group: 'records',
+  },
+  {
     label: 'Dashboard',
     href: '/dashboard',
     permission: 'dashboard:view',
@@ -70,14 +80,23 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
   {
     label: 'Agentes de IA',
     href: '/ai-agents',
-    permission: 'ai-agents:use',
+    permission: 'ai-agents:view',
     icon: Bot,
+    group: 'administration',
+  },
+  {
+    label: 'Knowledge Base',
+    href: '/knowledge',
+    permission: 'knowledge:view',
+    alternativePermissions: ['knowledge:manage', 'knowledge:publish'],
+    icon: BookOpenCheck,
     group: 'general',
   },
   {
     label: 'Painel WhatsApp',
     href: '/whatsapp-conversations',
-    permission: 'whatsapp-conversations:manage',
+    permission: 'service:view',
+    alternativePermissions: ['whatsapp-conversations:view', 'whatsapp-conversations:manage'],
     icon: MessageCircle,
     group: 'commercial',
   },
@@ -122,6 +141,13 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
     administratorOnly: true,
   },
   {
+    label: 'Canais WhatsApp',
+    href: '/whatsapp-channels',
+    permission: 'whatsapp-channels:view',
+    icon: RadioTower,
+    group: 'administration',
+  },
+  {
     label: 'Licença',
     href: '/license',
     permission: 'license:view',
@@ -154,6 +180,7 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
 function hasOrganizationalScope(user: User, item: InternalNavigationItem): boolean {
   if (user.isAdministrator === true) return true;
   if (item.href === '/users') return true;
+  if (item.href === '/whatsapp-conversations') return user.type === 'employee';
   if (item.group === 'commercial') return hasCommercialScope(user);
   if (item.group === 'operations') {
     return (

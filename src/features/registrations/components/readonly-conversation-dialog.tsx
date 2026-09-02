@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { LoaderCircle, MessageCircle, Search } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { ConversationMessageSheet } from '@/features/whatsapp-conversations/components/conversation-message-sheet';
 import type { WhatsAppConversation } from '@/features/whatsapp-conversations/domain';
@@ -29,6 +30,7 @@ export function ReadonlyConversationDialog({
 }: {
   readonly conversationId: string;
 }) {
+  const { push: pushRoute } = useRouter();
   const [open, setOpen] = useState(false);
   const [conversation, setConversation] = useState<WhatsAppConversation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ export function ReadonlyConversationDialog({
           cache: 'no-store',
         });
         if (response.status === 401) {
-          window.location.assign('/auth/session-expired');
+          pushRoute('/auth/session-expired');
           return;
         }
         if (!response.ok) throw new Error(await responseMessage(response));
@@ -86,7 +88,7 @@ export function ReadonlyConversationDialog({
         else setLoadingOlder(false);
       }
     },
-    [conversationId],
+    [conversationId, pushRoute],
   );
 
   return (

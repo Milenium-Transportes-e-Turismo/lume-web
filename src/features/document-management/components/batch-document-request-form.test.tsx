@@ -1,5 +1,4 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import type { DocumentTypeSummary } from '../domain';
 import type { TenantUser } from '@/features/tenant-administration/domain';
@@ -46,26 +45,21 @@ const documentTypes = [
 ] satisfies DocumentTypeSummary[];
 
 describe('BatchDocumentRequestForm', () => {
-  it('adiciona vários usuários e seleciona todos os documentos', async () => {
-    const interaction = userEvent.setup();
+  it('adiciona vários usuários e seleciona todos os documentos', () => {
     const { container } = render(
       <BatchDocumentRequestForm users={users} documentTypes={documentTypes} />,
     );
     const userSelect = screen.getByLabelText('Usuário a adicionar');
 
-    await interaction.click(userSelect);
-    await interaction.click(
-      screen.getByRole('option', { name: /Ana Silva · ana · ana@example.com/ }),
-    );
-    await interaction.click(screen.getByRole('button', { name: 'Adicionar usuário' }));
-    await interaction.click(userSelect);
-    await interaction.click(
-      screen.getByRole('option', { name: /Ana Souza · anas · ana.souza@example.com/ }),
-    );
-    await interaction.click(screen.getByRole('button', { name: 'Adicionar usuário' }));
-    await interaction.click(
-      screen.getByRole('checkbox', { name: /^Selecionar todos os documentos/ }),
-    );
+    fireEvent.change(userSelect, {
+      target: { value: 'Ana Silva · ana · ana@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar usuário' }));
+    fireEvent.change(userSelect, {
+      target: { value: 'Ana Souza · anas · ana.souza@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar usuário' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Selecionar todos os documentos/ }));
 
     expect(container.querySelectorAll('input[name="subjectUserIds"]')).toHaveLength(2);
     expect(container.querySelectorAll('input[name="documentTypeIds"]')).toHaveLength(2);

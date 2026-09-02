@@ -5,6 +5,10 @@ import type {
   WhatsAppMessage,
   WhatsAppConversationState,
   WhatsAppRequestStatus,
+  WhatsAppServiceAssignmentTarget,
+  WhatsAppServiceSessionPriority,
+  WhatsAppMediaInterpretation,
+  DeferredWhatsAppMediaInterpretation,
 } from '../../domain';
 
 export interface WhatsAppMessageSearchResult {
@@ -63,6 +67,27 @@ export interface SendHumanWhatsAppMessageCommand {
   readonly text: string;
 }
 
+export interface VersionedWhatsAppServiceSessionCommand {
+  readonly commandId: string;
+  readonly expectedVersion: number;
+  readonly serviceSessionId: string;
+  readonly reason?: string | null;
+}
+
+export interface ReturnToQueueWhatsAppServiceSessionCommand extends VersionedWhatsAppServiceSessionCommand {
+  readonly queueId: string;
+}
+
+export interface ChangeWhatsAppServiceSessionPriorityCommand extends VersionedWhatsAppServiceSessionCommand {
+  readonly priority: WhatsAppServiceSessionPriority;
+}
+
+export interface TransferWhatsAppServiceSessionCommand extends VersionedWhatsAppServiceSessionCommand {
+  readonly departmentId: string;
+  readonly queueId?: string;
+  readonly userId?: string;
+}
+
 export interface SendHumanWhatsAppMessageResult {
   readonly conversation: WhatsAppConversation;
   readonly message: WhatsAppMessage;
@@ -75,6 +100,7 @@ export interface WhatsAppMediaContent {
 }
 
 export interface WhatsAppConversationRepository {
+  getServiceAssignmentTargets(): Promise<readonly WhatsAppServiceAssignmentTarget[]>;
   startConversation(phone: string): Promise<WhatsAppConversation>;
   getConversations(
     filters?: GetWhatsAppConversationsFilters,
@@ -98,15 +124,33 @@ export interface WhatsAppConversationRepository {
   takeOverConversation(
     conversationId: string,
     expectedVersion: number,
+    commandId?: string,
+    serviceSessionId?: string,
   ): Promise<WhatsAppConversation>;
   returnConversationToBot(
     conversationId: string,
     expectedVersion: number,
+    commandId?: string,
+    serviceSessionId?: string,
   ): Promise<WhatsAppConversation>;
   forwardConversation(
     conversationId: string,
     targetDepartment: WhatsAppConversationDepartment,
     expectedVersion: number,
+    commandId?: string,
+    serviceSessionId?: string,
+  ): Promise<WhatsAppConversation>;
+  returnConversationToQueue(
+    conversationId: string,
+    command: ReturnToQueueWhatsAppServiceSessionCommand,
+  ): Promise<WhatsAppConversation>;
+  transferServiceSession(
+    conversationId: string,
+    command: TransferWhatsAppServiceSessionCommand,
+  ): Promise<WhatsAppConversation>;
+  changeConversationPriority(
+    conversationId: string,
+    command: ChangeWhatsAppServiceSessionPriorityCommand,
   ): Promise<WhatsAppConversation>;
   changeConversationDepartment(
     conversationId: string,
@@ -133,10 +177,26 @@ export interface WhatsAppConversationRepository {
     conversationId: string,
     expectedVersion: number,
     reason?: string | null,
+    commandId?: string,
+    serviceSessionId?: string,
   ): Promise<WhatsAppConversation>;
   sendHumanMessage(
     conversationId: string,
     command: SendHumanWhatsAppMessageCommand,
   ): Promise<SendHumanWhatsAppMessageResult>;
   downloadMessageContent(conversationId: string, messageId: string): Promise<WhatsAppMediaContent>;
+  getMediaInterpretation(
+    conversationId: string,
+    messageId: string,
+  ): Promise<WhatsAppMediaInterpretation>;
+  analyzeMedia(
+    conversationId: string,
+    messageId: string,
+  ): Promise<WhatsAppMediaInterpretation | DeferredWhatsAppMediaInterpretation>;
+  correctMediaInterpretation(
+    conversationId: string,
+    messageId: string,
+    correction: string,
+    feedback?: string,
+  ): Promise<WhatsAppMediaInterpretation>;
 }

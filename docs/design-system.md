@@ -1,9 +1,30 @@
 # Design system Lume
 
 Esta aplicação usa os componentes base em `src/shared/ui` e tokens semânticos em
-`src/app/globals.css`. A auditoria desta migração cobriu os 132 arquivos TSX do
-Tenant Web, incluindo autenticação, shell, dashboard, agentes de IA, WhatsApp,
-orçamentos, usuários, documentos, perfil, suporte e licença.
+`src/app/globals.css`. A auditoria cobre autenticação, shell, dashboard, agentes
+de IA, WhatsApp, orçamentos, usuários, documentos, perfil, suporte e licença.
+
+## Registry e proteção das customizações
+
+`components.json` usa `base-nova`, React Server Components, Tailwind CSS 4 sem
+arquivo de configuração, variáveis CSS, ícones Lucide e aliases `@/shared/ui`,
+`@/shared/lib` e `@/shared/hooks`. A identidade Lume continua nos tokens; o
+registry shadcn fornece infraestrutura, não a marca.
+
+Em 29/08/2026, `npx shadcn@latest add --all --dry-run` encontrou 62 itens: 61
+colisões com arquivos já existentes e somente `questionnaire.tsx` ausente. O
+comando real foi executado sem `--overwrite`; todas as colisões foram recusadas
+e apenas o arquivo ausente foi criado. `@shadcn/react` passou de 0.2.1 para 0.3.0
+porque o primitive `questionnaire` não existe na versão anterior. Nenhuma
+alteração automática foi aceita em `components.json`, `globals.css`,
+`use-mobile.ts` ou nos componentes existentes.
+
+O inventário atual possui 61 componentes TSX no nível principal, um componente
+customizado aninhado (`section-heading`) e um teste de primitive. Atualizações
+futuras devem repetir primeiro o `--dry-run`/`--diff`, comparar cada colisão e
+nunca usar `--overwrite` em lote. Em especial, `button`, `toast`, `field`,
+`sidebar`, `message`, `bubble`, `accordion`, `dropdown-menu` e `empty` possuem
+contratos ou estilos consumidos pela aplicação.
 
 ## Identidade e tema
 
@@ -27,36 +48,41 @@ Componentes de domínio não devem usar classes fixas de paleta como `blue-*`,
 
 ## Componentes revisados
 
-| Componente  | Aplicação ou decisão                                                    |
-| ----------- | ----------------------------------------------------------------------- |
-| Progress    | Progresso de solicitações e revisão documental.                         |
-| Select      | Filtros, políticas, decisões e administração de usuários.               |
-| Separator   | Divisões semânticas; não substitui toda borda estrutural.               |
-| Bubble      | Mensagens e estados compactos do WhatsApp.                              |
-| Checkbox    | Login, seleção documental e permissões.                                 |
-| Collapsible | Navegação e seções documentais expansíveis.                             |
-| Combobox    | Seleção pesquisável de usuários em solicitações avulsas.                |
-| Dialog      | Confirmações, formulários e revisão documental.                         |
-| Drawer      | Central de notificações e superfícies móveis.                           |
-| Input       | Campos textuais e de busca.                                             |
-| Scroll Area | Filas e listas longas com altura controlada.                            |
-| Sheet       | Histórico e compositor de mensagens.                                    |
-| Textarea    | Observações, motivos e mensagens.                                       |
-| Toast       | Confirmações transitórias; erros de formulário continuam também inline. |
-| Toggle      | Alternância de tema e controles binários adequados.                     |
-| Tooltip     | Complemento para ações apenas com ícone; nunca é o único rótulo.        |
-| Accordion   | Documentos aprovados e conteúdo concluído.                              |
-| Tabs        | Agrupamento por situação documental.                                    |
+| Componente    | Aplicação ou decisão                                                    |
+| ------------- | ----------------------------------------------------------------------- |
+| Progress      | Progresso de solicitações e revisão documental.                         |
+| Select        | Filtros, políticas, decisões e administração de usuários.               |
+| Separator     | Divisões semânticas; não substitui toda borda estrutural.               |
+| Bubble        | Mensagens e estados compactos do WhatsApp.                              |
+| Checkbox      | Login, seleção documental e permissões.                                 |
+| Collapsible   | Navegação e seções documentais expansíveis.                             |
+| Combobox      | Seleção pesquisável de usuários em solicitações avulsas.                |
+| Dialog        | Confirmações, formulários e revisão documental.                         |
+| Drawer        | Central de notificações e superfícies móveis.                           |
+| Input         | Campos textuais e de busca.                                             |
+| Scroll Area   | Filas e listas longas com altura controlada.                            |
+| Sheet         | Primitive disponível; a adoção por componentes de domínio é explícita.  |
+| Textarea      | Observações, motivos e mensagens.                                       |
+| Toast         | Confirmações transitórias; erros de formulário continuam também inline. |
+| Toggle        | Alternância de tema e controles binários adequados.                     |
+| Tooltip       | Complemento para ações apenas com ícone; nunca é o único rótulo.        |
+| Accordion     | Documentos aprovados e conteúdo concluído.                              |
+| Tabs          | Agrupamento por situação documental.                                    |
+| Questionnaire | Fluxos guiados futuros; ainda sem consumidor de domínio.                |
 
-## Componentes não introduzidos
+## Componentes instalados sem adoção funcional
 
-- **Calendar e Date Picker:** os fluxos atuais usam `date` e `datetime-local`
-  nativos, que preservam teclado móvel, timezone e o contrato das Server Actions.
-  Não há seleção de intervalo ou bloqueio de datas que justifique outra camada.
+- **Calendar:** está instalado, mas os fluxos atuais ainda usam `date` e
+  `datetime-local` nativos, que preservam teclado móvel, timezone e o contrato
+  das Server Actions. Um Date Picker só deve ser composto quando existir seleção
+  de intervalo ou bloqueio de datas que justifique outra camada.
 - **Hover Card:** informações essenciais precisam estar disponíveis em toque e
   teclado, sem depender de hover.
 - **Toggle Group:** não existe atualmente um conjunto compacto de opções
   mutuamente relacionadas que justifique o componente.
+- **Questionnaire:** o primitive oficial está disponível, mas textos padrão em
+  inglês não devem chegar à interface; cada composição de domínio fornece copy
+  em português e valida seu próprio contrato.
 
 Também permanecem nativos os inputs ocultos das Server Actions, seletores de
 arquivo, links de download e linhas ricas de seleção. Recharts, previews de mídia,

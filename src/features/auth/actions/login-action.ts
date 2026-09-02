@@ -1,5 +1,7 @@
 'use server';
 
+import { getServerEnv } from '@/env.server';
+
 import {
   AuthenticationGatewayError,
   saveAuthenticatedSession,
@@ -18,11 +20,7 @@ import {
 import { AUTH_FALLBACK_ERROR_CODES, type AuthFailureFeedback } from '../lib/auth-error-feedback';
 import { loginSchema } from '../lib/login-schema';
 import { passwordChangeActionSchema } from '../lib/password-change-schema';
-import {
-  findSimulatedUserByCredentials,
-  isSimulatedLoginEnabled,
-  type SimulatedUser,
-} from '../simulation';
+import { findSimulatedUserByCredentials, type SimulatedUser } from '../simulation';
 
 export type LoginActionFailure = AuthFailureFeedback & {
   readonly passwordSetupChallenge?: PasswordSetupChallenge;
@@ -65,10 +63,8 @@ export async function loginAction(input: unknown): Promise<LoginActionResult> {
     };
   }
 
-  const simulationEnabled = isSimulatedLoginEnabled(
-    process.env.NODE_ENV,
-    process.env.AUTH_SIMULATION_ENABLED,
-  );
+  const environment = getServerEnv();
+  const simulationEnabled = environment.AUTH_SIMULATION_ENABLED;
   let session: AuthenticatedSession;
   let apiTokens: ApiAuthenticationTokens | null = null;
   let authenticationGateway: AuthenticationGateway | null = null;
@@ -178,9 +174,7 @@ export async function loginAction(input: unknown): Promise<LoginActionResult> {
   return {
     success: true,
     destination:
-      session.user.documentAccessMode === 'document-portal'
-        ? '/documents'
-        : '/dashboard',
+      session.user.documentAccessMode === 'document-portal' ? '/documents' : '/dashboard',
   };
 }
 

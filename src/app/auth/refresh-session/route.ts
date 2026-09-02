@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+import { getSessionSecret } from '@/env.server';
 import { createTenantApiAuthenticationGateway } from '@/features/auth/infrastructure/tenant-api';
 import {
   API_TOKEN_COOKIE_NAME,
@@ -46,11 +47,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const successResponse = redirectResponse(request, returnTo);
 
   try {
-    const sessionSecret = process.env.SESSION_SECRET;
-
-    if (sessionSecret === undefined) {
-      throw new Error('SESSION_SECRET is required.');
-    }
+    const sessionSecret = getSessionSecret();
 
     const cookieStore = responseCookieStore(request, successResponse);
     const sessionStorage = new CookieSessionStorage(cookieStore, sessionSecret);

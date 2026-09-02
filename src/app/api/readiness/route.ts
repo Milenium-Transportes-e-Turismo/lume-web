@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { resolveTenantApiBaseUrl, resolveTenantApiTimeout } from '@/features/auth/infrastructure';
+import { getTenantApiConfig } from '@/env.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,22 +23,20 @@ function readinessResponse(status: 'ready' | 'not-ready', upstream: 'ready' | 'u
 }
 
 export async function GET() {
-  let tenantApiUrl: string;
-  let timeoutMs: number;
+  let tenantApi: ReturnType<typeof getTenantApiConfig>;
 
   try {
-    tenantApiUrl = resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL);
-    timeoutMs = resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS);
+    tenantApi = getTenantApiConfig();
   } catch {
     return readinessResponse('not-ready', 'unavailable');
   }
 
   try {
-    const response = await fetch(`${tenantApiUrl}/health/ready`, {
+    const response = await fetch(`${tenantApi.baseUrl}/health/ready`, {
       method: 'GET',
       cache: 'no-store',
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(tenantApi.timeoutMs),
     });
 
     return response.ok

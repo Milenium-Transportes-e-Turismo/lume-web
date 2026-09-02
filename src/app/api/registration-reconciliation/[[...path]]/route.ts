@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { getTenantApiConfig } from '@/env.server';
 import { RegistrationGatewayError } from '@/features/registrations/application';
 import { executeAuthenticatedRegistrationTokenMutation } from '@/features/registrations/server';
 
@@ -14,18 +15,14 @@ function status(error: RegistrationGatewayError): number {
   return 503;
 }
 
-async function proxy(
-  request: Request,
-  context: { params: Promise<{ path?: string[] }> },
-) {
+async function proxy(request: Request, context: { params: Promise<{ path?: string[] }> }) {
   const path = (await context.params).path ?? [];
   if (request.method !== 'POST' || path.join('/') !== 'imports') {
     return NextResponse.json({ message: 'Operação de conciliação inválida.' }, { status: 404 });
   }
   try {
     return await executeAuthenticatedRegistrationTokenMutation(async (accessToken) => {
-      const baseUrl = process.env.LUME_TENANT_API_URL;
-      if (!baseUrl) throw new Error('LUME_TENANT_API_URL is required.');
+      const tenantApi = getTenantApiConfig('LUME_TENANT_API_URL is required.');
       const headers = new Headers({
         Accept: 'application/json',
         Authorization: `Bearer ${accessToken}`,
@@ -43,7 +40,7 @@ async function proxy(
         init.duplex = 'half';
       }
       const upstream = await fetch(
-        `${baseUrl.replace(/\/+$/, '')}/registration-reconciliation/imports`,
+        `${tenantApi.baseUrl}/registration-reconciliation/imports`,
         init,
       );
       return new Response(upstream.body, {

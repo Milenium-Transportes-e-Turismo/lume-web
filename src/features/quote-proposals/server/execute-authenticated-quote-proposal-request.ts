@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { getServerEnv } from '@/env.server';
 import {
   AuthenticationGatewayError,
   shouldRefreshApiToken,
@@ -24,6 +25,18 @@ async function executeAuthenticatedQuoteProposalOperation<T>(
     createCookieApiTokenStorage(),
   ]);
   const [session, storedTokens] = await Promise.all([sessionStorage.get(), tokenStorage.get()]);
+
+  if (
+    getServerEnv().AUTH_SIMULATION_ENABLED &&
+    session !== null &&
+    isSessionValid(session) &&
+    storedTokens === null
+  ) {
+    throw new QuoteProposalRepositoryError(
+      'service-unavailable',
+      'Os orçamentos da Tenant API não estão disponíveis no modo simulado.',
+    );
+  }
 
   if (session === null || !isSessionValid(session) || storedTokens === null) {
     if (canRefreshCookies) {

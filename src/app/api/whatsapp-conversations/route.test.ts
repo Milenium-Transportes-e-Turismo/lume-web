@@ -65,7 +65,7 @@ describe('WhatsApp polling route', () => {
 
   it('returns the tenant-scoped list through the authenticated server layer', async () => {
     const conversation = createWhatsAppConversationFixture();
-    mockedSession.mockResolvedValue(session(['whatsapp-conversations:view']));
+    mockedSession.mockResolvedValue(session(['service:view']));
     mockedPollList.mockResolvedValue({
       conversations: [conversation],
       page: 1,

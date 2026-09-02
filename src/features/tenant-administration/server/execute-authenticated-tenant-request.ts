@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { getServerEnv } from '@/env.server';
 import {
   AuthenticationGatewayError,
   shouldRefreshApiToken,
@@ -24,6 +25,18 @@ async function executeAuthenticatedTenantOperation<T>(
     createCookieApiTokenStorage(),
   ]);
   const [session, storedTokens] = await Promise.all([sessionStorage.get(), tokenStorage.get()]);
+
+  if (
+    getServerEnv().AUTH_SIMULATION_ENABLED &&
+    session !== null &&
+    isSessionValid(session) &&
+    storedTokens === null
+  ) {
+    throw new TenantAdministrationError(
+      'service-unavailable',
+      'A administração da Tenant API não está disponível no modo simulado.',
+    );
+  }
 
   if (session === null || !isSessionValid(session) || storedTokens === null) {
     await Promise.allSettled([sessionStorage.remove(), tokenStorage.remove()]);

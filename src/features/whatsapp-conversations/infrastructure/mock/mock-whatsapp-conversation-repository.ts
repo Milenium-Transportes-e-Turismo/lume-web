@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   WhatsAppConversationRepositoryError,
+  type ChangeWhatsAppServiceSessionPriorityCommand,
   type GetWhatsAppConversationsFilters,
   type SendHumanWhatsAppMessageCommand,
   type SendHumanWhatsAppMessageResult,
@@ -9,9 +10,12 @@ import {
   type WhatsAppConversationPage,
   type WhatsAppMediaContent,
   type WhatsAppMessageSearchResult,
+  type ReturnToQueueWhatsAppServiceSessionCommand,
+  type TransferWhatsAppServiceSessionCommand,
 } from '../../application';
 import {
   getWhatsAppConversationMetrics,
+  getCurrentWhatsAppServiceSession,
   type WhatsAppConversation,
   type WhatsAppConversationDepartment,
 } from '../../domain';
@@ -63,6 +67,10 @@ function updateConversation(
 }
 
 export class MockWhatsAppConversationRepository implements WhatsAppConversationRepository {
+  async getServiceAssignmentTargets() {
+    return [];
+  }
+
   async startConversation(phone: string): Promise<WhatsAppConversation> {
     const existing = mockConversations.find(
       (conversation) => conversation.contact.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''),
@@ -234,6 +242,65 @@ export class MockWhatsAppConversationRepository implements WhatsAppConversationR
     });
   }
 
+  async returnConversationToQueue(
+    conversationId: string,
+    command: ReturnToQueueWhatsAppServiceSessionCommand,
+  ): Promise<WhatsAppConversation> {
+    const current = mockConversations[getConversationIndex(conversationId)];
+    const serviceSession = getCurrentWhatsAppServiceSession(current);
+    return updateConversation(conversationId, command.expectedVersion, {
+      conversationState: 'sent-to-human',
+      assignedTo: null,
+      currentServiceSession: {
+        ...serviceSession,
+        responsibleUserId: null,
+        responsible: null,
+        status: 'WAITING_HUMAN',
+        controlMode: 'HUMAN',
+        queueId: command.queueId,
+        version: serviceSession.version + 1,
+      },
+    });
+  }
+
+  async transferServiceSession(
+    conversationId: string,
+    command: TransferWhatsAppServiceSessionCommand,
+  ): Promise<WhatsAppConversation> {
+    const current = mockConversations[getConversationIndex(conversationId)];
+    const serviceSession = getCurrentWhatsAppServiceSession(current);
+    return updateConversation(conversationId, command.expectedVersion, {
+      conversationState: 'sent-to-human',
+      assignedTo: null,
+      currentServiceSession: {
+        ...serviceSession,
+        currentDepartmentId: command.departmentId,
+        queueId: command.queueId ?? null,
+        responsibleUserId: command.userId ?? null,
+        responsible: null,
+        queue: null,
+        version: serviceSession.version + 1,
+      },
+    });
+  }
+
+  async changeConversationPriority(
+    conversationId: string,
+    command: ChangeWhatsAppServiceSessionPriorityCommand,
+  ): Promise<WhatsAppConversation> {
+    const current = mockConversations[getConversationIndex(conversationId)];
+    const serviceSession = getCurrentWhatsAppServiceSession(current);
+    return updateConversation(conversationId, command.expectedVersion, {
+      currentServiceSession: {
+        ...serviceSession,
+        priority: command.priority,
+        priorityReason: command.reason?.trim() || null,
+        prioritySource: 'HUMAN_USER',
+        version: serviceSession.version + 1,
+      },
+    });
+  }
+
   async changeConversationDepartment(
     conversationId: string,
     targetDepartment: WhatsAppConversationDepartment,
@@ -354,6 +421,27 @@ export class MockWhatsAppConversationRepository implements WhatsAppConversationR
     throw new WhatsAppConversationRepositoryError(
       'not-found',
       'O arquivo não está disponível nos dados de demonstração.',
+    );
+  }
+
+  async getMediaInterpretation(): Promise<never> {
+    throw new WhatsAppConversationRepositoryError(
+      'service-unavailable',
+      'A interpretação de mídia exige a Tenant API real.',
+    );
+  }
+
+  async analyzeMedia(): Promise<never> {
+    throw new WhatsAppConversationRepositoryError(
+      'service-unavailable',
+      'A análise de mídia exige a Tenant API real.',
+    );
+  }
+
+  async correctMediaInterpretation(): Promise<never> {
+    throw new WhatsAppConversationRepositoryError(
+      'service-unavailable',
+      'A correção de mídia exige a Tenant API real.',
     );
   }
 }

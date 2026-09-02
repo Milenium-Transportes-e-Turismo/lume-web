@@ -1,6 +1,7 @@
 import type { WhatsAppConversationRepository } from '../contracts';
 import { closeWhatsAppConversation } from './close-whatsapp-conversation';
 import { closeWhatsAppConversationAfterRejection } from './close-whatsapp-conversation-after-rejection';
+import { changeWhatsAppConversationPriority } from './change-whatsapp-conversation-priority';
 import { forwardWhatsAppConversation } from './forward-whatsapp-conversation';
 import { getWhatsAppConversationById } from './get-whatsapp-conversation-by-id';
 import {
@@ -9,12 +10,14 @@ import {
 } from './get-whatsapp-conversations';
 import { markWhatsAppConversationAsRead } from './mark-whatsapp-conversation-as-read';
 import { returnWhatsAppConversationToBot } from './return-whatsapp-conversation-to-bot';
+import { returnWhatsAppConversationToQueue } from './return-whatsapp-conversation-to-queue';
 import { sendHumanWhatsAppMessage } from './send-human-whatsapp-message';
 import { startWhatsAppConversation } from './start-whatsapp-conversation';
 import { takeOverWhatsAppConversation } from './take-over-whatsapp-conversation';
 
 function createRepository(): jest.Mocked<WhatsAppConversationRepository> {
   return {
+    getServiceAssignmentTargets: jest.fn(),
     startConversation: jest.fn(),
     getConversations: jest.fn(),
     getDashboardConversations: jest.fn(),
@@ -25,6 +28,9 @@ function createRepository(): jest.Mocked<WhatsAppConversationRepository> {
     takeOverConversation: jest.fn(),
     returnConversationToBot: jest.fn(),
     forwardConversation: jest.fn(),
+    returnConversationToQueue: jest.fn(),
+    transferServiceSession: jest.fn(),
+    changeConversationPriority: jest.fn(),
     changeConversationDepartment: jest.fn(),
     archiveConversation: jest.fn(),
     unarchiveConversation: jest.fn(),
@@ -33,6 +39,9 @@ function createRepository(): jest.Mocked<WhatsAppConversationRepository> {
     closeConversation: jest.fn(),
     sendHumanMessage: jest.fn(),
     downloadMessageContent: jest.fn(),
+    getMediaInterpretation: jest.fn(),
+    analyzeMedia: jest.fn(),
+    correctMediaInterpretation: jest.fn(),
   };
 }
 
@@ -167,5 +176,37 @@ describe('WhatsApp conversation use cases', () => {
     });
 
     expect(repository.sendHumanMessage).not.toHaveBeenCalled();
+  });
+
+  it('validates versioned ServiceSession queue and priority commands', async () => {
+    const repository = createRepository();
+
+    await returnWhatsAppConversationToQueue(repository, ' conversation-001 ', {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000721',
+      expectedVersion: 12,
+      queueId: '00000000-0000-4000-8000-000000000732',
+    });
+    await changeWhatsAppConversationPriority(repository, ' conversation-001 ', {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000722',
+      expectedVersion: 13,
+      priority: 'URGENT',
+      reason: '  Risco operacional  ',
+    });
+
+    expect(repository.returnConversationToQueue).toHaveBeenCalledWith('conversation-001', {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000721',
+      expectedVersion: 12,
+      queueId: '00000000-0000-4000-8000-000000000732',
+    });
+    expect(repository.changeConversationPriority).toHaveBeenCalledWith('conversation-001', {
+      serviceSessionId: '00000000-0000-4000-8000-000000000731',
+      commandId: '00000000-0000-4000-8000-000000000722',
+      expectedVersion: 13,
+      priority: 'URGENT',
+      reason: 'Risco operacional',
+    });
   });
 });

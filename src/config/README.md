@@ -1,10 +1,11 @@
 # Config
 
-Esta pasta concentra configurações globais da aplicação.
+Esta pasta concentra configurações globais da aplicação. Variáveis de ambiente
+são uma exceção deliberada: os schemas ficam em `src/env.ts`, a leitura privada
+em `src/env.server.ts` e a projeção pública em `src/env.public.ts`.
 
-Exemplos futuros:
+Exemplos:
 
-- variáveis de ambiente tipadas
 - configuração de tema
 - configuração de autenticação
 - configuração de rotas

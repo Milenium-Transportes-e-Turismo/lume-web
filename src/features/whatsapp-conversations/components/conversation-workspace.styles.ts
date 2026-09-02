@@ -2,7 +2,7 @@ import { cva } from 'class-variance-authority';
 
 export const conversationWorkspaceStyles = {
   section: cva(
-    'grid h-full w-full max-w-full min-w-0 overflow-hidden bg-card text-card-foreground lg:grid-cols-[clamp(22rem,28vw,27rem)_minmax(0,1fr)]',
+    'grid h-full w-full max-w-full min-w-0 overflow-hidden bg-card text-card-foreground lg:grid-cols-[clamp(20rem,25vw,24rem)_minmax(0,1fr)] xl:grid-cols-[clamp(18rem,22vw,22rem)_minmax(28rem,1fr)_clamp(18rem,22vw,22rem)]',
   ),
   visuallyHidden: cva('sr-only'),
   sidebar: cva(

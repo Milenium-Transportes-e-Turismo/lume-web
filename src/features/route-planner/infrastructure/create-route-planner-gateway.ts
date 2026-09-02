@@ -1,15 +1,17 @@
 import 'server-only';
 
-import { resolveTenantApiBaseUrl, resolveTenantApiTimeout } from '@/features/auth/infrastructure';
+import { getTenantApiConfig } from '@/env.server';
 
 import type { RoutePlannerGateway } from '../application/route-planner-gateway';
 import { TenantApiRoutePlannerGateway } from './tenant-api-route-planner-gateway';
 
 export function createRoutePlannerGateway(accessToken: string): RoutePlannerGateway {
+  const tenantApi = getTenantApiConfig();
+
   return new TenantApiRoutePlannerGateway(
-    resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL),
+    tenantApi.baseUrl,
     accessToken,
     fetch,
-    Math.max(30_000, resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS)),
+    Math.max(30_000, tenantApi.timeoutMs),
   );
 }

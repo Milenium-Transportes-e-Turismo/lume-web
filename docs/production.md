@@ -10,6 +10,12 @@ O `Dockerfile` gera o `output: standalone` do Next.js em uma imagem sem
 dependências de desenvolvimento e executa o processo como o usuário não-root
 `nextjs`.
 
+O build não recebe segredos. `src/env.server.ts` lê e valida as variáveis de
+forma lazy depois que o processo inicia, permitindo injeção pelo cofre ou pelo
+ambiente do contêiner sem gravá-las nas camadas da imagem. Consulte
+[environment-configuration.md](environment-configuration.md) para o contrato
+completo e os limites dos timeouts.
+
 A compilação usa uma pilha tipográfica local do sistema e não baixa fontes
 externas. Isso mantém o artefato reproduzível mesmo quando o ambiente de build
 não possui acesso ao Google Fonts.
@@ -39,7 +45,12 @@ para a imagem. Requisitos:
   `https://tiles.openfreemap.org/styles/liberty` e não contém segredo.
 
 Nunca grave tokens, cookies, `SESSION_SECRET` ou o arquivo real de ambiente em
-logs, imagens ou repositórios.
+logs, argumentos de build, imagens ou repositórios. Credenciais individuais de
+agentes OpenAI ficam no backend/cofre; o Tenant Web nunca recebe a chave.
+
+`NEXT_PUBLIC_*` é incorporada ao bundle no build. Não use esse prefixo para um
+valor secreto nem espere que a variável mude ao iniciar outra réplica da mesma
+imagem.
 
 ## Rede e TLS
 

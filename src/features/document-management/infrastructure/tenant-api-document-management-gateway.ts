@@ -2,6 +2,8 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { getServerEnv } from '@/env.server';
+
 import {
   DocumentManagementError,
   type DocumentManagementErrorCode,
@@ -492,21 +494,16 @@ export class TenantApiDocumentManagementGateway implements DocumentManagementGat
 }
 
 export function createDocumentManagementGateway(accessToken: string) {
-  const baseUrl = process.env.LUME_TENANT_API_URL;
-  if (!baseUrl) throw new Error('LUME_TENANT_API_URL is required.');
-  const configuredReviewTimeout = Number(
-    process.env.LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS ?? 300_000,
-  );
-  const reviewTimeoutMs =
-    Number.isInteger(configuredReviewTimeout) && configuredReviewTimeout >= 30_000
-      ? configuredReviewTimeout
-      : 300_000;
+  const environment = getServerEnv();
+  if (environment.LUME_TENANT_API_URL === undefined) {
+    throw new Error('LUME_TENANT_API_URL is required.');
+  }
   return new TenantApiDocumentManagementGateway(
-    baseUrl,
+    environment.LUME_TENANT_API_URL,
     accessToken,
     fetch,
     15_000,
-    reviewTimeoutMs,
+    environment.LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS,
   );
 }
 
@@ -516,20 +513,14 @@ export async function proxyDocumentUploadRequest(
   request: Request,
   fetcher: Fetcher = fetch,
 ): Promise<Response> {
-  const baseUrl = process.env.LUME_TENANT_API_URL;
-  if (!baseUrl) throw new Error('LUME_TENANT_API_URL is required.');
+  const environment = getServerEnv();
+  if (environment.LUME_TENANT_API_URL === undefined) {
+    throw new Error('LUME_TENANT_API_URL is required.');
+  }
   const contentType = request.headers.get('content-type');
   if (!contentType?.toLowerCase().startsWith('multipart/form-data;') || request.body === null) {
     throw new DocumentManagementError('validation', 'Envie um arquivo válido.');
   }
-
-  const configuredReviewTimeout = Number(
-    process.env.LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS ?? 300_000,
-  );
-  const reviewTimeoutMs =
-    Number.isInteger(configuredReviewTimeout) && configuredReviewTimeout >= 30_000
-      ? configuredReviewTimeout
-      : 300_000;
 
   try {
     const init: RequestInit & { duplex: 'half' } = {
@@ -542,10 +533,10 @@ export async function proxyDocumentUploadRequest(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': contentType,
       },
-      signal: AbortSignal.timeout(reviewTimeoutMs),
+      signal: AbortSignal.timeout(environment.LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS),
     };
     return await fetcher(
-      `${normalizeBaseUrl(baseUrl)}/document-management/items/${encodeURIComponent(requestItemId)}/submissions/complete`,
+      `${normalizeBaseUrl(environment.LUME_TENANT_API_URL)}/document-management/items/${encodeURIComponent(requestItemId)}/submissions/complete`,
       init,
     );
   } catch {

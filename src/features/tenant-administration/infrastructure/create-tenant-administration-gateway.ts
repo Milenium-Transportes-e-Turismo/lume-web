@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { resolveTenantApiBaseUrl, resolveTenantApiTimeout } from '@/features/auth/infrastructure';
+import { getTenantApiConfig } from '@/env.server';
 
 import type { TenantAdministrationGateway } from '../application';
 import { TenantApiAdministrationGateway } from './tenant-api-administration-gateway';
@@ -8,10 +8,12 @@ import { TenantApiAdministrationGateway } from './tenant-api-administration-gate
 export function createTenantAdministrationGateway(
   accessToken: string,
 ): TenantAdministrationGateway {
+  const tenantApi = getTenantApiConfig();
+
   return new TenantApiAdministrationGateway(
-    resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL),
+    tenantApi.baseUrl,
     accessToken,
     fetch,
-    resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS),
+    tenantApi.timeoutMs,
   );
 }

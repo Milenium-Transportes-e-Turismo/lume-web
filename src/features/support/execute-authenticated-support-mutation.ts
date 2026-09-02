@@ -5,13 +5,12 @@ import {
   shouldRefreshApiToken,
   type ApiAuthentication,
 } from '@/features/auth/application';
+import { getTenantApiConfig } from '@/env.server';
 import { isSessionValid } from '@/features/auth/domain';
 import {
   createCookieApiTokenStorage,
   createCookieSessionStorage,
   createTenantApiAuthenticationGateway,
-  resolveTenantApiBaseUrl,
-  resolveTenantApiTimeout,
 } from '@/features/auth/infrastructure';
 
 import {
@@ -34,13 +33,16 @@ export async function executeAuthenticatedSupportMutation<T>(
   }
 
   let tokens = storedTokens;
-  const createGateway = () =>
-    new TenantApiSupportGateway(
-      resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL),
+  const createGateway = () => {
+    const tenantApi = getTenantApiConfig();
+
+    return new TenantApiSupportGateway(
+      tenantApi.baseUrl,
       tokens.accessToken,
       fetch,
-      resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS),
+      tenantApi.timeoutMs,
     );
+  };
 
   async function refreshAuthentication(): Promise<ApiAuthentication> {
     try {

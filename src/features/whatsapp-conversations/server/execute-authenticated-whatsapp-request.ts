@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { getServerEnv } from '@/env.server';
 import {
   AuthenticationGatewayError,
   shouldRefreshApiToken,
@@ -27,6 +28,10 @@ async function executeAuthenticatedWhatsAppOperation<T>(
     createCookieApiTokenStorage(),
   ]);
   const [session, storedTokens] = await Promise.all([sessionStorage.get(), tokenStorage.get()]);
+
+  if (getServerEnv().AUTH_SIMULATION_ENABLED && session !== null && isSessionValid(session)) {
+    return operation(await createWhatsAppConversationRepository(), '');
+  }
 
   if (session === null || !isSessionValid(session) || storedTokens === null) {
     if (canRefreshCookies) {

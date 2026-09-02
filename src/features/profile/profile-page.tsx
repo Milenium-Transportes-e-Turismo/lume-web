@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Camera, LoaderCircle, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -20,6 +21,7 @@ import { prepareProfilePicture } from './profile-picture-client';
 import { ownPasswordSchema, type OwnPasswordForm, type ProfilePictureForm } from './profile-schema';
 
 export function ProfilePage({ profile }: { readonly profile: TenantProfile }) {
+  const { push: pushRoute } = useRouter();
   const [picture, setPicture] = useState(profile.profilePictureDataUrl);
   const [picturePending, setPicturePending] = useState(false);
   const pictureForm = useForm<ProfilePictureForm>({
@@ -63,7 +65,7 @@ export function ProfilePage({ profile }: { readonly profile: TenantProfile }) {
       description: formatActionResultDescription(result),
       type: result.success ? 'success' : 'error',
     });
-    if (result.success) window.location.assign('/login');
+    if (result.success) pushRoute('/login');
   });
 
   return (

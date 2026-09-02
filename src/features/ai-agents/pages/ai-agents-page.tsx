@@ -1,39 +1,34 @@
-import { Sparkles } from 'lucide-react';
-
 import type { AuthenticatedSession } from '@/features/auth/domain';
 import { AuthenticatedShell } from '@/features/navigation';
 
-import { AgentCatalog } from '../components';
-import { AI_AGENT_CATALOG } from '../data';
-import { aiAgentsPageStyles as styles } from './ai-agents-page.styles';
+import { AgentAdministration } from '../components';
+import type { AiAgentExecutionPage, ManagedAiAgent } from '../domain';
 
 export interface AiAgentsPageProps {
   readonly session: AuthenticatedSession;
+  readonly initialAgents: readonly ManagedAiAgent[];
+  readonly initialExecutions: AiAgentExecutionPage | null;
+  readonly initialError?: string;
+  readonly initialExecutionsError?: string;
 }
 
-export function AiAgentsPage({ session }: AiAgentsPageProps) {
+export function AiAgentsPage({
+  session,
+  initialAgents,
+  initialExecutions,
+  initialError,
+  initialExecutionsError,
+}: AiAgentsPageProps) {
   return (
     <AuthenticatedShell user={session.user}>
-      <div className={styles.content()}>
-        <p className={styles.eyebrow()}>Ferramentas internas</p>
-        <h1 className={styles.title()}>Agentes de IA</h1>
-        <p className={styles.description()}>
-          Consulte os assistentes planejados para apoiar as equipes da Lume. Use a busca para
-          localizar agentes por nome, área ou capacidade.
-        </p>
-
-        <aside className={styles.notice()}>
-          <Sparkles aria-hidden="true" className={styles.noticeIcon()} />
-          <div>
-            <p className={styles.noticeTitle()}>Integração em preparação</p>
-            <p className={styles.noticeDescription()}>
-              O catálogo já pode ser consultado. A abertura de conversas será disponibilizada
-              somente após a integração segura com o serviço de IA.
-            </p>
-          </div>
-        </aside>
-
-        <AgentCatalog agents={AI_AGENT_CATALOG} />
+      <div className="mx-auto w-full max-w-[1800px] p-3 sm:p-4 lg:p-6">
+        <AgentAdministration
+          initialAgents={initialAgents}
+          initialExecutions={initialExecutions}
+          initialError={initialError}
+          initialExecutionsError={initialExecutionsError}
+          canManage={session.user.permissions.includes('ai-agents:manage')}
+        />
       </div>
     </AuthenticatedShell>
   );

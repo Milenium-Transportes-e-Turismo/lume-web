@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ComponentProps } from 'react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { findClientByPhoneAction } from '@/features/clients/actions/client-actions';
@@ -9,14 +10,36 @@ import {
   forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
   returnWhatsAppConversationToBotAction,
+  returnWhatsAppConversationToQueueAction,
   sendHumanWhatsAppMessageAction,
   startWhatsAppConversationAction,
   takeOverWhatsAppConversationAction,
+  transferWhatsAppServiceSessionAction,
   unarchiveWhatsAppConversationAction,
 } from '../actions';
-import type { WhatsAppConversation } from '../domain';
+import {
+  getCurrentWhatsAppServiceSession,
+  type WhatsAppConversation,
+  type WhatsAppServiceAssignmentTarget,
+} from '../domain';
 import { createWhatsAppConversationFixture } from '../testing/whatsapp-conversation-fixture';
-import { ConversationWorkspace, preserveLoadedConversationHistory } from './conversation-workspace';
+import {
+  ConversationWorkspace as RawConversationWorkspace,
+  preserveLoadedConversationHistory,
+} from './conversation-workspace';
+
+const ALL_WORKSPACE_PERMISSIONS = {
+  respond: true,
+  assume: true,
+  transfer: true,
+  priority: true,
+  close: true,
+  legacyManagement: true,
+} as const;
+
+function ConversationWorkspace(props: ComponentProps<typeof RawConversationWorkspace>) {
+  return <RawConversationWorkspace permissions={ALL_WORKSPACE_PERMISSIONS} {...props} />;
+}
 
 jest.setTimeout(15_000);
 
@@ -39,14 +62,17 @@ jest.mock('@/shared/ui/toast', () => ({
 
 jest.mock('../actions', () => ({
   archiveWhatsAppConversationAction: jest.fn(),
+  changeWhatsAppConversationPriorityAction: jest.fn(),
   changeWhatsAppConversationDepartmentAction: jest.fn(),
   closeWhatsAppConversationAction: jest.fn(),
   forwardWhatsAppConversationAction: jest.fn(),
   markWhatsAppConversationAsReadAction: jest.fn(),
   returnWhatsAppConversationToBotAction: jest.fn(),
+  returnWhatsAppConversationToQueueAction: jest.fn(),
   sendHumanWhatsAppMessageAction: jest.fn(),
   startWhatsAppConversationAction: jest.fn(),
   takeOverWhatsAppConversationAction: jest.fn(),
+  transferWhatsAppServiceSessionAction: jest.fn(),
   unarchiveWhatsAppConversationAction: jest.fn(),
 }));
 
@@ -56,12 +82,47 @@ const mockedForward = jest.mocked(forwardWhatsAppConversationAction);
 const mockedClose = jest.mocked(closeWhatsAppConversationAction);
 const mockedMarkAsRead = jest.mocked(markWhatsAppConversationAsReadAction);
 const mockedReturnToBot = jest.mocked(returnWhatsAppConversationToBotAction);
+const mockedReturnToQueue = jest.mocked(returnWhatsAppConversationToQueueAction);
 const mockedSendMessage = jest.mocked(sendHumanWhatsAppMessageAction);
 const mockedStartConversation = jest.mocked(startWhatsAppConversationAction);
 const mockedTakeOver = jest.mocked(takeOverWhatsAppConversationAction);
+const mockedTransfer = jest.mocked(transferWhatsAppServiceSessionAction);
 const mockedUnarchive = jest.mocked(unarchiveWhatsAppConversationAction);
 const mockedFindClient = jest.mocked(findClientByPhoneAction);
 const originalFetch = global.fetch;
+
+const assignmentTargets: readonly WhatsAppServiceAssignmentTarget[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000751',
+    code: 'commercial',
+    name: 'Comercial',
+    isDefault: true,
+    queues: [
+      {
+        id: '00000000-0000-4000-8000-000000000761',
+        name: 'Fila comercial',
+        assignmentStrategy: 'round-robin',
+        maxConcurrentAttendances: 10,
+      },
+    ],
+    users: [],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000752',
+    code: 'operations',
+    name: 'Operações',
+    isDefault: false,
+    queues: [
+      {
+        id: '00000000-0000-4000-8000-000000000762',
+        name: 'Fila operacional',
+        assignmentStrategy: 'least-load',
+        maxConcurrentAttendances: null,
+      },
+    ],
+    users: [{ id: '00000000-0000-4000-8000-000000000771', name: 'Ana Operadora' }],
+  },
+];
 
 function response(body: unknown, status = 200): Response {
   return {
@@ -96,6 +157,29 @@ describe('ConversationWorkspace', () => {
     });
   });
 
+  it('does not expose or enable write controls without explicit capabilities', () => {
+    const conversation = createWhatsAppConversationFixture({
+      conversationState: 'human-active',
+      flowStep: 'human-service',
+      assignedTo: { id: 'employee-001', name: 'Atendente' },
+      unreadCount: 0,
+    });
+
+    render(
+      <RawConversationWorkspace
+        initialConversations={[conversation]}
+        currentUserId="employee-001"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Nova conversa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Importar históricos' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enviar mensagem' })).toBeDisabled();
+    for (const button of screen.getAllByRole('button', { name: /Arquivar|Assumir|Encerrar/ })) {
+      expect(button).toBeDisabled();
+    }
+  });
+
   it('inicia uma conversa pelo telefone e seleciona o atendimento criado', async () => {
     const current = createWhatsAppConversationFixture({ unreadCount: 0 });
     const started = createWhatsAppConversationFixture({
@@ -113,14 +197,13 @@ describe('ConversationWorkspace', () => {
     });
     mockFetchDetail(started);
     mockedStartConversation.mockResolvedValue({ success: true, conversation: started });
-    const user = userEvent.setup();
-
     render(<ConversationWorkspace initialConversations={[current]} currentUserId="employee-001" />);
 
-    await user.click(screen.getByRole('button', { name: 'Ações das conversas' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Nova conversa' }));
-    await user.type(screen.getByLabelText('Número do WhatsApp'), '(34) 98765-4321');
-    await user.click(screen.getByRole('button', { name: 'Iniciar atendimento' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Nova conversa' }));
+    fireEvent.change(screen.getByLabelText('Número do WhatsApp'), {
+      target: { value: '(34) 98765-4321' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar atendimento' }));
 
     await waitFor(() =>
       expect(mockedStartConversation).toHaveBeenCalledWith({ phone: '(34) 98765-4321' }),
@@ -157,7 +240,9 @@ describe('ConversationWorkspace', () => {
 
     await waitFor(() =>
       expect(mockedTakeOver).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: closed.id,
+        serviceSessionId: closed.id,
         expectedVersion: 8,
       }),
     );
@@ -232,6 +317,27 @@ describe('ConversationWorkspace', () => {
     expect(inbox).toHaveClass('flex');
     fireEvent.click(conversationButton);
     expect(inbox).toHaveClass('hidden', 'lg:flex');
+
+    const openContextButton = screen.getByRole('button', {
+      name: 'Abrir contexto do atendimento',
+    });
+    expect(openContextButton).toHaveClass('xl:hidden');
+    fireEvent.click(openContextButton);
+
+    const contextPanel = screen.getByRole('complementary', {
+      name: 'Contexto do atendimento',
+    });
+    expect(contextPanel.parentElement).toHaveClass('flex');
+    expect(detailHeader?.parentElement).toHaveClass('hidden', 'xl:flex');
+
+    const backToConversationButton = screen.getByRole('button', {
+      name: 'Voltar para a conversa',
+    });
+    expect(backToConversationButton).toHaveClass('xl:hidden');
+    fireEvent.click(backToConversationButton);
+    expect(contextPanel.parentElement).toHaveClass('hidden', 'xl:flex');
+    expect(detailHeader?.parentElement).toHaveClass('flex');
+
     fireEvent.click(screen.getByRole('button', { name: 'Voltar para a caixa de entrada' }));
     expect(inbox).toHaveClass('flex');
     expect(screen.getAllByText('553496305110')).toHaveLength(2);
@@ -357,10 +463,10 @@ describe('ConversationWorkspace', () => {
 
     render(<ConversationWorkspace initialConversations={[summary]} />);
 
-    expect(screen.getAllByText('Departamento')).toHaveLength(2);
+    expect(screen.getAllByText('Departamento')).toHaveLength(3);
     expect(screen.getByText('Estado da conversa')).toBeInTheDocument();
     expect(screen.getByText('Etapa do fluxo')).toBeInTheDocument();
-    expect(screen.getAllByText('Status comercial')).toHaveLength(2);
+    expect(screen.getAllByText('Status comercial')).toHaveLength(3);
     expect(screen.getByRole('button', { name: 'BOT ativo' })).toBeDisabled();
     expect(
       screen.queryByText('Segundo contato retomado no acompanhamento comercial.'),
@@ -491,12 +597,62 @@ describe('ConversationWorkspace', () => {
 
     await waitFor(() => {
       expect(mockedTakeOver).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 3,
       });
     });
     expect(await screen.findByText('Atendimento assumido com sucesso.')).toBeInTheDocument();
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  });
+
+  it('uses the ServiceSession version and a commandId when returning a native session to queue', async () => {
+    const legacy = createWhatsAppConversationFixture({ unreadCount: 0, version: 7 });
+    const conversation = {
+      ...legacy,
+      currentServiceSession: {
+        ...getCurrentWhatsAppServiceSession(legacy),
+        id: 'service-session-21',
+        version: 21,
+        status: 'OPEN' as const,
+        controlMode: 'HUMAN' as const,
+        projection: 'NATIVE' as const,
+        availableActions: ['RETURN_TO_QUEUE', 'CLOSE'] as const,
+      },
+    };
+    mockedReturnToQueue.mockResolvedValue({
+      success: true,
+      conversation: {
+        ...conversation,
+        currentServiceSession: {
+          ...conversation.currentServiceSession,
+          version: 22,
+          status: 'WAITING_HUMAN',
+        },
+      },
+    });
+
+    render(
+      <ConversationWorkspace
+        initialConversations={[conversation]}
+        initialAssignmentTargets={assignmentTargets}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retornar à fila' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Retornar à fila' }),
+    );
+
+    await waitFor(() =>
+      expect(mockedReturnToQueue).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        conversationId: conversation.id,
+        serviceSessionId: 'service-session-21',
+        expectedVersion: 21,
+        queueId: '00000000-0000-4000-8000-000000000761',
+      }),
+    );
   });
 
   it('permite assumir uma conversa que está com outro atendente', async () => {
@@ -526,7 +682,9 @@ describe('ConversationWorkspace', () => {
 
     await waitFor(() =>
       expect(mockedTakeOver).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 11,
       }),
     );
@@ -550,7 +708,10 @@ describe('ConversationWorkspace', () => {
 
     render(<ConversationWorkspace initialConversations={[conversation]} />);
 
-    await user.click(screen.getByRole('button', { name: 'Arquivar' }));
+    const compactActions = screen.getByRole('region', {
+      name: 'Ações compactas do atendimento',
+    });
+    await user.click(within(compactActions).getByRole('button', { name: 'Arquivar' }));
     await waitFor(() =>
       expect(mockedArchive).toHaveBeenCalledWith({
         conversationId: conversation.id,
@@ -578,7 +739,10 @@ describe('ConversationWorkspace', () => {
 
     render(<ConversationWorkspace initialConversations={[archived]} />);
 
-    await user.click(screen.getByRole('button', { name: 'Desarquivar' }));
+    const compactActions = screen.getByRole('region', {
+      name: 'Ações compactas do atendimento',
+    });
+    await user.click(within(compactActions).getByRole('button', { name: 'Desarquivar' }));
     await waitFor(() =>
       expect(mockedUnarchive).toHaveBeenCalledWith({
         conversationId: archived.id,
@@ -600,14 +764,13 @@ describe('ConversationWorkspace', () => {
     });
     mockFetchDetail(conversation);
     mockedChangeDepartment.mockResolvedValue({ success: true, conversation: changed });
-    const user = userEvent.setup();
-
     render(<ConversationWorkspace initialConversations={[conversation]} />);
 
-    await user.click(screen.getByRole('button', { name: 'Alterar departamento' }));
-    await user.click(screen.getByRole('combobox', { name: 'Novo departamento' }));
-    await user.click(await screen.findByRole('option', { name: 'Financeiro' }));
-    await user.click(screen.getByRole('button', { name: 'Salvar departamento' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alterar departamento' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Novo departamento' }), {
+      target: { value: 'financial' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar departamento' }));
 
     await waitFor(() =>
       expect(mockedChangeDepartment).toHaveBeenCalledWith({
@@ -659,7 +822,9 @@ describe('ConversationWorkspace', () => {
 
     await waitFor(() => {
       expect(mockedReturnToBot).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 8,
       });
     });
@@ -757,17 +922,13 @@ describe('ConversationWorkspace', () => {
       unreadCount: 0,
     });
     mockFetchDetail(conversation);
-    const user = userEvent.setup();
-
     render(<ConversationWorkspace initialConversations={[conversation]} />);
 
     expect(screen.queryByText('personnel-department')).not.toBeInTheDocument();
     const departmentFilter = screen.getByRole('combobox', { name: 'Departamento' });
     expect(departmentFilter).toHaveTextContent('Todos');
-    await user.click(departmentFilter);
-
-    expect(await screen.findAllByRole('option')).toHaveLength(10);
-    expect(await screen.findByRole('option', { name: 'Departamento Pessoal' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(10);
+    expect(screen.getByRole('option', { name: 'Departamento Pessoal' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Operacional' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Recursos Humanos' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Limpeza' })).not.toBeInTheDocument();
@@ -877,7 +1038,9 @@ describe('ConversationWorkspace', () => {
 
     await waitFor(() => {
       expect(mockedClose).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 6,
         reason: 'Cliente recusou o valor da proposta.',
       });
@@ -913,13 +1076,19 @@ describe('ConversationWorkspace', () => {
     const closeButton = screen.getByRole('button', { name: 'Encerrar' });
     expect(closeButton).toBeEnabled();
     await user.click(closeButton);
+    await user.type(
+      screen.getByRole('textbox', { name: /Motivo do encerramento/ }),
+      'Atendimento concluído.',
+    );
     await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
 
     await waitFor(() => {
       expect(mockedClose).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 4,
-        reason: undefined,
+        reason: 'Atendimento concluído.',
       });
     });
   });
@@ -950,13 +1119,19 @@ describe('ConversationWorkspace', () => {
     const closeButton = screen.getByRole('button', { name: 'Encerrar' });
     expect(closeButton).toBeEnabled();
     await user.click(closeButton);
+    await user.type(
+      screen.getByRole('textbox', { name: /Motivo do encerramento/ }),
+      'Atendimento encaminhado.',
+    );
     await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
 
     await waitFor(() => {
       expect(mockedClose).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 10,
-        reason: undefined,
+        reason: 'Atendimento encaminhado.',
       });
     });
   });
@@ -987,13 +1162,19 @@ describe('ConversationWorkspace', () => {
     const closeButton = screen.getByRole('button', { name: 'Encerrar' });
     expect(closeButton).toBeEnabled();
     await user.click(closeButton);
+    await user.type(
+      screen.getByRole('textbox', { name: /Motivo do encerramento/ }),
+      'Proposta concluída.',
+    );
     await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
 
     await waitFor(() => {
       expect(mockedClose).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: 8,
-        reason: undefined,
+        reason: 'Proposta concluída.',
       });
     });
   });
@@ -1019,6 +1200,10 @@ describe('ConversationWorkspace', () => {
     render(<ConversationWorkspace initialConversations={[conversation]} />);
 
     await user.click(screen.getByRole('button', { name: 'Encerrar' }));
+    await user.type(
+      screen.getByRole('textbox', { name: /Motivo do encerramento/ }),
+      'Tentativa de encerramento.',
+    );
     await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
 
     await waitFor(() =>
@@ -1117,25 +1302,33 @@ describe('ConversationWorkspace', () => {
       version: 4,
     });
     mockFetchDetail(conversation);
-    mockedForward.mockResolvedValue({ success: true, conversation: forwarded });
-    const user = userEvent.setup();
+    mockedTransfer.mockResolvedValue({ success: true, conversation: forwarded });
+    render(
+      <ConversationWorkspace
+        initialConversations={[conversation]}
+        initialAssignmentTargets={assignmentTargets}
+      />,
+    );
 
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
-
-    await user.click(screen.getByRole('button', { name: 'Encaminhar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Encaminhar' }));
     const destination = screen.getByRole('combobox', { name: 'Departamento de destino' });
-    await user.click(destination);
-    const operationsOption = await screen.findByRole('option', { name: /Opera/ });
     expect(screen.queryByRole('option', { name: 'Comercial' })).not.toBeInTheDocument();
-    await user.click(operationsOption);
-    await user.click(screen.getByRole('button', { name: 'Confirmar encaminhamento' }));
+    fireEvent.change(destination, {
+      target: { value: '00000000-0000-4000-8000-000000000752' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar transferência' }));
 
     await waitFor(() => {
-      expect(mockedForward).toHaveBeenCalledWith({
-        conversationId: conversation.id,
-        expectedVersion: conversation.version,
-        targetDepartment: 'operations',
-      });
+      expect(mockedTransfer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+          conversationId: conversation.id,
+          serviceSessionId: conversation.id,
+          expectedVersion: conversation.version,
+          departmentId: '00000000-0000-4000-8000-000000000752',
+          queueId: '00000000-0000-4000-8000-000000000762',
+        }),
+      );
     });
   });
 
@@ -1372,7 +1565,9 @@ describe('ConversationWorkspace', () => {
 
     await waitFor(() =>
       expect(mockedTakeOver).toHaveBeenCalledWith({
+        commandId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         conversationId: conversation.id,
+        serviceSessionId: conversation.id,
         expectedVersion: conversation.version,
       }),
     );

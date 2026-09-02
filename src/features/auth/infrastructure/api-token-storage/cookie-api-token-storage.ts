@@ -1,3 +1,5 @@
+import { getServerEnv } from '@/env.server';
+
 import type { ApiAuthenticationTokens, ApiTokenStorage } from '../../application';
 import type { SessionCookieStore } from '../session-storage/cookie-session-storage';
 import { assertSessionSecret } from '../session-storage/session-cookie-crypto';
@@ -28,7 +30,7 @@ export class CookieApiTokenStorage implements ApiTokenStorage {
 
     this.cookieName = options.cookieName ?? API_TOKEN_COOKIE_NAME;
     this.path = options.path ?? '/';
-    this.secure = options.secure ?? process.env.NODE_ENV === 'production';
+    this.secure = options.secure ?? getServerEnv().NODE_ENV === 'production';
   }
 
   async save(tokens: ApiAuthenticationTokens): Promise<void> {

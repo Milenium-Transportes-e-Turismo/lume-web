@@ -14,6 +14,8 @@ const RESOURCE_LABELS: Readonly<Record<string, string>> = {
   clients: 'Cadastro',
   'ai-agents': 'Agentes de IA',
   'whatsapp-conversations': 'Painel WhatsApp',
+  'whatsapp-channels': 'Canais WhatsApp',
+  knowledge: 'Knowledge Base',
   manuals: 'Manuais',
   reports: 'Relatórios',
   settings: 'Configurações',
@@ -40,6 +42,8 @@ const ACTION_LABELS: Readonly<Record<string, string>> = {
   export: 'Exportar',
   publish: 'Publicar',
   calculate: 'Calcular rotas e custos',
+  connect: 'Conectar',
+  disconnect: 'Desconectar',
 };
 
 export function getPermissionResourceLabel(resource: string): string {

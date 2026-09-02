@@ -3,6 +3,7 @@ import 'server-only';
 import {
   archiveWhatsAppConversation,
   changeWhatsAppConversationDepartment,
+  changeWhatsAppConversationPriority,
   closeWhatsAppConversation,
   closeWhatsAppConversationAfterRejection,
   forwardWhatsAppConversation,
@@ -11,12 +12,15 @@ import {
   getWhatsAppDashboardConversationPage,
   getWhatsAppConversationPage,
   getWhatsAppConversations,
+  getWhatsAppServiceAssignmentTargets,
   markWhatsAppConversationAsRead,
   returnWhatsAppConversationToBot,
+  returnWhatsAppConversationToQueue,
   searchWhatsAppMessages,
   sendHumanWhatsAppMessage,
   startWhatsAppConversation,
   takeOverWhatsAppConversation,
+  transferWhatsAppServiceSession,
   unarchiveWhatsAppConversation,
   type GetWhatsAppConversationsFilters,
 } from '../application';
@@ -28,6 +32,12 @@ import {
 export function getWhatsAppConversationsForDashboard(filters?: GetWhatsAppConversationsFilters) {
   return executeAuthenticatedWhatsAppRequest((repository) =>
     getWhatsAppConversations(repository, filters),
+  );
+}
+
+export function getWhatsAppServiceAssignmentTargetsForDashboard() {
+  return executeAuthenticatedWhatsAppRequest((repository) =>
+    getWhatsAppServiceAssignmentTargets(repository),
   );
 }
 
@@ -89,6 +99,32 @@ export function getWhatsAppConversationForDashboard(conversationId: unknown) {
   );
 }
 
+export function getWhatsAppMediaInterpretationForDashboard(
+  conversationId: string,
+  messageId: string,
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    repository.getMediaInterpretation(conversationId, messageId),
+  );
+}
+
+export function analyzeWhatsAppMediaForDashboard(conversationId: string, messageId: string) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    repository.analyzeMedia(conversationId, messageId),
+  );
+}
+
+export function correctWhatsAppMediaInterpretationForDashboard(
+  conversationId: string,
+  messageId: string,
+  correction: string,
+  feedback?: string,
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    repository.correctMediaInterpretation(conversationId, messageId, correction, feedback),
+  );
+}
+
 export function pollWhatsAppConversationForDashboard(
   conversationId: unknown,
   messagePage: unknown = 1,
@@ -101,18 +137,84 @@ export function pollWhatsAppConversationForDashboard(
 export function takeOverWhatsAppConversationForDashboard(
   conversationId: unknown,
   expectedVersion: unknown,
+  commandId?: unknown,
+  serviceSessionId?: unknown,
 ) {
   return executeAuthenticatedWhatsAppMutation((repository) =>
-    takeOverWhatsAppConversation(repository, conversationId, expectedVersion),
+    commandId === undefined
+      ? takeOverWhatsAppConversation(repository, conversationId, expectedVersion)
+      : takeOverWhatsAppConversation(
+          repository,
+          conversationId,
+          expectedVersion,
+          commandId,
+          serviceSessionId,
+        ),
   );
 }
 
 export function returnWhatsAppConversationToBotForDashboard(
   conversationId: unknown,
   expectedVersion: unknown,
+  commandId?: unknown,
+  serviceSessionId?: unknown,
 ) {
   return executeAuthenticatedWhatsAppMutation((repository) =>
-    returnWhatsAppConversationToBot(repository, conversationId, expectedVersion),
+    commandId === undefined
+      ? returnWhatsAppConversationToBot(repository, conversationId, expectedVersion)
+      : returnWhatsAppConversationToBot(
+          repository,
+          conversationId,
+          expectedVersion,
+          commandId,
+          serviceSessionId,
+        ),
+  );
+}
+
+export function returnWhatsAppConversationToQueueForDashboard(
+  conversationId: unknown,
+  command: {
+    readonly serviceSessionId: unknown;
+    readonly commandId: unknown;
+    readonly expectedVersion: unknown;
+    readonly queueId: unknown;
+  },
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    returnWhatsAppConversationToQueue(repository, conversationId, command),
+  );
+}
+
+export function transferWhatsAppServiceSessionForDashboard(
+  conversationId: unknown,
+  command: {
+    readonly serviceSessionId: unknown;
+    readonly commandId: unknown;
+    readonly expectedVersion: unknown;
+    readonly departmentId: unknown;
+    readonly queueId?: unknown;
+    readonly userId?: unknown;
+    readonly reason?: unknown;
+  },
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    transferWhatsAppServiceSession(repository, conversationId, command),
+  );
+}
+
+export function changeWhatsAppConversationPriorityForDashboard(
+  conversationId: unknown,
+  command: {
+    readonly serviceSessionId: unknown;
+    readonly commandId: unknown;
+    readonly expectedVersion: unknown;
+    readonly priority: unknown;
+    readonly reason?: unknown;
+  },
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) =>
+    changeWhatsAppConversationPriority(repository, conversationId, command),
   );
 }
 
@@ -120,9 +222,18 @@ export function forwardWhatsAppConversationForDashboard(
   conversationId: unknown,
   targetDepartment: unknown,
   expectedVersion: unknown,
+  commandId?: unknown,
 ) {
   return executeAuthenticatedWhatsAppMutation((repository) =>
-    forwardWhatsAppConversation(repository, conversationId, targetDepartment, expectedVersion),
+    commandId === undefined
+      ? forwardWhatsAppConversation(repository, conversationId, targetDepartment, expectedVersion)
+      : forwardWhatsAppConversation(
+          repository,
+          conversationId,
+          targetDepartment,
+          expectedVersion,
+          commandId,
+        ),
   );
 }
 
@@ -181,9 +292,18 @@ export function closeWhatsAppConversationForDashboard(
   conversationId: unknown,
   expectedVersion: unknown,
   reason?: unknown,
+  commandId?: unknown,
+  serviceSessionId?: unknown,
 ) {
   return executeAuthenticatedWhatsAppMutation((repository) =>
-    closeWhatsAppConversation(repository, conversationId, expectedVersion, reason),
+    closeWhatsAppConversation(
+      repository,
+      conversationId,
+      expectedVersion,
+      reason,
+      commandId,
+      serviceSessionId,
+    ),
   );
 }
 

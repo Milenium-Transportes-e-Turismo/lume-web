@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+import { DEFAULT_TENANT_API_TIMEOUT_MS } from '@/env';
+
+export { resolveTenantApiBaseUrl, resolveTenantApiTimeout } from '@/env';
+
 import {
   AuthenticationGatewayError,
   type ApiAuthentication,
@@ -10,10 +14,6 @@ import {
 } from '../../application';
 import { AUTHENTICATED_SESSION_VERSION, type Permission, type User } from '../../domain';
 import { normalizePublicErrorCode } from '../../lib/auth-error-feedback';
-
-const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
-const MINIMUM_REQUEST_TIMEOUT_MS = 100;
-const MAXIMUM_REQUEST_TIMEOUT_MS = 30_000;
 
 type Fetcher = typeof fetch;
 
@@ -189,7 +189,7 @@ export class TenantApiAuthenticationGateway implements AuthenticationGateway {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
     this.fetcher = options.fetcher ?? fetch;
     this.now = options.now ?? (() => new Date());
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TENANT_API_TIMEOUT_MS;
   }
 
   async authenticate(credentials: AuthenticationCredentials): Promise<AuthenticationResult> {
@@ -489,52 +489,4 @@ export class TenantApiAuthenticationGateway implements AuthenticationGateway {
       );
     }
   }
-}
-
-export function resolveTenantApiBaseUrl(
-  value: string | undefined,
-  nodeEnvironment = process.env.NODE_ENV,
-): string {
-  if (value === undefined || value.trim() === '') {
-    throw new Error('LUME_TENANT_API_URL is required when simulated authentication is disabled.');
-  }
-
-  const normalizedValue = normalizeBaseUrl(value.trim());
-  let url: URL;
-
-  try {
-    url = new URL(normalizedValue);
-  } catch {
-    throw new Error('LUME_TENANT_API_URL must be a valid absolute URL.');
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('LUME_TENANT_API_URL must use HTTP or HTTPS.');
-  }
-
-  if (nodeEnvironment === 'production' && url.protocol !== 'https:') {
-    throw new Error('LUME_TENANT_API_URL must use HTTPS in production.');
-  }
-
-  return normalizedValue;
-}
-
-export function resolveTenantApiTimeout(value: string | undefined): number {
-  if (value === undefined || value.trim() === '') {
-    return DEFAULT_REQUEST_TIMEOUT_MS;
-  }
-
-  const timeout = Number(value);
-
-  if (
-    !Number.isInteger(timeout) ||
-    timeout < MINIMUM_REQUEST_TIMEOUT_MS ||
-    timeout > MAXIMUM_REQUEST_TIMEOUT_MS
-  ) {
-    throw new Error(
-      `LUME_TENANT_API_TIMEOUT_MS must be an integer between ${MINIMUM_REQUEST_TIMEOUT_MS} and ${MAXIMUM_REQUEST_TIMEOUT_MS}.`,
-    );
-  }
-
-  return timeout;
 }

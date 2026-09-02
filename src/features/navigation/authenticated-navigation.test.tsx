@@ -67,7 +67,7 @@ describe('AuthenticatedNavigation', () => {
   it('shows the AI agents module only with its permission', () => {
     mockedUsePathname.mockReturnValue('/ai-agents');
 
-    renderNavigation(createEmployee(['dashboard:view', 'ai-agents:use']));
+    renderNavigation(createEmployee(['dashboard:view', 'ai-agents:view'], true, ['management']));
 
     expect(screen.getByRole('link', { name: 'Agentes de IA' })).toHaveAttribute(
       'href',
@@ -79,10 +79,10 @@ describe('AuthenticatedNavigation', () => {
     );
   });
 
-  it('shows the WhatsApp conversations module only with its permission', async () => {
+  it('shows the WhatsApp conversations module with service:view across internal departments', () => {
     mockedUsePathname.mockReturnValue('/whatsapp-conversations');
 
-    renderNavigation(createEmployee(['dashboard:view', 'whatsapp-conversations:manage']));
+    renderNavigation(createEmployee(['dashboard:view', 'service:view'], true, ['operations']));
 
     expect(screen.getByRole('link', { name: 'Painel WhatsApp' })).toHaveAttribute(
       'href',
@@ -92,7 +92,7 @@ describe('AuthenticatedNavigation', () => {
       'aria-current',
       'page',
     );
-    await waitFor(() => expect(mockedPendingCount).toHaveBeenCalledTimes(1));
+    expect(mockedPendingCount).not.toHaveBeenCalled();
   });
 
   it('shows one parent notification icon and the numeric count only in Pendentes', async () => {

@@ -23,9 +23,7 @@ const messageId = '00000000-0000-4000-8000-000000000501';
 const mockedSession = jest.mocked(getCurrentAuthenticatedSession);
 const mockedDownload = jest.mocked(downloadWhatsAppMessageContentForDashboard);
 
-function session(
-  permissions: readonly Permission[] = ['whatsapp-conversations:manage'],
-): AuthenticatedSession {
+function session(permissions: readonly Permission[] = ['service:view']): AuthenticatedSession {
   return {
     version: AUTHENTICATED_SESSION_VERSION,
     id: 'session-001',
@@ -81,7 +79,7 @@ describe('rota protegida de conteúdo de mídia do WhatsApp', () => {
   });
 
   it('marca o conteúdo como anexo quando o download é solicitado', async () => {
-    mockedSession.mockResolvedValue(session(['whatsapp-conversations:view']));
+    mockedSession.mockResolvedValue(session(['service:view']));
     mockedDownload.mockResolvedValue({
       fileName: 'proposta.pdf',
       mimeType: 'application/pdf',
@@ -98,7 +96,7 @@ describe('rota protegida de conteúdo de mídia do WhatsApp', () => {
   });
 
   it('não expõe detalhes internos quando a mídia não existe', async () => {
-    mockedSession.mockResolvedValue(session(['whatsapp-conversations:view']));
+    mockedSession.mockResolvedValue(session(['service:view']));
     mockedDownload.mockRejectedValue(
       new WhatsAppConversationRepositoryError(
         'not-found',

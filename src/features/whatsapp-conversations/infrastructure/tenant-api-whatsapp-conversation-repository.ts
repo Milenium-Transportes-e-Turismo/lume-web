@@ -7,6 +7,9 @@ import { z } from 'zod';
 import {
   WhatsAppConversationRepositoryError,
   type GetWhatsAppConversationsFilters,
+  type ChangeWhatsAppServiceSessionPriorityCommand,
+  type TransferWhatsAppServiceSessionCommand,
+  type ReturnToQueueWhatsAppServiceSessionCommand,
   type SendHumanWhatsAppMessageCommand,
   type SendHumanWhatsAppMessageResult,
   type WhatsAppConversationPage,
@@ -21,14 +24,27 @@ import {
   WHATSAPP_MESSAGE_DELIVERY_STATUSES,
   WHATSAPP_MESSAGE_DIRECTIONS,
   WHATSAPP_MESSAGE_KINDS,
+  WHATSAPP_MESSAGE_ACTOR_TYPES,
+  WHATSAPP_MESSAGE_SOURCES,
+  WHATSAPP_MEDIA_INTERPRETATION_STATUSES,
   WHATSAPP_REQUEST_STATUSES,
+  WHATSAPP_SERVICE_SESSION_ACTIONS,
+  WHATSAPP_SERVICE_SESSION_CONTROL_MODES,
+  WHATSAPP_SERVICE_SESSION_PRIORITIES,
+  WHATSAPP_SERVICE_SESSION_STATUSES,
+  getCurrentWhatsAppServiceSession,
   getWhatsAppConversationMetrics,
   type WhatsAppConversation,
+  type WhatsAppConversationEvidence,
   type WhatsAppConversationDepartment,
   type WhatsAppConversationTransition,
   type WhatsAppMessage,
   type WhatsAppMessageAttachment,
+  type WhatsAppEvidenceItem,
   type WhatsAppQuoteRequest,
+  type WhatsAppServiceAssignmentTarget,
+  type WhatsAppMediaInterpretation,
+  type DeferredWhatsAppMediaInterpretation,
 } from '../domain';
 
 type Fetcher = typeof fetch;
@@ -40,6 +56,139 @@ const nullableCivilDateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .nullable();
 const jsonObjectSchema = z.record(z.string(), z.unknown());
+
+const mediaInterpretationSchema = z.object({
+  mediaAssetId: z.string().uuid(),
+  interpretationId: z.string().uuid().nullable(),
+  status: z.enum(WHATSAPP_MEDIA_INTERPRETATION_STATUSES),
+  transcription: z.string().nullable(),
+  detectedLanguage: z.string().nullable(),
+  extractedText: z.string().nullable(),
+  summary: z.string().nullable(),
+  documentType: z.string().nullable(),
+  structuredData: jsonObjectSchema.nullable(),
+  confidence: z.number().min(0).max(1).nullable(),
+  durationSeconds: z.number().nonnegative().nullable(),
+  provenance: jsonObjectSchema.nullable(),
+  errorCode: z.string().nullable(),
+  correction: z
+    .object({
+      correction: z.string().min(1),
+      feedback: z.string().nullable(),
+      correctedByUserId: z.string().uuid(),
+      createdAt: isoDateSchema,
+    })
+    .nullable(),
+  effectiveContext: z.object({
+    value: z.string().nullable(),
+    source: z.enum(['human', 'machine', 'none']),
+  }),
+  completedAt: nullableIsoDateSchema,
+});
+const deferredMediaInterpretationSchema = z.object({
+  mediaAssetId: z.string().uuid(),
+  status: z.literal('deferred'),
+  reason: z.enum(['human-control-disabled', 'media-agent-unavailable', 'binary-not-stored']),
+});
+
+const evidenceItemSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1).nullable().optional(),
+    title: z.string().min(1).nullable().optional(),
+    status: z.string().min(1).nullable().optional(),
+    summary: z.string().min(1).nullable().optional(),
+    reason: z.string().min(1).nullable().optional(),
+    url: z.string().url().nullable().optional(),
+    occurredAt: nullableIsoDateSchema.optional(),
+    createdAt: nullableIsoDateSchema.optional(),
+    provider: z.string().min(1).nullable().optional(),
+    model: z.string().min(1).nullable().optional(),
+    metadata: jsonObjectSchema.optional(),
+  })
+  .passthrough();
+
+const conversationEvidenceSchema = z.object({
+  agentExecutions: z.array(evidenceItemSchema).optional().default([]),
+  knowledgeSources: z.array(evidenceItemSchema).optional().default([]),
+  toolExecutions: z.array(evidenceItemSchema).optional().default([]),
+  mediaInterpretations: z.array(evidenceItemSchema).optional().default([]),
+  registrationDataReviews: z.array(evidenceItemSchema).optional().default([]),
+});
+
+const serviceSessionPartySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+});
+
+const apiServiceSessionStatuses = [
+  'open',
+  'waiting-customer',
+  'waiting-human',
+  'paused-by-higher-priority',
+  'closing',
+  'closed',
+] as const;
+const apiServiceControlModes = ['ai', 'human'] as const;
+const apiServicePriorities = ['low', 'normal', 'high', 'urgent'] as const;
+
+const serviceSessionSchema = z
+  .object({
+    id: z.string().min(1),
+    companyId: z.string().min(1),
+    threadId: z.string().min(1),
+    sourceChannelId: z.string().min(1),
+    currentDepartmentId: z.string().min(1).nullable(),
+    responsibleUserId: z.string().min(1).nullable(),
+    queueId: z.string().min(1).nullable(),
+    relatedServiceSessionId: z.string().min(1).nullable(),
+    status: z.union([z.enum(WHATSAPP_SERVICE_SESSION_STATUSES), z.enum(apiServiceSessionStatuses)]),
+    controlMode: z.union([
+      z.enum(WHATSAPP_SERVICE_SESSION_CONTROL_MODES),
+      z.enum(apiServiceControlModes),
+    ]),
+    priority: z.union([z.enum(WHATSAPP_SERVICE_SESSION_PRIORITIES), z.enum(apiServicePriorities)]),
+    priorityReason: z.string().nullable().optional().default(null),
+    prioritySource: z.string().nullable().optional().default(null),
+    isForeground: z.boolean(),
+    version: z.number().int().positive(),
+    responsible: serviceSessionPartySchema.nullable().optional().default(null),
+    queue: serviceSessionPartySchema.nullable().optional().default(null),
+    availableActions: z.array(z.enum(WHATSAPP_SERVICE_SESSION_ACTIONS)).optional().default([]),
+    publicContinuationCode: z.string().min(1).nullable().optional().default(null),
+    continuationCodeExpiresAt: nullableIsoDateSchema.optional().default(null),
+    closingStartedAt: nullableIsoDateSchema.optional().default(null),
+    aiClosingStartedAt: nullableIsoDateSchema.optional().default(null),
+    closingDeadlineAt: nullableIsoDateSchema.optional().default(null),
+    closedAt: nullableIsoDateSchema.optional().default(null),
+  })
+  .transform(({ aiClosingStartedAt, ...session }) => ({
+    ...session,
+    status: session.status
+      .toUpperCase()
+      .replaceAll('-', '_') as (typeof WHATSAPP_SERVICE_SESSION_STATUSES)[number],
+    controlMode:
+      session.controlMode.toUpperCase() as (typeof WHATSAPP_SERVICE_SESSION_CONTROL_MODES)[number],
+    priority:
+      session.priority.toUpperCase() as (typeof WHATSAPP_SERVICE_SESSION_PRIORITIES)[number],
+    closingStartedAt: session.closingStartedAt ?? aiClosingStartedAt,
+  }));
+
+const serviceAssignmentTargetSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string().min(1),
+  name: z.string().min(1),
+  isDefault: z.boolean(),
+  queues: z.array(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string().min(1),
+      assignmentStrategy: z.enum(['manual', 'round-robin', 'least-load']),
+      maxConcurrentAttendances: z.number().int().positive().nullable(),
+    }),
+  ),
+  users: z.array(serviceSessionPartySchema.extend({ id: z.string().uuid() })),
+});
 
 const quoteRequestSchema = z.object({
   id: z.string().uuid(),
@@ -74,6 +223,14 @@ const conversationSchema = z.object({
     name: z.string().min(1),
     phoneNumber: z.string().min(1),
   }),
+  sourceChannel: z
+    .object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      type: z.string().min(1),
+      address: z.string().nullable().optional().default(null),
+    })
+    .optional(),
   contact: z.object({
     id: z.string().uuid(),
     phone: z.string().min(1),
@@ -91,6 +248,14 @@ const conversationSchema = z.object({
       name: z.string().min(1),
     })
     .nullable(),
+  currentServiceSession: serviceSessionSchema.optional(),
+  serviceSession: serviceSessionSchema.optional(),
+  evidence: conversationEvidenceSchema.optional(),
+  agentExecutions: z.array(evidenceItemSchema).optional(),
+  knowledgeSources: z.array(evidenceItemSchema).optional(),
+  toolExecutions: z.array(evidenceItemSchema).optional(),
+  mediaInterpretations: z.array(evidenceItemSchema).optional(),
+  registrationDataReviews: z.array(evidenceItemSchema).optional(),
   unreadCount: z.number().int().nonnegative(),
   version: z.number().int().positive(),
   lastInboundAt: nullableIsoDateSchema,
@@ -168,6 +333,19 @@ const messageSchema = z.object({
     })
     .nullable()
     .optional(),
+  actor: z
+    .object({
+      type: z.union([z.enum(WHATSAPP_MESSAGE_ACTOR_TYPES), z.string().min(1)]),
+      id: z.string().min(1).nullable().optional().default(null),
+      name: z.string().min(1).nullable().optional().default(null),
+    })
+    .nullable()
+    .optional(),
+  source: z
+    .union([z.enum(WHATSAPP_MESSAGE_SOURCES), z.string().min(1)])
+    .nullable()
+    .optional(),
+  evidence: conversationEvidenceSchema.optional(),
   correlationId: z.string().min(1),
   occurredAt: isoDateSchema,
   attempts: z.array(messageAttemptSchema),
@@ -185,6 +363,14 @@ const humanMessageResultSchema = z.object({
   conversation: conversationSchema,
 });
 
+const versionedActionResultSchema = z
+  .object({
+    resultingVersion: z.number().int().positive(),
+    conversation: conversationSchema.optional(),
+    snapshot: z.union([conversationSchema, serviceSessionSchema]).optional(),
+  })
+  .refine((value) => value.conversation !== undefined || value.snapshot !== undefined);
+
 const conversationSnapshotSchema = z.object({
   department: z.enum(WHATSAPP_CONVERSATION_DEPARTMENTS),
   conversationState: z.enum(WHATSAPP_CONVERSATION_STATES),
@@ -200,6 +386,8 @@ const transitionSchema = z.object({
   resultingVersion: z.number().int().positive(),
   actorType: z.string().min(1),
   actorUserId: z.string().uuid().nullable(),
+  actorAgentId: z.string().min(1).nullable().optional(),
+  source: z.string().min(1).nullable().optional(),
   actor: z
     .object({
       type: z.string().min(1),
@@ -235,6 +423,7 @@ const apiErrorSchema = z.object({
 type ApiConversation = z.infer<typeof conversationSchema>;
 type ApiMessage = z.infer<typeof messageSchema>;
 type ApiPagination = z.infer<typeof paginationSchema>;
+type ApiEvidenceItem = z.infer<typeof evidenceItemSchema>;
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '');
@@ -326,6 +515,81 @@ function mapAttachment(message: ApiMessage): WhatsAppMessageAttachment | null {
   };
 }
 
+function mapEvidenceItem(item: ApiEvidenceItem): WhatsAppEvidenceItem {
+  return {
+    id: item.id,
+    name: item.name ?? item.title ?? null,
+    status: item.status ?? null,
+    summary: item.summary ?? item.reason ?? null,
+    url: item.url ?? null,
+    occurredAt: item.occurredAt ?? item.createdAt ?? null,
+    provider: item.provider ?? null,
+    model: item.model ?? null,
+    metadata: sanitizeEvidenceMetadata(item.metadata ?? {}),
+  };
+}
+
+const SENSITIVE_EVIDENCE_METADATA_KEY =
+  /(?:api[-_]?key|secret|token|credential|authorization|cookie)/iu;
+
+function sanitizeEvidenceMetadata(
+  metadata: Readonly<Record<string, unknown>>,
+  depth = 0,
+): Readonly<Record<string, unknown>> {
+  if (depth >= 4) return {};
+
+  return Object.fromEntries(
+    Object.entries(metadata)
+      .filter(([key]) => !SENSITIVE_EVIDENCE_METADATA_KEY.test(key))
+      .map(([key, value]) => {
+        if (Array.isArray(value)) {
+          return [
+            key,
+            value.map((item) =>
+              item && typeof item === 'object' && !Array.isArray(item)
+                ? sanitizeEvidenceMetadata(item as Readonly<Record<string, unknown>>, depth + 1)
+                : item,
+            ),
+          ];
+        }
+
+        if (value && typeof value === 'object') {
+          return [
+            key,
+            sanitizeEvidenceMetadata(value as Readonly<Record<string, unknown>>, depth + 1),
+          ];
+        }
+
+        return [key, value];
+      }),
+  );
+}
+
+function mapEvidence(
+  evidence: z.infer<typeof conversationEvidenceSchema> | undefined,
+): WhatsAppConversationEvidence {
+  return {
+    agentExecutions: (evidence?.agentExecutions ?? []).map(mapEvidenceItem),
+    knowledgeSources: (evidence?.knowledgeSources ?? []).map(mapEvidenceItem),
+    toolExecutions: (evidence?.toolExecutions ?? []).map(mapEvidenceItem),
+    mediaInterpretations: (evidence?.mediaInterpretations ?? []).map(mapEvidenceItem),
+    registrationDataReviews: (evidence?.registrationDataReviews ?? []).map(mapEvidenceItem),
+  };
+}
+
+function getConversationEvidence(conversation: ApiConversation): WhatsAppConversationEvidence {
+  return mapEvidence({
+    agentExecutions: conversation.evidence?.agentExecutions ?? conversation.agentExecutions ?? [],
+    knowledgeSources:
+      conversation.evidence?.knowledgeSources ?? conversation.knowledgeSources ?? [],
+    toolExecutions: conversation.evidence?.toolExecutions ?? conversation.toolExecutions ?? [],
+    mediaInterpretations:
+      conversation.evidence?.mediaInterpretations ?? conversation.mediaInterpretations ?? [],
+    registrationDataReviews:
+      conversation.evidence?.registrationDataReviews ?? conversation.registrationDataReviews ?? [],
+  });
+}
+
 function mapMessage(message: ApiMessage): WhatsAppMessage {
   return {
     id: message.id,
@@ -335,6 +599,9 @@ function mapMessage(message: ApiMessage): WhatsAppMessage {
     text: message.text,
     attachment: mapAttachment(message),
     sentBy: message.sentBy ?? null,
+    ...(message.actor !== undefined ? { actor: message.actor } : {}),
+    ...(message.source !== undefined ? { source: message.source } : {}),
+    ...(message.evidence !== undefined ? { evidence: mapEvidence(message.evidence) } : {}),
     occurredAt: message.occurredAt,
     attempts: message.attempts,
   };
@@ -346,10 +613,16 @@ function mapConversation(
   transitions: readonly WhatsAppConversationTransition[] = [],
   messageHistory?: ApiPagination,
 ): WhatsAppConversation {
-  return {
+  const mappedConversation: WhatsAppConversation = {
     id: conversation.id,
     companyId: conversation.companyId,
     channel: conversation.channel,
+    sourceChannel: conversation.sourceChannel ?? {
+      id: conversation.channel.id,
+      name: conversation.channel.name,
+      type: 'WHATSAPP',
+      address: conversation.channel.phoneNumber,
+    },
     contact: {
       id: conversation.contact.id,
       name: contactDisplayName(conversation),
@@ -362,6 +635,15 @@ function mapConversation(
     requestStatus: conversation.requestStatus,
     resumeState: conversation.resumeState,
     assignedTo: conversation.assignedTo,
+    ...((conversation.currentServiceSession ?? conversation.serviceSession)
+      ? {
+          currentServiceSession: {
+            ...(conversation.currentServiceSession ?? conversation.serviceSession)!,
+            projection: 'NATIVE' as const,
+          },
+        }
+      : {}),
+    evidence: getConversationEvidence(conversation),
     unreadCount: conversation.unreadCount,
     version: conversation.version,
     lastInboundAt: conversation.lastInboundAt,
@@ -378,6 +660,13 @@ function mapConversation(
     messages,
     ...(messageHistory ? { messageHistory } : {}),
     transitions,
+  };
+
+  return {
+    ...mappedConversation,
+    currentServiceSession:
+      mappedConversation.currentServiceSession ??
+      getCurrentWhatsAppServiceSession(mappedConversation),
   };
 }
 
@@ -430,6 +719,13 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     private readonly timeoutMs = 5_000,
   ) {
     this.baseUrl = normalizeBaseUrl(baseUrl);
+  }
+
+  async getServiceAssignmentTargets(): Promise<readonly WhatsAppServiceAssignmentTarget[]> {
+    return parseResponse(
+      z.array(serviceAssignmentTargetSchema),
+      await this.request('/service/sessions/assignment-targets'),
+    );
   }
 
   async startConversation(phone: string): Promise<WhatsAppConversation> {
@@ -599,28 +895,152 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     };
   }
 
+  async getMediaInterpretation(
+    conversationId: string,
+    messageId: string,
+  ): Promise<WhatsAppMediaInterpretation> {
+    return parseResponse(
+      mediaInterpretationSchema,
+      await this.request(
+        `/whatsapp/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/media-interpretation`,
+      ),
+    );
+  }
+
+  async analyzeMedia(
+    conversationId: string,
+    messageId: string,
+  ): Promise<WhatsAppMediaInterpretation | DeferredWhatsAppMediaInterpretation> {
+    return parseResponse(
+      z.union([mediaInterpretationSchema, deferredMediaInterpretationSchema]),
+      await this.request(
+        `/whatsapp/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/actions/analyze-media`,
+        { method: 'POST' },
+      ),
+    );
+  }
+
+  async correctMediaInterpretation(
+    conversationId: string,
+    messageId: string,
+    correction: string,
+    feedback?: string,
+  ): Promise<WhatsAppMediaInterpretation> {
+    return parseResponse(
+      mediaInterpretationSchema,
+      await this.request(
+        `/whatsapp/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/media-interpretation/correction`,
+        { method: 'POST', body: { correction, ...(feedback ? { feedback } : {}) } },
+      ),
+    );
+  }
+
   async takeOverConversation(
     conversationId: string,
     expectedVersion: number,
+    commandId?: string,
+    serviceSessionId: string = conversationId,
   ): Promise<WhatsAppConversation> {
-    return this.executeVersionedAction(conversationId, 'take-over', expectedVersion);
+    return this.executeServiceSessionAction(
+      conversationId,
+      serviceSessionId,
+      'assume',
+      expectedVersion,
+      {},
+      commandId,
+    );
   }
 
   async returnConversationToBot(
     conversationId: string,
     expectedVersion: number,
+    commandId?: string,
+    serviceSessionId: string = conversationId,
   ): Promise<WhatsAppConversation> {
-    return this.executeVersionedAction(conversationId, 'return-to-bot', expectedVersion);
+    return this.executeServiceSessionAction(
+      conversationId,
+      serviceSessionId,
+      'return-to-ai',
+      expectedVersion,
+      {},
+      commandId,
+    );
   }
 
   async forwardConversation(
     conversationId: string,
     targetDepartment: WhatsAppConversationDepartment,
     expectedVersion: number,
+    commandId?: string,
+    serviceSessionId: string = conversationId,
   ): Promise<WhatsAppConversation> {
-    return this.executeVersionedAction(conversationId, 'forward', expectedVersion, {
-      targetDepartment,
-    });
+    const target = (await this.getServiceAssignmentTargets()).find(
+      (candidate) => candidate.code === targetDepartment,
+    );
+    if (!target) {
+      throw new WhatsAppConversationRepositoryError(
+        'validation',
+        'O departamento de destino não está disponível para transferência.',
+      );
+    }
+    return this.executeServiceSessionAction(
+      conversationId,
+      serviceSessionId,
+      'transfer',
+      expectedVersion,
+      { departmentId: target.id },
+      commandId,
+    );
+  }
+
+  async returnConversationToQueue(
+    conversationId: string,
+    command: ReturnToQueueWhatsAppServiceSessionCommand,
+  ): Promise<WhatsAppConversation> {
+    return this.executeServiceSessionAction(
+      conversationId,
+      command.serviceSessionId,
+      'return-to-queue',
+      command.expectedVersion,
+      { queueId: command.queueId },
+      command.commandId,
+    );
+  }
+
+  async transferServiceSession(
+    conversationId: string,
+    command: TransferWhatsAppServiceSessionCommand,
+  ): Promise<WhatsAppConversation> {
+    return this.executeServiceSessionAction(
+      conversationId,
+      command.serviceSessionId,
+      'transfer',
+      command.expectedVersion,
+      {
+        departmentId: command.departmentId,
+        ...(command.queueId ? { queueId: command.queueId } : {}),
+        ...(command.userId ? { userId: command.userId } : {}),
+        ...(command.reason?.trim() ? { reason: command.reason.trim() } : {}),
+      },
+      command.commandId,
+    );
+  }
+
+  async changeConversationPriority(
+    conversationId: string,
+    command: ChangeWhatsAppServiceSessionPriorityCommand,
+  ): Promise<WhatsAppConversation> {
+    return this.executeServiceSessionAction(
+      conversationId,
+      command.serviceSessionId,
+      'change-priority',
+      command.expectedVersion,
+      {
+        priority: command.priority.toLowerCase(),
+        reason: command.reason?.trim(),
+      },
+      command.commandId,
+    );
   }
 
   async changeConversationDepartment(
@@ -665,10 +1085,17 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     conversationId: string,
     expectedVersion: number,
     reason?: string | null,
+    commandId?: string,
+    serviceSessionId: string = conversationId,
   ): Promise<WhatsAppConversation> {
-    return this.executeVersionedAction(conversationId, 'close', expectedVersion, {
-      reason: reason?.trim() || null,
-    });
+    return this.executeServiceSessionAction(
+      conversationId,
+      serviceSessionId,
+      'close',
+      expectedVersion,
+      { reason: reason?.trim() },
+      commandId,
+    );
   }
 
   async sendHumanMessage(
@@ -742,7 +1169,9 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     action:
       | 'take-over'
       | 'return-to-bot'
+      | 'return-to-queue'
       | 'forward'
+      | 'change-priority'
       | 'change-department'
       | 'archive'
       | 'unarchive'
@@ -751,23 +1180,94 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
       | 'close-after-rejection',
     expectedVersion: number,
     extra: Readonly<Record<string, unknown>> = {},
+    commandId: string = randomUUID(),
   ): Promise<WhatsAppConversation> {
-    const response = parseResponse(
-      conversationSchema,
-      await this.request(
-        `/whatsapp/conversations/${encodeURIComponent(conversationId)}/actions/${action}`,
-        {
-          method: 'POST',
-          body: {
-            commandId: randomUUID(),
-            expectedVersion,
-            ...extra,
-          },
+    const responseValue = await this.request(
+      `/whatsapp/conversations/${encodeURIComponent(conversationId)}/actions/${action}`,
+      {
+        method: 'POST',
+        body: {
+          commandId,
+          expectedVersion,
+          ...extra,
         },
-      ),
+      },
     );
+    const directConversation = conversationSchema.safeParse(responseValue);
 
-    return mapConversation(response);
+    if (directConversation.success) return mapConversation(directConversation.data);
+
+    const response = parseResponse(versionedActionResultSchema, responseValue);
+    if (response.conversation) return mapConversation(response.conversation);
+
+    const snapshotConversation = conversationSchema.safeParse(response.snapshot);
+    if (snapshotConversation.success) return mapConversation(snapshotConversation.data);
+
+    return this.reconcileServiceSessionSnapshot(
+      conversationId,
+      serviceSessionSchema.parse(response.snapshot),
+      response.resultingVersion,
+    );
+  }
+
+  private async executeServiceSessionAction(
+    conversationId: string,
+    serviceSessionId: string,
+    action:
+      'assume' | 'return-to-queue' | 'return-to-ai' | 'transfer' | 'change-priority' | 'close',
+    expectedVersion: number,
+    extra: Readonly<Record<string, unknown>> = {},
+    commandId: string = randomUUID(),
+  ): Promise<WhatsAppConversation> {
+    const responseValue = await this.request(
+      `/service/sessions/${encodeURIComponent(serviceSessionId)}/actions/${action}`,
+      {
+        method: 'POST',
+        body: { commandId, expectedVersion, ...extra },
+      },
+    );
+    const directServiceSession = serviceSessionSchema.safeParse(responseValue);
+    if (directServiceSession.success) {
+      return this.reconcileServiceSessionSnapshot(
+        conversationId,
+        directServiceSession.data,
+        directServiceSession.data.version,
+      );
+    }
+    const response = parseResponse(versionedActionResultSchema, responseValue);
+    const snapshotConversation = conversationSchema.safeParse(
+      response.conversation ?? response.snapshot,
+    );
+    if (snapshotConversation.success) return mapConversation(snapshotConversation.data);
+
+    return this.reconcileServiceSessionSnapshot(
+      conversationId,
+      serviceSessionSchema.parse(response.snapshot),
+      response.resultingVersion,
+    );
+  }
+
+  private async reconcileServiceSessionSnapshot(
+    conversationId: string,
+    serviceSession: z.infer<typeof serviceSessionSchema>,
+    resultingVersion: number,
+  ): Promise<WhatsAppConversation> {
+    const conversation = await this.getConversationById(conversationId);
+    if (!conversation) {
+      throw new WhatsAppConversationRepositoryError(
+        'not-found',
+        'A conversa atualizada não foi encontrada após a confirmação do comando.',
+      );
+    }
+
+    return {
+      ...conversation,
+      currentServiceSession: {
+        ...serviceSession,
+        version: resultingVersion,
+        projection: 'NATIVE',
+      },
+    };
   }
 
   private async request(

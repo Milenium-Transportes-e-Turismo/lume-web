@@ -1,15 +1,15 @@
 import 'server-only';
 
+import { getTenantApiConfig } from '@/env.server';
+
 import type { AuthenticationGateway } from '../../application';
-import {
-  TenantApiAuthenticationGateway,
-  resolveTenantApiBaseUrl,
-  resolveTenantApiTimeout,
-} from './tenant-api-authentication-gateway';
+import { TenantApiAuthenticationGateway } from './tenant-api-authentication-gateway';
 
 export function createTenantApiAuthenticationGateway(): AuthenticationGateway {
+  const tenantApi = getTenantApiConfig();
+
   return new TenantApiAuthenticationGateway({
-    baseUrl: resolveTenantApiBaseUrl(process.env.LUME_TENANT_API_URL),
-    timeoutMs: resolveTenantApiTimeout(process.env.LUME_TENANT_API_TIMEOUT_MS),
+    baseUrl: tenantApi.baseUrl,
+    timeoutMs: tenantApi.timeoutMs,
   });
 }

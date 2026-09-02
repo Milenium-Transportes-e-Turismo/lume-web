@@ -6,6 +6,9 @@ O fluxo de checklists, upload, revisão humana e candidatos restritos está em
 Os tokens, decisões de componentes e regras de acessibilidade do design system
 Lume estão em [`docs/design-system.md`](docs/design-system.md).
 
+Os schemas, defaults e procedimentos seguros de injeção em contêiner estão em
+[`docs/environment-configuration.md`](docs/environment-configuration.md).
+
 Aplicação operacional instalada por cliente. Ela se comunica somente com o
 `lume-tenant-api` da mesma instalação e continua funcional sem acesso ao
 `lume-control`.
@@ -92,17 +95,14 @@ versionados, resposta do atendente idempotente e polling server-side com
 backoff. A caixa de entrada consulta uma página por vez e envia pesquisa e
 filtros ao servidor; os indicadores agregados chegam no mesmo contrato. Assim,
 uma importação com milhares de conversas não dispara uma requisição por página
-nem excede o limite de chamadas da API. O detalhe compacto exibe canal e
-responsável no cabeçalho; quando a
-conversa está encerrada, projeta ali o atendente que executou o encerramento. Separa as
-ações operacionais em duas colunas e abre encaminhamento, status comercial,
-histórico de ações e orçamentos em modais. O botão **Abrir chat** abre o painel
-lateral construído com o componente `Message` do shadcn/ui para leitura do
-histórico completo, anexos e envio de texto ou arquivo pelo atendente. As
-mensagens anteriores são carregadas progressivamente quando o usuário chega ao
-início da lista, preservando a posição de leitura. No desktop, esse painel pode
-usar até 84 rem de largura — aproximadamente o dobro da largura anterior — e,
-no celular, ocupa a largura disponível sem criar rolagem horizontal.
+nem excede o limite de chamadas da API. No desktop, o workspace usa três
+painéis densos — caixa de entrada, conversa e contexto — e, no celular,
+navegação progressiva sem rolagem horizontal. O contexto separa status,
+controle IA/HUMANO, responsável, fila e prioridade da `ServiceSession`, além de
+mostrar canal de origem, fontes, tools, interpretações e revisões quando a API
+os publica. Provider/model aparecem apenas como evidência da execução efetiva.
+O histórico e o compositor reutilizam `ConversationMessageSheet`; mensagens
+anteriores são carregadas progressivamente, preservando a posição de leitura.
 O chat apresenta imagens e figurinhas, reproduz áudio e vídeo e oferece a
 abertura de documentos quando a Evolution fornece uma URL HTTPS válida. Esses
 conteúdos permanecem no histórico, mas nunca são enviados à IA para leitura.
@@ -165,6 +165,12 @@ contrato.
 Os exemplos de ambiente são organizados por finalidade e informam o que é
 obrigatório, opcional, público ou secreto. Valores `NEXT_PUBLIC_*` chegam ao
 navegador e nunca podem conter chaves, tokens, senhas ou licenças.
+
+`src/env.ts` centraliza a validação Zod. Leituras privadas são lazy e
+server-only, portanto a imagem é compilada sem segredos e recebe
+`LUME_TENANT_API_URL` e `SESSION_SECRET` no início do contêiner. Já valores
+`NEXT_PUBLIC_*` são fixados durante o build e não mudam apenas com a injeção no
+runtime.
 
 ## O que reutilizar em novas telas
 

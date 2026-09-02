@@ -254,7 +254,6 @@ describe('users management permissions', () => {
   });
 
   it('publishes implicit permissions in the effective-permission filter', async () => {
-    const interaction = userEvent.setup();
     render(
       <UsersManagement
         users={users}
@@ -265,10 +264,16 @@ describe('users management permissions', () => {
       />,
     );
 
-    await interaction.click(screen.getByLabelText('Permissão efetiva'));
+    const permissionFilter = screen.getByRole('combobox', { name: 'Permissão efetiva' });
 
-    expect(screen.getByText('Painel · Visualizar (automática)')).toBeInTheDocument();
-    expect(screen.getByText('Comercial · Visualizar')).toBeInTheDocument();
+    expect(
+      within(permissionFilter).getByRole('option', {
+        name: 'Painel · Visualizar (automática)',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(permissionFilter).getByRole('option', { name: 'Comercial · Visualizar' }),
+    ).toBeInTheDocument();
   });
 
   it('applies a selected permission immediately and exposes a removable filter label', async () => {
@@ -283,8 +288,10 @@ describe('users management permissions', () => {
       />,
     );
 
-    await interaction.click(screen.getByLabelText('Permissão efetiva'));
-    await interaction.click(await screen.findByRole('option', { name: 'Licença · Visualizar' }));
+    await interaction.selectOptions(
+      screen.getByRole('combobox', { name: 'Permissão efetiva' }),
+      'license:view',
+    );
 
     expect(mockRouterPush).toHaveBeenCalledWith('/users?permission=license%3Aview', {
       scroll: false,

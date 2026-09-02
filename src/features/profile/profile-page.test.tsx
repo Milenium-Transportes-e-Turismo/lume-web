@@ -6,6 +6,12 @@ import { toast } from '@/shared/ui/toast';
 import { changeOwnPasswordAction } from './profile-actions';
 import { ProfilePage } from './profile-page';
 
+const routerPush = jest.fn();
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
+
 jest.mock('./profile-actions', () => ({
   changeOwnPasswordAction: jest.fn(),
   updateProfilePictureAction: jest.fn(),

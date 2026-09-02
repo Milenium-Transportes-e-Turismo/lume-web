@@ -4,6 +4,7 @@ import {
   canSendHumanWhatsAppMessage,
   canTakeOverWhatsAppConversation,
   canWhatsAppBotReply,
+  getCurrentWhatsAppServiceSession,
   isWhatsAppAwaitingProposal,
   isWhatsAppBotBlocked,
   isWhatsAppConversationDepartment,
@@ -33,6 +34,26 @@ describe('WhatsApp conversation domain', () => {
 
   it.each(WHATSAPP_REQUEST_STATUSES)('accepts the %s request status', (status) => {
     expect(isWhatsAppRequestStatus(status)).toBe(true);
+  });
+
+  it('projects legacy lifecycle, control and assignment as separate ServiceSession dimensions', () => {
+    const conversation = createWhatsAppConversationFixture({
+      conversationState: 'sent-to-human',
+      assignedTo: null,
+      version: 9,
+    });
+
+    expect(getCurrentWhatsAppServiceSession(conversation)).toMatchObject({
+      id: conversation.id,
+      status: 'WAITING_HUMAN',
+      controlMode: 'HUMAN',
+      responsibleUserId: null,
+      queueId: null,
+      priority: 'NORMAL',
+      version: 9,
+      projection: 'LEGACY_CONVERSATION',
+      availableActions: ['ASSUME', 'TRANSFER_DEPARTMENT', 'CLOSE'],
+    });
   });
 
   it.each(['new', '', null, undefined, 1])('rejects invalid taxonomy values %p', (value) => {
