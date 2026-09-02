@@ -1,8 +1,10 @@
 # Arquitetura do Lume Tenant Web
 
-Gestão documental usa o shell existente e um gateway server-only. O modo
-`document-portal` reduz a navegação a **Meus documentos**; a Tenant API continua
-autoritativa para isolamento, revisão e download.
+Gestão documental usa o shell existente e um gateway server-only. Contas
+legadas no modo `document-portal` reduzem a navegação a **Meus documentos**; a
+Tenant API continua autoritativa para isolamento, revisão e download. Novos
+candidatos não recebem esse tipo de conta: o produto aguarda um contrato de link
+seguro.
 
 ```text
 Navegador
@@ -29,23 +31,29 @@ tenant. `NEXT_PUBLIC_TENANT_NAME` e `NEXT_PUBLIC_TENANT_PRODUCT_NAME` fornecem
 somente contexto textual. Departamentos e módulos específicos permanecem
 configuráveis por tenant.
 
-O departamento é o limite estrutural de navegação e dados; permissões
-individuais, no formato `recurso:ação`, refinam o que o usuário pode fazer
-dentro desse limite. O formulário de criação segue três etapas: dados básicos,
+A permissão individual, no formato `recurso:ação`, autoriza a operação; a área
+de atuação limita o escopo dos dados. O formulário de criação de colaborador
+segue três etapas: dados básicos,
 seleção de um ou mais departamentos e seleção das permissões compatíveis
-publicadas por `GET /permissions`. Permissões implícitas permanecem sob
+publicadas por `GET /permissions`. A lista de departamentos ainda é um espelho
+local do catálogo estático da API; permissões implícitas permanecem sob
 autoridade da Tenant API e não podem ser removidas pelo navegador.
 
-O catálogo público possui exatamente Comercial, Compras, Controladoria,
-Departamento Pessoal, Financeiro, Gerência, Manutenção, Monitoramento e
-Operacional. Registros legados continuam legíveis para compatibilidade, sempre
-traduzidos para um rótulo humano, mas não voltam às opções de cadastro nem aos
-filtros e encaminhamentos do Painel WhatsApp.
+As opções oferecidas pelo Tenant Web para um novo colaborador são Comercial,
+Compras, Controladoria, Departamento Pessoal, Financeiro, Gerência, Manutenção,
+Monitoramento, Operacional e Tecnologia da Informação. O catálogo técnico da API
+também reconhece `client-company`; o Tenant Web reserva esse código para leitura
+e edição de contas de cliente legadas e o exclui de novas contas. Registros
+legados continuam legíveis para compatibilidade. A configuração dinâmica e a
+separação completa de áreas, perfis e delegações dependem de contrato da API.
 
-`/users` exige departamento Gerência e ao menos uma permissão entre
-`users:view`, `users:create`, `users:update` e `users:manage`;
-`/license` exige o mesmo departamento e `license:view`. Painel WhatsApp e
-Orçamentos exigem departamento Comercial e a permissão do módulo.
+`/users` exige ao menos uma permissão entre `users:view`, `users:create`,
+`users:update` e `users:manage`; a API aplica as restrições do papel e do alvo.
+`/license` exige departamento Gerência e `license:view`. Painel WhatsApp e
+Orçamentos ainda exigem departamento Comercial e a permissão do módulo. O gate
+do Painel WhatsApp só poderá ser removido quando listagem, detalhe, busca e
+comandos forem limitados às filas atribuídas; abrir apenas a página hoje
+exporia conversas de outros departamentos do tenant.
 
 As conversas exibidas no Painel WhatsApp passam pelo
 `LumeApiWhatsAppConversationRepository`, que é server-only. Server Components,
@@ -106,18 +114,20 @@ Tenant API continua sendo a fonte de verdade do perfil.
 
 Os itens são organizados em seis grupos:
 
-- **Geral:** Dashboard, Agentes de IA e Suporte, sujeitos às respectivas
-  permissões e com conteúdo filtrado pelo departamento;
-- **Cadastros:** clientes PF/PJ usados por toda a aplicação;
-- **Comercial:** Painel WhatsApp e Orçamentos, somente para vínculo Comercial;
+- **Geral:** Dashboard, Knowledge Base, Meus documentos e Suporte, sujeitos às
+  respectivas permissões e com conteúdo filtrado pelo departamento;
+- **Cadastros:** Cadastro, Conciliação de Cadastros e Revisões cadastrais,
+  conforme as permissões de clientes e histórico;
+- **Comercial:** Painel WhatsApp, Contatos e Orçamentos, conforme o vínculo e as
+  permissões de atendimento;
 - **Operacional:** cálculo de roteirização e custos, conforme as permissões
   `route-planner:view` e `route-planner:calculate`;
 - **Pessoas:** Usuários e Gestão documental conforme vínculo e permissões;
-- **Administração:** Painel administrativo exclusivo de administradores, além de
-  Usuários e Licença conforme as permissões e o vínculo organizacional. O painel
+- **Administração:** Agentes de IA, Painel administrativo exclusivo de
+  administradores, Canais WhatsApp e Licença conforme as permissões e o vínculo
+  organizacional. O painel
   apresenta volume, bytes, duração, resultados, usuários e ações humanizadas;
   nunca exibe rotas ou conteúdo das requisições.
-  permissão individual correspondente.
 
 O tema usa `next-themes` e os tokens semânticos de `globals.css`; componentes
 de domínio não persistem preferência paralela. `src/app/loading.tsx` fornece o
@@ -150,9 +160,9 @@ não introduzem rolagem horizontal.
 
 O detalhe mantém telefone sob o nome, responsável e canal no cabeçalho; após o
 fechamento, o responsável é substituído pelo ator da transição de encerramento. As
-dimensões canônicas em uma grade compacta. Assumir, devolver e encerrar ficam
-na coluna operacional; Abrir chat, Encaminhar e Alterar status ficam na coluna
-de apoio. Encaminhamento, status, lista de orçamentos e histórico de ações são
+dimensões canônicas aparecem em uma grade compacta. Assumir e **Encerrar
+atendimento** ficam na coluna operacional; Abrir chat, Encaminhar e Alterar
+status ficam na coluna de apoio. Encaminhamento, status, lista de orçamentos e histórico de ações são
 modais, evitando que formulários e históricos imponham rolagem permanente à
 página. O botão Assumir fica desabilitado assim que houver responsável; a
 devolução ao bot usa exclusivamente o comando versionado da Tenant API.
@@ -162,20 +172,27 @@ enquanto o rascunho não for confirmado. A Tenant API persiste a mensagem em
 `pending` e publica o processamento assíncrono; o frontend apenas acompanha o
 resultado pelo histórico versionado.
 
-O encerramento também é um comando versionado da Tenant API. Durante o MVP,
-uma proposta já aprovada não bloqueia o encerramento manual. A antiga política
-permanece documentada na constante
-`BLOCK_APPROVED_QUOTE_CONVERSATION_CLOSE=false`, permitindo reativação futura
-sem apagar a decisão anterior. Propostas ainda em coleta, aguardando o cliente
-ou em análise continuam bloqueando a ação. A Tenant API é a autoridade final:
-uma resposta de erro não é convertida em sucesso pelo frontend. Uma conversa
-com proposta aprovada, sem atendente e em `waiting-for-customer` também pode ser
-devolvida ao bot para o menu de acompanhamento. Quando a solicitação foi
-recusada, o motivo efetivo é obrigatório. O painel apresenta o histórico de
-encerramento com data e hora, atendente responsável e motivo, sem expor o log
-técnico completo de transições. A permissão de gerenciamento do Comercial
-autoriza o mesmo encerramento versionado em conversas encaminhadas a outros
-departamentos; o frontend não impõe um filtro departamental adicional.
+Encerrar o atendimento humano usa exclusivamente o comando versionado
+`return-to-bot`. A ação só fica disponível para uma conversa `human-active`
+atribuída ao usuário autenticado. A interface e a Server Action conferem o
+responsável atual e o escopo Comercial; a API também garante a propriedade na
+mesma transação da mudança. O estado devolvido substitui o snapshot local e um
+conflito recarrega a versão autoritativa.
+
+Gerência e Diretoria poderão encerrar um atendimento humano de outro atendente
+somente como supervisão explícita, com permissão própria, motivo obrigatório e
+auditoria de ator e data/hora. Enquanto a Tenant API não publicar a autorização,
+o DTO e o registro de auditoria correspondentes, o Web mantém a regra do
+responsável e não deriva essa exceção de departamento ou administração da
+plataforma.
+
+`close` continua sendo o comando atual e distinto para colocar a conversa
+canônica no estado técnico temporário `closed`; nunca representa exclusão ou
+fechamento definitivo, e o próximo contato reabre a mesma conversa. Ele não é
+exposto pela interface nem por uma Server Action como encerramento do
+atendimento humano. O alias legado `close-after-rejection` permanece reconhecido
+no gateway e na projeção de históricos. Orçamentos e demais processos permanecem
+separados da conversa contínua.
 
 ## Fronteira para importação e exportação
 
@@ -246,6 +263,10 @@ colaboradores, pontos fixos, rotas sugeridas e downloads do módulo anterior nã
 fazem parte deste núcleo e suas telas foram removidas. Um futuro consumidor de
 fretamento contínuo deverá chamar o mesmo endpoint, sem inserir lógica no React.
 
+Novas contas são restritas ao modo colaborador. Contas legadas de candidato,
+cliente ou portal documental continuam editáveis sem permitir troca do modo de
+acesso, até que a Tenant API publique representação e permissões próprias.
+
 ## Autenticação e ciclo da conta
 
 O login só aceita uma resposta de sessão completa. A senha inicial de
@@ -261,13 +282,20 @@ apresenta a mesma confirmação independentemente de a conta existir. O token
 entregue por e-mail abre `/reset-password?token=...`; somente essa rota renderiza
 o formulário que consome `POST /auth/password/change`.
 
-Contas usam os estados `active`, `inactive` e `suspended`. A suspensão exige
+O contrato técnico atual usa os estados `active`, `inactive` e `suspended`; isso
+não transforma `inactive` em termo de negócio nem substitui o futuro estado do
+vínculo de trabalho. A suspensão exige
 motivo e prazo em quantidade de dias ou data final. A Tenant API bloqueia novas
-autenticações e sessões existentes. `users:update` edita dados, departamentos,
-permissões e recuperação de senha; `users:manage` atua somente no estado da
-conta, permitindo reativar, desativar ou suspender. `users:delete` não existe no
-catálogo nem na interface.
+autenticações e sessões existentes. `users:update` autoriza edição e recuperação
+de senha; a API atual só aplica departamentos e permissões enviados por
+administrador ou TI. Depois de uma tentativa de edição de acesso, o frontend
+compara esses campos na resposta autoritativa e sinaliza conflito em vez de
+mostrar sucesso quando a API os descarta. `users:manage` atua no estado da conta, permitindo
+reativar, desativar ou suspender. Não existe `users:delete` no catálogo: o
+endpoint `DELETE /users/:id` usa `users:manage`, mas o caso de uso exige
+administrador, senha atual e um alvo diferente da própria conta. O controle de
+exclusão lógica aparece somente para administrador.
 
 Consulte [tenant-api-integration.md](tenant-api-integration.md) para os
-endpoints já integrados, o ciclo de renovação da sessão e as pendências de
-contrato da API.
+endpoints já integrados e [tenant-api-contract-gaps.md](tenant-api-contract-gaps.md)
+para as decisões aprovadas que ainda não possuem contrato consumível.

@@ -85,22 +85,6 @@ function requireClientScope(
   }
 }
 
-function requireDocumentsForCandidate(
-  input: {
-    readonly documentAccessMode?: 'standard' | 'document-portal' | 'client';
-    readonly requestDocuments: boolean;
-  },
-  context: z.RefinementCtx,
-) {
-  if (input.documentAccessMode === 'document-portal' && !input.requestDocuments) {
-    context.addIssue({
-      code: 'custom',
-      message: 'A solicitação de documentação é obrigatória para candidatos.',
-      path: ['requestDocuments'],
-    });
-  }
-}
-
 export const userFormSchema = z
   .object({
     ...userAssignmentFields,
@@ -124,6 +108,22 @@ export const userFormSchema = z
         'Inclua maiúscula, minúscula, número e símbolo.',
       ),
     requestDocuments: z.boolean().default(false),
+    documentAccessMode: z
+      .literal('standard', {
+        error:
+          'Novas contas de candidato ou cliente não podem ser criadas pelo Tenant Web neste momento.',
+      })
+      .default('standard'),
+    clientCategory: z
+      .null({
+        error: 'A categoria de cliente não se aplica à criação de colaboradores.',
+      })
+      .optional(),
+    routingCompanyId: z
+      .null({
+        error: 'O vínculo com cliente não se aplica à criação de colaboradores.',
+      })
+      .optional(),
     // Compatibilidade de entrada com clientes anteriores; a seleção fixa não é mais usada.
     initialDocumentChecklistCode: z
       .enum(['admission-general', 'admission-administrative', 'admission-driver'])
@@ -132,8 +132,13 @@ export const userFormSchema = z
   .strict()
   .superRefine((input, context) => {
     requireDepartmentForStandardUser(input, context);
-    requireDocumentsForCandidate(input, context);
-    requireClientScope(input, context);
+    if (input.departments.includes('client-company')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Empresa cliente não é um departamento válido para uma nova conta de colaborador.',
+        path: ['departments'],
+      });
+    }
   });
 
 export const userEditorFormSchema = z

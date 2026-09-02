@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 
-import { getTenantApiConfig } from '@/env.server';
+import { getServerEnv, getTenantApiConfig } from '@/env.server';
 
 export const dynamic = 'force-dynamic';
 
-function readinessResponse(status: 'ready' | 'not-ready', upstream: 'ready' | 'unavailable') {
+const unsafeSessionSecrets = new Set(['replace-me', 'replace-with-at-least-32-random-characters']);
+
+function readinessResponse(
+  status: 'ready' | 'not-ready',
+  upstream: 'ready' | 'unavailable' | 'not-checked',
+  configuration: 'valid' | 'invalid',
+) {
   return NextResponse.json(
     {
       status,
       service: 'lume-tenant-web',
+      configuration,
       dependencies: {
         tenantApi: upstream,
       },
@@ -22,13 +29,23 @@ function readinessResponse(status: 'ready' | 'not-ready', upstream: 'ready' | 'u
   );
 }
 
+function assertRuntimeConfiguration() {
+  const environment = getServerEnv();
+  const sessionSecret = environment.SESSION_SECRET;
+  if (!sessionSecret) throw new Error('SESSION_SECRET is required.');
+  if (unsafeSessionSecrets.has(sessionSecret)) {
+    throw new Error('SESSION_SECRET must not use a documented placeholder.');
+  }
+}
+
 export async function GET() {
   let tenantApi: ReturnType<typeof getTenantApiConfig>;
 
   try {
+    assertRuntimeConfiguration();
     tenantApi = getTenantApiConfig();
   } catch {
-    return readinessResponse('not-ready', 'unavailable');
+    return readinessResponse('not-ready', 'not-checked', 'invalid');
   }
 
   try {
@@ -40,9 +57,9 @@ export async function GET() {
     });
 
     return response.ok
-      ? readinessResponse('ready', 'ready')
-      : readinessResponse('not-ready', 'unavailable');
+      ? readinessResponse('ready', 'ready', 'valid')
+      : readinessResponse('not-ready', 'unavailable', 'valid');
   } catch {
-    return readinessResponse('not-ready', 'unavailable');
+    return readinessResponse('not-ready', 'unavailable', 'valid');
   }
 }

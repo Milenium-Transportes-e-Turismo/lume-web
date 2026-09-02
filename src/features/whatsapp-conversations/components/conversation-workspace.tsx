@@ -73,6 +73,7 @@ import {
 } from '../actions';
 import { HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH } from '../application';
 import {
+  canReturnWhatsAppConversationToBot,
   canSendHumanWhatsAppMessage,
   getWhatsAppConversationMetrics,
   getCurrentWhatsAppServiceSession,
@@ -285,8 +286,8 @@ const TRANSITION_LABELS: Readonly<Record<string, string>> = {
   'return-to-bot': 'Atendimento devolvido ao bot',
   forward: 'Atendimento encaminhado',
   'mark-read': 'Conversa marcada como lida',
-  close: 'Atendimento encerrado',
-  'close-after-rejection': 'Atendimento encerrado após recusa',
+  close: 'Conversa encerrada até novo contato',
+  'close-after-rejection': 'Conversa encerrada após recusa até novo contato',
   'resume-awaited-reply': 'Resposta aguardada retomada',
   'resume-contextual-contact': 'Contato contextual retomado',
 };
@@ -762,6 +763,10 @@ export function ConversationWorkspace({
     selectedConversation !== null &&
     canSendHumanWhatsAppMessage(selectedConversation) &&
     selectedConversation.assignedTo?.id === currentUserId;
+  const canCurrentUserReturnToBot =
+    selectedConversation !== null &&
+    canReturnWhatsAppConversationToBot(selectedConversation) &&
+    selectedConversation.assignedTo?.id === currentUserId;
   const actionHistory = selectedConversation?.transitions ?? [];
 
   function handleClientHeaderClick() {
@@ -1036,7 +1041,6 @@ export function ConversationWorkspace({
       }
     });
   }
-
   function handleManualCommercialStatus() {
     if (!selectedConversation?.currentQuoteRequest) return;
     setFeedbackMessage('');
@@ -1703,12 +1707,13 @@ export function ConversationWorkspace({
                       onClick={() =>
                         handleVersionedAction(
                           returnWhatsAppConversationToBotAction,
-                          'Conversa devolvida ao bot na etapa permitida.',
+                          'Atendimento humano encerrado. A conversa continua sob controle do bot.',
                         )
                       }
                       disabled={
                         isUpdatingConversation ||
                         !permissions.transfer ||
+                        !canCurrentUserReturnToBot ||
                         !getCurrentWhatsAppServiceSession(
                           selectedConversation,
                         ).availableActions.includes('RETURN_TO_AI')
@@ -1716,7 +1721,9 @@ export function ConversationWorkspace({
                       className={styles.actionButton({ action: 'bot' })}
                     >
                       <Bot aria-hidden="true" />
-                      BOT {isWhatsAppBotBlocked(selectedConversation) ? 'inativo' : 'ativo'}
+                      {canCurrentUserReturnToBot
+                        ? 'Encerrar atendimento'
+                        : `BOT ${isWhatsAppBotBlocked(selectedConversation) ? 'inativo' : 'ativo'}`}
                     </button>
                     <button
                       type="button"

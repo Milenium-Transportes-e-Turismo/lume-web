@@ -68,7 +68,6 @@ export interface ReturnWhatsAppConversationToQueueActionInput extends VersionedW
   readonly commandId: unknown;
   readonly queueId: unknown;
 }
-
 export interface SendHumanWhatsAppMessageActionInput extends VersionedWhatsAppConversationActionInput {
   readonly commandId: unknown;
   readonly idempotencyKey: unknown;
@@ -268,6 +267,18 @@ async function executeAction(
     };
   }
 
+  return executeAuthorizedAction(input, operation);
+}
+
+async function executeAuthorizedAction(
+  input: VersionedWhatsAppConversationActionInput,
+  operation: (
+    conversationId: unknown,
+    expectedVersion: unknown,
+    commandId?: unknown,
+    serviceSessionId?: unknown,
+  ) => Promise<WhatsAppConversation | null>,
+): Promise<WhatsAppConversationActionResult> {
   try {
     const conversation =
       input.commandId === undefined
@@ -309,7 +320,31 @@ export async function takeOverWhatsAppConversationAction(
 export async function returnWhatsAppConversationToBotAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, 'transfer', returnWhatsAppConversationToBotForDashboard);
+  const session = await getCurrentAuthenticatedSession();
+  if (session === null || !hasServiceCapability(session.user, 'transfer')) {
+    return {
+      success: false,
+      code: 'forbidden',
+      message: 'Você não tem permissão para alterar esta conversa.',
+    };
+  }
+
+  try {
+    const current = await pollWhatsAppConversationForDashboard(input.conversationId);
+    if (current === null) return invalidVersionedAction();
+    if (current.assignedTo?.id !== session.user.id) {
+      return {
+        success: false,
+        code: 'forbidden',
+        message: 'Somente o atendente responsável pode encerrar este atendimento humano.',
+        conversation: current,
+      };
+    }
+  } catch (error) {
+    return standardActionFailure(error);
+  }
+
+  return executeAuthorizedAction(input, returnWhatsAppConversationToBotForDashboard);
 }
 
 export async function returnWhatsAppConversationToQueueAction(
@@ -432,7 +467,6 @@ export async function closeWhatsAppConversationAction(
           ),
   );
 }
-
 export async function forwardWhatsAppConversationAction(
   input: ForwardWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {

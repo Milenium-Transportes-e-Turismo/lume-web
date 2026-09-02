@@ -15,7 +15,6 @@ import {
   rethrowTenantPageError,
 } from '@/features/tenant-administration/server';
 import { PageFeedbackToast } from '@/shared/page-feedback-toast';
-import { executeAuthenticatedClientRequest } from '@/features/clients/server';
 
 export default async function UsersRoute({
   searchParams,
@@ -38,7 +37,6 @@ export default async function UsersRoute({
   ]);
   const query = await searchParams;
   let users: TenantUserList;
-  let routingCompanies: readonly { readonly id: string; readonly label: string }[] = [];
   let permissionCatalog: PermissionCatalog = {
     resources: [],
     actions: [],
@@ -61,35 +59,26 @@ export default async function UsersRoute({
     session.user.isAdministrator === true ||
     (session.user.type === 'employee' &&
       session.user.departments.includes('information-technology'));
+  const isPeopleOperations =
+    session.user.isAdministrator !== true &&
+    session.user.type === 'employee' &&
+    !session.user.departments.includes('information-technology') &&
+    session.user.departments.some((department) =>
+      ['human-resources', 'personnel-department'].includes(department),
+    );
 
   try {
-    if (canManageAccess) {
-      [users, permissionCatalog] = await executeAuthenticatedTenantRequest((gateway) =>
-        Promise.all([
-          gateway.listUsers({ ...filters, page, pageSize: 20 }),
-          gateway.listPermissions(),
-        ]),
-      );
-      if (!session.user.isAdministrator) {
-        permissionCatalog = withoutLicenseManagement(permissionCatalog);
-      }
-    } else {
-      users = await executeAuthenticatedTenantRequest((gateway) =>
+    [users, permissionCatalog] = await executeAuthenticatedTenantRequest((gateway) =>
+      Promise.all([
         gateway.listUsers({ ...filters, page, pageSize: 20 }),
-      );
+        gateway.listPermissions(),
+      ]),
+    );
+    if (canManageAccess && !session.user.isAdministrator) {
+      permissionCatalog = withoutLicenseManagement(permissionCatalog);
     }
   } catch (error) {
     rethrowTenantPageError(error);
-  }
-
-  if (canManageAccess && session.user.permissions.includes('clients:view')) {
-    const companies = await executeAuthenticatedClientRequest((gateway) =>
-      gateway.list({ status: 'active' }),
-    );
-    routingCompanies = companies.items.map((company) => ({
-      id: company.id,
-      label: `${company.tradeName || company.legalName} — ${company.taxId}`,
-    }));
   }
 
   return (
@@ -106,11 +95,15 @@ export default async function UsersRoute({
             session.user.permissions.includes('users:update')
           }
           canManageAccess={canManageAccess}
-          canManageLifecycle={canManageAccess}
+          canManageLifecycle={
+            !isPeopleOperations && session.user.permissions.includes('users:manage')
+          }
+          canResetPassword={
+            !isPeopleOperations && session.user.permissions.includes('users:update')
+          }
           canDelete={session.user.isAdministrator === true}
           currentUserId={session.user.id}
           filters={filters}
-          routingCompanies={routingCompanies}
         />
       </div>
     </AuthenticatedShell>

@@ -440,7 +440,7 @@ export function ConversationServiceContextPanel({
             onClick={onClose}
             disabled={isBusy || !canClose || !can('CLOSE')}
           >
-            Encerrar atendimento
+            Encerrar conversa
           </Button>
         </section>
 

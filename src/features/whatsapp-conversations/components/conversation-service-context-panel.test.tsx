@@ -182,7 +182,7 @@ describe('ConversationServiceContextPanel', () => {
       'Retornar à fila',
       'Retornar à IA',
       'Aplicar',
-      'Encerrar atendimento',
+      'Encerrar conversa',
     ]) {
       expect(screen.getByRole('button', { name })).toBeDisabled();
     }

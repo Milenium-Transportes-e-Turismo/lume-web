@@ -68,6 +68,12 @@ const MILITARY_STATUS_LABELS = {
   'not-applicable': 'Não aplicável',
 } as const;
 
+const ACCESS_MODE_LABELS = {
+  standard: 'Colaborador',
+  'document-portal': 'Candidato — acesso documental legado',
+  client: 'Cliente — acesso legado',
+} as const;
+
 function classificationFromStoredValue(
   value: string | null,
 ): keyof typeof USER_CLASSIFICATION_LABELS {
@@ -359,53 +365,18 @@ export function UserEditorForm({
               <FieldDescription>O identificador de acesso não é alterado.</FieldDescription>
             </Field>
 
-            {canManageAccess ? (
-              <Field data-invalid={Boolean(form.formState.errors.documentAccessMode)}>
-                <FieldLabel htmlFor="edit-user-access-mode">Modo de acesso</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="documentAccessMode"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(next) => {
-                        field.onChange(next);
-                        if (next === 'client') {
-                          form.setValue('departments', ['client-company']);
-                        } else {
-                          form.setValue('clientCategory', null);
-                          form.setValue('routingCompanyId', null);
-                        }
-                      }}
-                      disabled={isAdministrator}
-                    >
-                      <SelectTrigger id="edit-user-access-mode" className="w-full">
-                        <SelectValue>
-                          {field.value === 'client'
-                            ? 'Cliente - acesso contratado'
-                            : field.value === 'document-portal'
-                              ? 'Candidato — somente documentos'
-                              : 'Colaborador — painel autorizado'}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Colaborador — painel autorizado</SelectItem>
-                        <SelectItem value="document-portal">
-                          Candidato — somente documentos
-                        </SelectItem>
-                        <SelectItem value="client">Cliente - pessoa jurídica ou física</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldDescription>
-                  {documentAccessMode === 'document-portal'
-                    ? 'O candidato acessa somente o portal documental.'
-                    : 'O colaborador acessa as áreas liberadas abaixo.'}
-                </FieldDescription>
-                <FieldError errors={[form.formState.errors.documentAccessMode]} />
-              </Field>
-            ) : null}
+            <Field>
+              <FieldLabel htmlFor="edit-user-access-mode">Modo de acesso</FieldLabel>
+              <Input
+                id="edit-user-access-mode"
+                value={ACCESS_MODE_LABELS[documentAccessMode ?? 'standard']}
+                className="h-11"
+                readOnly
+              />
+              <FieldDescription>
+                O modo atual é preservado. Conversões aguardam uma regra explícita de migração.
+              </FieldDescription>
+            </Field>
             {canManageAccess && documentAccessMode === 'client' ? (
               <>
                 <Field data-invalid={Boolean(form.formState.errors.clientCategory)}>

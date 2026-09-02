@@ -2,6 +2,8 @@
 
 O fluxo de checklists, upload, revisão humana e candidatos restritos está em
 [`docs/document-management.md`](docs/document-management.md).
+Decisões aprovadas que ainda dependem de contrato da Tenant API estão separadas
+em [`docs/tenant-api-contract-gaps.md`](docs/tenant-api-contract-gaps.md).
 
 Os tokens, decisões de componentes e regras de acessibilidade do design system
 Lume estão em [`docs/design-system.md`](docs/design-system.md).
@@ -38,23 +40,32 @@ mais recente antes de aceitar uma ação.
 O frontend não cria usuários por meio do plano de controle e não se comunica
 diretamente com automações externas ou `lume-edge-agent`.
 
-O departamento define o escopo estrutural de páginas e filas; a permissão
-individual limita as operações disponíveis dentro desse escopo. O cadastro de
-usuários seleciona um ou mais dos nove departamentos do MVP — Comercial,
-Compras, Controladoria, Departamento Pessoal, Financeiro, Gerência, Manutenção,
-Monitoramento e Operacional — e, em seguida, somente permissões compatíveis com
-esses vínculos. Códigos técnicos de departamento, estado ou permissão não são
-exibidos aos atendentes.
+A permissão autoriza a operação e a área limita o escopo dos dados. Enquanto o
+contrato configurável não é publicado, o cadastro de colaboradores usa um
+espelho local do catálogo estático atualmente publicado pela Tenant API — Comercial, Compras, Controladoria,
+Departamento Pessoal, Financeiro, Gerência, Manutenção, Monitoramento,
+Operacional e Tecnologia da Informação — e oferece somente permissões
+compatíveis. Códigos técnicos não são exibidos aos atendentes. Os gates
+organizacionais legados ainda existentes estão registrados como lacuna de
+contrato, não como regra definitiva do produto.
 
 Contas administradoras não podem ser criadas, promovidas, rebaixadas ou
 transferidas pelo Tenant Web. O cadastro sempre cria um usuário padrão com
 departamentos e permissões explícitas; uma conta administradora já
 provisionada aparece apenas como informação de leitura.
 
-As rotas `/users` e `/license` exigem vínculo com o departamento Gerência e,
-respectivamente, `users:view`/`users:manage` ou `license:view`. A sidebar separa
-módulos em **Geral**, **Comercial** e **Administração**; Painel WhatsApp e
-Orçamentos são exclusivos do escopo Comercial. **Orçamentos** é um único item
+Novas contas de candidato (`document-portal`) e cliente (`client`) estão
+bloqueadas no formulário, no schema e nas Server Actions. Candidatos aguardam o
+contrato de link seguro; clientes aguardam a Área do Cliente. Contas legadas
+continuam legíveis e editáveis, mas o modo de acesso é somente leitura e não
+pode ser convertido pelo frontend.
+
+`/users` exige ao menos uma permissão entre `users:view`, `users:create`,
+`users:update` e `users:manage`; os limites por papel e alvo continuam aplicados
+pela Tenant API. `/license` exige vínculo com Gerência e `license:view`. A
+sidebar separa módulos em **Geral**, **Cadastros**, **Comercial**, **Pessoas** e
+**Administração**; Painel WhatsApp e Orçamentos são exclusivos do escopo
+Comercial. **Orçamentos** é um único item
 de navegação e abre `/quote-proposals`, onde as filas **Pendentes**, **Enviadas**,
 **Aprovadas** e **Canceladas** aparecem como abas. A contagem pendente é
 autoritativa da Tenant API. Os gráficos e motivos de cancelamento ficam no
@@ -84,6 +95,12 @@ npm.cmd run dev
 Por padrão, a API local é `http://localhost:3333/api/v1`. Em produção,
 `LUME_TENANT_API_URL` deve usar HTTPS. A autenticação simulada nunca é aceita
 quando `NODE_ENV=production`.
+
+Para homologação na VPS, use `.env.staging.example` e siga o canário, a troca
+controlada e o rollback descritos em
+[Ambientes e branches](docs/deployment-environments.md). A VPS consome somente
+`origin/staging`; branches de trabalho e alterações sem commit nunca chegam ao
+ambiente.
 
 Os endpoints consumidos, o fluxo de renovação e os limites atuais do backend
 estão documentados em [docs/tenant-api-integration.md](docs/tenant-api-integration.md).
@@ -129,14 +146,21 @@ pendentes de importações anteriores. O ZIP de mídias é enviado em blocos
 retomáveis e vinculado em segundo plano, com progresso persistente na tela; o
 navegador não precisa manter o arquivo inteiro em memória.
 
-No MVP, uma proposta aprovada não impede o atendente de encerrar a conversa,
-desde que não exista outra proposta em coleta, aguardando cliente ou em análise.
-A política mais restritiva foi preservada no domínio, mas está explicitamente
-desabilitada para possível reativação futura. A Tenant API permanece
-autoritativa: se ela recusar o comando, o painel mostra o erro e não simula o
-encerramento. Um usuário Comercial com `whatsapp-conversations:manage` também
-pode encerrar, pelo mesmo comando versionado, contatos encaminhados a outra
-fila departamental.
+**Encerrar atendimento** termina somente o controle humano por meio do comando
+versionado `actions/return-to-bot`. A interface e a Server Action permitem essa
+ação somente ao atendente atualmente responsável, dentro do escopo Comercial;
+a Tenant API repete essa verificação dentro da transação versionada. A exceção
+de supervisão para Gerência e Diretoria foi aprovada com permissão explícita,
+motivo obrigatório e auditoria de pessoa e data/hora, mas continua desabilitada
+até a Tenant API publicar esse contrato. O Web não a infere de `management` nem
+de `isAdministrator`.
+
+`actions/close` permanece um comando distinto que move a conversa canônica para
+o estado técnico temporário `closed`. Ele não encerra nem elimina a conversa em
+definitivo: o próximo contato reabre o mesmo histórico. A rota não é exposta
+pela interface nem por uma Server Action como sinônimo de encerrar o atendimento
+humano; `close-after-rejection` permanece apenas como alias legado no gateway e
+na leitura do histórico.
 
 O atendente responsável pode alterar o status comercial no Painel WhatsApp.
 A ação recarrega a conversa autoritativa, exige motivo para recusa ou
@@ -145,12 +169,16 @@ orçamento também parte exclusivamente da conversa comercial já assumida; as
 a página de Orçamentos mantém as filas Pendentes, Enviadas, Aprovadas e
 Canceladas em abas.
 
-Na administração de usuários, `users:update` representa **Editar acesso** e
-permite alterar dados, departamentos, permissões e solicitar recuperação de
-senha. `users:manage` representa **Gerenciar acesso** e fica restrito ao ciclo
-de estado da conta (ativar novamente, desativar ou suspender). A aplicação não
-publica nem renderiza `users:delete`, pois exclusão de usuário não faz parte do
-contrato.
+Na administração de usuários, `users:update` autoriza edição e recuperação de
+senha, mas o contrato atual da Tenant API ainda aplica departamentos e
+permissões somente quando o ator é administrador ou TI. `users:manage` autoriza
+o ciclo de estado da conta (ativar novamente, desativar ou suspender). Não há a
+permissão `users:delete`: a exclusão lógica usa `DELETE /users/:id`, exige
+`users:manage` no endpoint e ainda é recusada pelo caso de uso para qualquer ator
+que não seja administrador com senha confirmada. Por isso, somente um
+administrador vê esse controle no Tenant Web. Quando uma edição solicita mudança
+de acesso, o frontend confere departamentos, permissões e vínculo devolvidos pela
+API e não apresenta sucesso se o estado autoritativo não confirmar a alteração.
 
 ## Configuração passo a passo
 
@@ -186,9 +214,9 @@ runtime.
   útil ao suporte.
 
 Novas interfaces genéricas de importação e exportação devem receber da Tenant
-API um contrato de lote, progresso, erros por registro e download. A exceção já
-publicada é o módulo de roteirização descrito abaixo. Conversão de documentos e
-planilhas continua proibida no navegador.
+API um contrato de lote, progresso, erros por registro e download. A integração
+local de compatibilidade já existente é o módulo de roteirização descrito
+abaixo. Conversão de documentos e planilhas continua proibida no navegador.
 
 ## Roteirização e custos rodoviários
 
@@ -201,6 +229,9 @@ agente de IA diretamente e não executa cálculos de negócio.
 O resultado é renderizado com MapLibre sobre um estilo configurado por
 `MAP_STYLE_URL`; o padrão é o OpenFreeMap Liberty. O mapa desenha ida, volta,
 origem, destino, paradas e pedágios sem alterar os cálculos autoritativos da API.
+
+Novas contas são somente de colaborador. Os modos candidato e cliente aparecem
+apenas em contas legadas e não podem ser escolhidos nem convertidos.
 
 O cadastro corporativo de clientes PF/PJ continua em `/clients`. As telas
 anteriores de contratos, colaboradores, pontos fixos, sugestões e exportações
