@@ -14,18 +14,19 @@ A conclusão que chama o agente documental usa o timeout dedicado
 extração pode executar até três tentativas na API. As demais chamadas mantêm o
 timeout curto do gateway.
 
-Usuários com `documentAccessMode=document-portal` são direcionados a
+Contas legadas com `documentAccessMode=document-portal` são direcionadas a
 `/documents` após o login e veem somente a navegação documental. A API também
-limita suas permissões; a proteção não depende do menu.
+limita suas permissões; a proteção não depende do menu. O Tenant Web não cria
+novas contas desse modo enquanto a Tenant API não publicar o fluxo de
+pré-admissão por link seguro.
 
 O menu **Pessoas** exibe **Usuários** e **Gestão documental** conforme as
 permissões. Administradores mantêm edição integral de departamentos,
 permissões e estado das contas. RH e Departamento Pessoal veem a listagem e
-podem criar somente o acesso inicial “somente documentos”; o formulário não
-oferece departamentos nem permissões adicionais nesse perfil.
-Eles também podem editar os dados pessoais e o perfil documental do usuário,
-sem visualizar o catálogo administrativo nem alterar departamentos, permissões,
-senha ou estado da conta.
+podem editar os dados pessoais e o perfil documental do usuário,
+podem consultar o catálogo para filtrar a lista, mas não alteram departamentos,
+permissões, senha ou estado da conta. A criação fica indisponível para esses
+perfis até o contrato de link seguro substituir a conta de candidato com senha.
 
 O cadastro agora coleta a classificação documental (Administrativo, Geral ou
 Motorista), estado civil, decisão explícita sobre documento militar e qualquer
@@ -91,11 +92,12 @@ preservados na API para auditoria.
 ## Teste manual
 
 1. execute migration e bootstrap da Tenant API;
-2. crie um usuário de Departamento Pessoal com permissões documentais;
-3. crie um candidato no modo “somente documentos”, informe dois dependentes de
-   idades diferentes e confira a prévia antes de confirmar;
-4. abra a solicitação gerada automaticamente em **Gestão documental**;
-5. conclua o primeiro acesso e confirme o redirecionamento;
+2. use uma conta existente de Departamento Pessoal com permissões documentais;
+3. confirme que esse perfil pode editar dados documentais, mas não criar uma
+   conta de candidato com senha;
+4. para testar compatibilidade, use somente uma conta `document-portal` legada
+   e previamente provisionada fora deste fluxo;
+5. abra a solicitação existente em **Gestão documental**;
 6. envie arquivos em **Meus documentos**;
 7. retorne com o revisor e registre uma decisão humana;
 8. crie uma solicitação avulsa para dois usuários, selecione vários documentos e

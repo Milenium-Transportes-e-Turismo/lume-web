@@ -114,22 +114,34 @@ Respostas são validadas antes de chegar às páginas. Permissões permanecem
 strings opacas: o frontend usa o catálogo retornado por `GET /permissions` e
 não mantém uma lista fechada para rejeitar novos códigos válidos.
 
-A criação de usuário ocorre em três etapas: dados básicos, seleção de um ou mais
-departamentos e seleção das permissões compatíveis retornadas em
-`permissionsByDepartment`. Os códigos originais continuam sendo enviados sem
+A criação de colaborador ocorre em três etapas: dados básicos, seleção de um ou
+mais departamentos e seleção das permissões compatíveis retornadas em
+`permissionsByDepartment`. As opções de departamento são um espelho local do
+catálogo estático atualmente publicado; a configuração dinâmica permanece em
+`GAP-ACCESS-02`. O frontend envia somente
+`documentAccessMode=standard`; schema e Server Action rejeitam novas contas
+`document-portal`, `client` e o escopo `client-company`. Contas legadas continuam
+compatíveis, mas uma atualização consulta `GET /users/:id` e recusa mudança do
+modo persistido. Quando departamentos, permissões ou vínculo de cliente mudam, a
+ação também compara a resposta de `PATCH /users/:id` com o pedido e sinaliza
+conflito se a API descartar os campos, sem produzir uma confirmação falsa.
+
+Os códigos originais de departamento e permissão continuam sendo enviados sem
 alteração à API; rótulos de recurso e ação são apenas apresentação. Permissões
 implícitas publicadas no catálogo não são oferecidas para remoção.
 
-O departamento estabelece o limite estrutural e a permissão individual
-autoriza a página ou ação dentro desse limite:
+A permissão individual autoriza a operação e a área limita seu escopo. As rotas
+abaixo refletem os limites atuais:
 
-- `/users` exige vínculo Gerência e ao menos uma permissão entre `users:view`,
-  `users:create`, `users:update` e `users:manage`;
+- `/users` exige ao menos uma permissão entre `users:view`, `users:create`,
+  `users:update` e `users:manage`; a Tenant API ainda aplica restrições por papel
+  e por usuário-alvo;
 - `/license` exige vínculo Gerência e `license:view`;
 - `/whatsapp-conversations` e `/quote-proposals` exigem vínculo Comercial e
   `whatsapp-conversations:manage`.
 
-A sidebar organiza os itens em **Geral**, **Comercial** e **Administração**.
+A sidebar organiza os itens em **Geral**, **Cadastros**, **Comercial**,
+**Pessoas** e **Administração**.
 
 O estado da licença segue o contrato atual da API:
 
@@ -261,10 +273,14 @@ configurado com `api` sem conhecer consumidores internos.
 ## Ações e limites reais do contrato WhatsApp
 
 A Tenant API publica cinco comandos de estado do painel — assumir, devolver ao
-bot, encaminhar, marcar como lida e encerrar — além do envio de texto pelo
-atendente. O frontend usa a rota canônica `actions/close`; a rota
-`close-after-rejection` existe somente como alias legado no backend e não é
-emitida pelo painel.
+bot, encaminhar, marcar como lida e fechar — além do envio de texto pelo
+atendente. Para a decisão de **encerrar atendimento humano**, o frontend usa
+somente `actions/return-to-bot`. `actions/close` continua sendo o comando atual
+e distinto que coloca a conversa canônica no estado temporário `closed`; ele
+permanece no gateway, mas não é exposto pela interface nem por uma Server
+Action. O próximo contato reabre a mesma conversa e preserva o histórico, de
+modo que não existe fechamento definitivo. `close-after-rejection` é o alias
+legado mantido para compatibilidade e leitura do histórico.
 
 Para iniciar um atendimento, o painel envia o telefone a
 `POST /whatsapp/conversations`. A Tenant API normaliza o número, escolhe o canal
@@ -273,21 +289,23 @@ Uma conversa encerrada expõe **Iniciar atendimento**, que reutiliza `take-over`
 para bloquear o bot, limpar o encerramento e ativar o atendente sem duplicar o
 histórico.
 
-O encerramento exige conversa aberta e ausência de proposta ativa. No MVP,
-`hasApprovedQuoteRequest=true` não bloqueia mais o botão: a política anterior
-permanece no domínio, desabilitada por uma constante explícita, para possível
-reativação coordenada com a Tenant API. Solicitações em
-`collecting-information`, `waiting-for-customer` ou `under-review`, assim como
-um PDF ainda em envio, continuam bloqueando a ação. A resposta da Tenant API
-permanece autoritativa; uma recusa é apresentada ao usuário e não altera o
-snapshot local como se houvesse sucesso. Uma conversa `waiting-for-customer`
-com proposta aprovada, sem atendente responsável, pode executar **Devolver ao
-bot** para retomar o menu de acompanhamento; a mesma ação continua bloqueada
-para um resumo ainda aguardando confirmação. Para proposta recusada, a Tenant
-API exige um motivo efetivo: o texto confirmado pelo atendente ou o motivo já
-persistido na decisão. O próximo inbound do mesmo telefone reutiliza a conversa
-canônica e reinicia o bot em `bot-active/main-menu`; histórico, proposta e
-auditoria permanecem preservados.
+**Encerrar atendimento** exige `human-active` e um responsável atribuído. O
+Tenant Web recarrega o detalhe e permite o comando somente quando o responsável
+atual é o usuário autenticado no escopo Comercial. O comando envia
+`expectedVersion`, devolve o controle ao bot na etapa definida pela matriz da
+API e preserva a conversa contínua, o histórico e os processos comerciais. A
+resposta da Tenant API permanece autoritativa; conflitos recarregam o snapshot
+atual antes de outra tentativa. A API confere o responsável dentro da própria
+transação; uma chamada direta autenticada por outro usuário recebe `403` sem
+persistir a mudança.
+
+A decisão de negócio permite que Gerência e Diretoria encerrem o atendimento
+humano de outro atendente como ação supervisionada. Esse override deve exigir
+permissão explícita, motivo obrigatório e auditoria de ator e data/hora. O
+contrato atual não publica a permissão, não representa Diretoria como papel
+autenticado e não aceita motivo no DTO de `return-to-bot`; por isso o Web ainda
+não oferece a exceção e não tenta inferi-la de `management` ou
+`isAdministrator`.
 
 A matriz ainda não publica comandos de painel para aguardar cliente ou cancelar
 solicitação. Esses controles permanecem desabilitados e identificados como
@@ -300,11 +318,11 @@ encerramento em um histórico útil: data e hora, atendente responsável e motiv
 Os motivos de falha das tentativas de envio continuam vinculados às respectivas
 mensagens.
 
-Em conversa encerrada, o cabeçalho usa a transição `close` ou
-`close-after-rejection` mais recente para mostrar **Encerrado por**. O comando
-de encerramento depende da permissão `whatsapp-conversations:manage`, não de a
-conversa permanecer no departamento Comercial; por isso o painel comercial
-pode concluir um contato já encaminhado a outra fila.
+Em uma conversa fechada, o cabeçalho usa a transição `close` ou o alias
+`close-after-rejection` mais recente para mostrar **Encerrado por**. Esse suporte
+de leitura representa um estado técnico temporário, não um fechamento
+definitivo, e não transforma `close` em sinônimo de encerrar o atendimento
+humano.
 
 O histórico de mensagens e o compositor ficam no painel lateral aberto por
 **Abrir chat**. A apresentação usa o componente
@@ -337,12 +355,13 @@ O frontend nunca contorna essas ausências chamando cache, Evolution,
 
 ## Contrato futuro de arquivos, importação e exportação genéricos
 
-O Tenant Web não converte documentos ou planilhas. Fora dos contratos já
-publicados para documentos e roteirização, quando a Tenant API publicar
-o contrato definitivo, a integração deve ser criada como gateway server-only e
-tipos validados com Zod. A tela futura poderá enviar um arquivo, consultar o
-progresso do lote, apresentar erros por registro e baixar o resultado
-autenticado; não poderá decidir formatos, estados ou permissões localmente.
+O Tenant Web não converte documentos ou planilhas. Fora do contrato documental
+já integrado e da roteirização local de compatibilidade, quando a Tenant API
+publicar o contrato definitivo, a integração deve ser criada como gateway
+server-only e tipos validados com Zod. A tela futura poderá enviar um arquivo,
+consultar o progresso do lote, apresentar erros por registro e baixar o
+resultado autenticado; não poderá decidir formatos, estados ou permissões
+localmente.
 
 Até que endpoints, DTOs e limites sejam estabilizados pela Tenant API, nenhum
 endpoint é presumido nesta aplicação. Esse desenho reserva a fronteira sem
@@ -510,10 +529,11 @@ do filtro é o publicado por `GET /permissions` e inclui permissões individuais
 automáticas; a Tenant API resolve o acesso efetivo antes de aplicar o filtro. O
 cadastramento possui três etapas obrigatórias e somente a ação final da etapa de
 permissões envia os dados. Nomes de usuário precisam conter ao menos uma letra.
-Na edição, cada bloco possui **Selecionar todas** com estado parcial. Perfis com
-autoridade de gestão também podem trocar **Candidato — somente documentos** por
-**Colaborador — painel autorizado**; a promoção exige departamento e permissões
-compatíveis antes do envio à Tenant API.
+Na edição, cada bloco possui **Selecionar todas** com estado parcial. O modo de
+acesso aparece somente para leitura. Antes de atualizar, a Server Action consulta
+o usuário atual e recusa qualquer conversão entre colaborador, candidato legado
+e cliente legado; uma futura migração precisa preservar pessoa, documentos,
+escopo e histórico.
 
 `isAdministrator` é uma autoridade explícita da Tenant API, não um cargo, mas
 não pode ser atribuída pelo Tenant Web. O cadastro força
@@ -528,19 +548,30 @@ Falhas nas ações de usuário e perfil preservam o código público da Tenant A
 (ou um fallback como `HTTP_413`) e o exibem no toast em uma linha própria para
 facilitar o atendimento de suporte.
 
-O ciclo de conta é:
+O ciclo técnico de conta publicado hoje é:
 
 - `active`: autenticação e sessões permitidas;
 - `inactive`: conta desativada até ativação explícita;
 - `suspended`: bloqueio temporário com motivo obrigatório e término calculado
   por quantidade de dias ou data final.
 
-`users:update` habilita **Editar acesso**: dados, departamentos, permissões e
-recuperação de senha. `users:manage` habilita somente **Gerenciar acesso**:
-ativar novamente, desativar ou suspender. Não existe checkbox nem ação
-`users:delete`, porque a API não oferece exclusão de usuários. A Tenant API
-persiste o estado, o prazo e o motivo e também invalida sessões conforme sua
-política; o frontend não decide o estado efetivo da autenticação.
+Esses códigos não substituem o modelo de vínculo de trabalho aprovado. Em
+especial, `inactive` permanece compatibilidade técnica e não é adotado como
+termo de negócio para desligamento.
+
+`users:create` ou `users:update` permitem abrir a edição de dados, mas a Tenant
+API atual só aplica departamentos e permissões quando o ator é administrador ou
+TI; RH, DP e atores delegados ficam limitados aos campos pessoais/documentais.
+Quando o pedido inclui mudança de acesso, a Server Action confere a resposta da
+API e devolve `AUTHORITATIVE_USER_STATE_MISMATCH` se os campos não forem
+confirmados.
+Recuperação de senha exige `users:update`. `users:manage` habilita o ciclo de
+estado: ativar novamente, desativar ou suspender. Não existe a permissão
+`users:delete`: `DELETE /users/:id` usa `users:manage` no guard e o caso de uso
+ainda exige administrador, senha atual, alvo diferente da própria conta e faz
+exclusão lógica. A Tenant API persiste o estado, o prazo e o motivo e também
+invalida sessões conforme sua política; o frontend não decide o estado efetivo
+da autenticação.
 
 `/support` envia primeiro `POST /support/requests` pela Tenant API. O backend
 deriva nome, usuário e e-mail do JWT e é o único componente que conversa com o
@@ -559,9 +590,11 @@ permissões implícitas de autoatendimento publicadas pela Tenant API. Elas são
 somadas às permissões individuais sem criar um atalho para páginas de outro
 departamento.
 
-## Roteirização
+## Roteirização legada
 
-O gateway autenticado integra `routing/companies`, `routing/fixed-points`,
+Esta é a integração local atual e não o contrato canônico de Viagem e Plano de
+Rota; a evolução está registrada em `GAP-TRIP-01`. O gateway autenticado integra
+`routing/companies`, `routing/fixed-points`,
 `routing/contracts`, `routing/passengers` e `routing/routes`. Comandos de criação, importação,
 geração e ciclo de aprovação recebem `commandId`; alterações concorrentes usam
 `expectedVersion`. O upload XLSX/CSV/TSV é multipart e nunca expõe o token ao

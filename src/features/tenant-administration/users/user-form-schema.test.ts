@@ -1,4 +1,4 @@
-import { userFormSchema } from './user-form-schema';
+import { userEditorFormSchema, userFormSchema } from './user-form-schema';
 
 describe('userFormSchema', () => {
   it('accepts the four requested identity fields and tenant assignments', () => {
@@ -78,69 +78,73 @@ describe('userFormSchema', () => {
     ).toBe(true);
   });
 
-  it('allows an initial document portal access without departments', () => {
-    expect(
-      userFormSchema.safeParse({
-        name: 'Novo Candidato',
-        username: 'novo.candidato',
-        email: 'candidato@example.com',
+  it.each(['document-portal', 'client'] as const)(
+    'rejects creating a new %s account',
+    (documentAccessMode) => {
+      const parsed = userFormSchema.safeParse({
+        name: 'Acesso Externo',
+        username: 'acesso.externo',
+        email: 'externo@example.com',
         password: 'SenhaInicial@2026',
         jobTitle: 'Geral',
         isAdministrator: false,
-        documentAccessMode: 'document-portal',
+        documentAccessMode,
         requestDocuments: true,
-        initialDocumentChecklistCode: 'admission-general',
         departments: [],
         permissionCodes: [],
-      }).success,
-    ).toBe(true);
-  });
+      });
 
-  it('requires a served company for a legal-entity client', () => {
-    const client = {
-      name: 'Gestor Cliente',
-      username: 'gestor.cliente',
-      email: 'gestor@cliente.example',
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0]?.message).toBe(
+        'Novas contas de candidato ou cliente não podem ser criadas pelo Tenant Web neste momento.',
+      );
+    },
+  );
+
+  it('rejects the external client scope on a new collaborator account', () => {
+    const parsed = userFormSchema.safeParse({
+      name: 'Novo Colaborador',
+      username: 'novo.colaborador',
+      email: 'colaborador@example.com',
       password: 'SenhaInicial@2026',
-      jobTitle: 'Geral' as const,
-      isAdministrator: false as const,
-      documentAccessMode: 'client' as const,
-      clientCategory: 'legal-entity' as const,
-      departments: ['client-company'],
-      permissionCodes: ['passengers:import'],
-    };
-
-    expect(userFormSchema.safeParse(client).success).toBe(false);
-    expect(
-      userFormSchema.safeParse({
-        ...client,
-        routingCompanyId: '11111111-1111-4111-8111-111111111111',
-      }).success,
-    ).toBe(true);
-  });
-
-  it('requires an individual client to be linked to its client record', () => {
-    const client = {
-      name: 'Cliente Pessoa Física',
-      username: 'cliente.pf',
-      email: 'cliente.pf@example.com',
-      password: 'SenhaInicial@2026',
-      jobTitle: 'Geral' as const,
-      isAdministrator: false as const,
-      documentAccessMode: 'client' as const,
-      clientCategory: 'individual' as const,
+      jobTitle: 'Geral',
+      isAdministrator: false,
+      documentAccessMode: 'standard',
       departments: ['client-company'],
       permissionCodes: [],
-    };
+    });
 
-    expect(userFormSchema.safeParse(client).success).toBe(false);
-    expect(
-      userFormSchema.safeParse({
-        ...client,
-        routingCompanyId: '11111111-1111-4111-8111-111111111111',
-      }).success,
-    ).toBe(true);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues).toContainEqual(
+      expect.objectContaining({
+        path: ['departments'],
+        message: 'Empresa cliente não é um departamento válido para uma nova conta de colaborador.',
+      }),
+    );
   });
+
+  it.each(['document-portal', 'client'] as const)(
+    'keeps the editor compatible with an existing %s account',
+    (documentAccessMode) => {
+      expect(
+        userEditorFormSchema.safeParse({
+          name: 'Acesso Legado',
+          email: 'legado@example.com',
+          isAdministrator: false,
+          documentAccessMode,
+          clientCategory: documentAccessMode === 'client' ? 'legal-entity' : null,
+          routingCompanyId:
+            documentAccessMode === 'client' ? '11111111-1111-4111-8111-111111111111' : null,
+          departments: documentAccessMode === 'client' ? ['client-company'] : [],
+          permissionCodes: [],
+          jobTitle: 'Geral',
+          maritalStatus: 'not-informed',
+          militaryDocumentStatus: 'pending-confirmation',
+          dependents: [],
+        }).success,
+      ).toBe(true);
+    },
+  );
 
   it('does not allow creating an administrator through the Tenant Web', () => {
     const parsed = userFormSchema.safeParse({

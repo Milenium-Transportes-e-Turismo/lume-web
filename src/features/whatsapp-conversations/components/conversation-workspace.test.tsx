@@ -5,9 +5,7 @@ import { findClientByPhoneAction } from '@/features/clients/actions/client-actio
 import {
   archiveWhatsAppConversationAction,
   changeWhatsAppConversationDepartmentAction,
-  closeWhatsAppConversationAction,
   forwardWhatsAppConversationAction,
-  markWhatsAppConversationAsReadAction,
   returnWhatsAppConversationToBotAction,
   sendHumanWhatsAppMessageAction,
   startWhatsAppConversationAction,
@@ -40,7 +38,6 @@ jest.mock('@/shared/ui/toast', () => ({
 jest.mock('../actions', () => ({
   archiveWhatsAppConversationAction: jest.fn(),
   changeWhatsAppConversationDepartmentAction: jest.fn(),
-  closeWhatsAppConversationAction: jest.fn(),
   forwardWhatsAppConversationAction: jest.fn(),
   markWhatsAppConversationAsReadAction: jest.fn(),
   returnWhatsAppConversationToBotAction: jest.fn(),
@@ -53,8 +50,6 @@ jest.mock('../actions', () => ({
 const mockedArchive = jest.mocked(archiveWhatsAppConversationAction);
 const mockedChangeDepartment = jest.mocked(changeWhatsAppConversationDepartmentAction);
 const mockedForward = jest.mocked(forwardWhatsAppConversationAction);
-const mockedClose = jest.mocked(closeWhatsAppConversationAction);
-const mockedMarkAsRead = jest.mocked(markWhatsAppConversationAsReadAction);
 const mockedReturnToBot = jest.mocked(returnWhatsAppConversationToBotAction);
 const mockedSendMessage = jest.mocked(sendHumanWhatsAppMessageAction);
 const mockedStartConversation = jest.mocked(startWhatsAppConversationAction);
@@ -211,7 +206,9 @@ describe('ConversationWorkspace', () => {
     });
     mockFetchDetail(conversation);
 
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
+    render(
+      <ConversationWorkspace initialConversations={[conversation]} currentUserId="employee-001" />,
+    );
 
     const contactHeading = screen.getByRole('heading', {
       level: 3,
@@ -653,9 +650,11 @@ describe('ConversationWorkspace', () => {
     mockFetchDetail(conversation);
     mockedReturnToBot.mockResolvedValue({ success: true, conversation: returned });
     const user = userEvent.setup();
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
+    render(
+      <ConversationWorkspace initialConversations={[conversation]} currentUserId="employee-001" />,
+    );
 
-    await user.click(screen.getByRole('button', { name: 'BOT inativo' }));
+    await user.click(screen.getByRole('button', { name: 'Encerrar atendimento' }));
 
     await waitFor(() => {
       expect(mockedReturnToBot).toHaveBeenCalledWith({
@@ -722,7 +721,8 @@ describe('ConversationWorkspace', () => {
     );
     expect(screen.queryByText(/Responsável:/)).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Atendente ativo' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'BOT inativo' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'BOT inativo' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Encerrar atendimento' })).not.toBeInTheDocument();
   });
 
   it('renders empty and initial error states and retries the list request', async () => {
@@ -759,7 +759,9 @@ describe('ConversationWorkspace', () => {
     mockFetchDetail(conversation);
     const user = userEvent.setup();
 
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
+    render(
+      <ConversationWorkspace initialConversations={[conversation]} currentUserId="employee-001" />,
+    );
 
     expect(screen.queryByText('personnel-department')).not.toBeInTheDocument();
     const departmentFilter = screen.getByRole('combobox', { name: 'Departamento' });
@@ -832,99 +834,49 @@ describe('ConversationWorkspace', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('permite encerrar somente a sessão humana enquanto existe proposta em andamento', async () => {
-    const conversation = createWhatsAppConversationFixture({ unreadCount: 0 });
-    mockFetchDetail(conversation);
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
-
-    expect(screen.getByRole('button', { name: 'Encerrar' })).toBeEnabled();
-    expect(mockedForward).not.toHaveBeenCalled();
-    expect(mockedMarkAsRead).not.toHaveBeenCalled();
-  });
-
-  it('confirma e encerra um atendimento cuja proposta foi recusada', async () => {
+  it('encerra somente o controle humano mesmo quando a proposta foi recusada', async () => {
     const conversation = createWhatsAppConversationFixture({
       conversationState: 'human-active',
       flowStep: 'human-service',
+      assignedTo: { id: 'employee-001', name: 'Usuário Comercial' },
       requestStatus: 'rejected',
       unreadCount: 0,
       version: 6,
     });
-    const closed = createWhatsAppConversationFixture({
+    const returned = createWhatsAppConversationFixture({
       ...conversation,
-      conversationState: 'closed',
-      flowStep: 'closed',
+      conversationState: 'bot-active',
+      flowStep: 'commercial-follow-up-menu',
       assignedTo: null,
-      closedAt: '2026-07-28T12:00:00.000Z',
       version: 7,
     });
     mockFetchDetail(conversation);
-    mockedClose.mockResolvedValue({ success: true, conversation: closed });
+    mockedReturnToBot.mockResolvedValue({ success: true, conversation: returned });
     const user = userEvent.setup();
 
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
-
-    await user.click(screen.getByRole('button', { name: 'Encerrar' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent(
-      'Quando o cliente enviar uma nova mensagem, o bot iniciará outro atendimento',
+    render(
+      <ConversationWorkspace initialConversations={[conversation]} currentUserId="employee-001" />,
     );
-    const confirmButton = screen.getByRole('button', { name: 'Confirmar encerramento' });
-    expect(confirmButton).toBeDisabled();
-    fireEvent.change(screen.getByRole('textbox', { name: /Motivo do encerramento/ }), {
-      target: { value: 'Cliente recusou o valor da proposta.' },
-    });
-    await user.click(confirmButton);
+
+    await user.click(screen.getByRole('button', { name: 'Encerrar atendimento' }));
 
     await waitFor(() => {
-      expect(mockedClose).toHaveBeenCalledWith({
+      expect(mockedReturnToBot).toHaveBeenCalledWith({
         conversationId: conversation.id,
         expectedVersion: 6,
-        reason: 'Cliente recusou o valor da proposta.',
       });
     });
     expect(
-      await screen.findByText(/Atendimento encerrado\. O próximo contato/),
+      await screen.findByText(
+        'Atendimento humano encerrado. A conversa continua sob controle do bot.',
+      ),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Confirmar encerramento' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('permite encerrar uma conversa sem proposta em andamento', async () => {
-    const conversation = createWhatsAppConversationFixture({
-      conversationState: 'human-active',
-      flowStep: 'human-service',
-      requestStatus: 'not-started',
-      currentQuoteRequest: null,
-      unreadCount: 0,
-      version: 4,
-    });
-    const closed = createWhatsAppConversationFixture({
-      ...conversation,
-      conversationState: 'closed',
-      flowStep: 'closed',
-      assignedTo: null,
-      closedAt: '2026-07-28T13:00:00.000Z',
-      version: 5,
-    });
-    mockFetchDetail(conversation);
-    mockedClose.mockResolvedValue({ success: true, conversation: closed });
-    const user = userEvent.setup();
-
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
-
-    const closeButton = screen.getByRole('button', { name: 'Encerrar' });
-    expect(closeButton).toBeEnabled();
-    await user.click(closeButton);
-    await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
-
-    await waitFor(() => {
-      expect(mockedClose).toHaveBeenCalledWith({
-        conversationId: conversation.id,
-        expectedVersion: 4,
-        reason: undefined,
-      });
-    });
-  });
-
-  it('permite ao painel comercial encerrar atendimento encaminhado a outro departamento', async () => {
+  it('não oferece encerramento enquanto o atendimento humano ainda não foi assumido', () => {
     const conversation = createWhatsAppConversationFixture({
       department: 'operations',
       conversationState: 'sent-to-human',
@@ -932,122 +884,17 @@ describe('ConversationWorkspace', () => {
       requestStatus: 'not-started',
       currentQuoteRequest: null,
       unreadCount: 0,
-      version: 10,
-    });
-    const closed = createWhatsAppConversationFixture({
-      ...conversation,
-      conversationState: 'closed',
-      flowStep: 'closed',
-      closedAt: '2026-07-31T16:00:00.000Z',
-      version: 11,
     });
     mockFetchDetail(conversation);
-    mockedClose.mockResolvedValue({ success: true, conversation: closed });
-    const user = userEvent.setup();
 
     render(<ConversationWorkspace initialConversations={[conversation]} />);
 
-    const closeButton = screen.getByRole('button', { name: 'Encerrar' });
-    expect(closeButton).toBeEnabled();
-    await user.click(closeButton);
-    await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
-
-    await waitFor(() => {
-      expect(mockedClose).toHaveBeenCalledWith({
-        conversationId: conversation.id,
-        expectedVersion: 10,
-        reason: undefined,
-      });
-    });
+    expect(screen.getByRole('button', { name: 'BOT inativo' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Encerrar atendimento' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Encerrar' })).not.toBeInTheDocument();
   });
 
-  it('permite encerrar no MVP mesmo quando existe proposta aprovada', async () => {
-    const conversation = createWhatsAppConversationFixture({
-      conversationState: 'human-active',
-      flowStep: 'human-service',
-      requestStatus: 'approved',
-      hasApprovedQuoteRequest: true,
-      unreadCount: 0,
-      version: 8,
-    });
-    const closed = createWhatsAppConversationFixture({
-      ...conversation,
-      conversationState: 'closed',
-      flowStep: 'closed',
-      assignedTo: null,
-      closedAt: '2026-07-29T13:00:00.000Z',
-      version: 9,
-    });
-    mockFetchDetail(conversation);
-    mockedClose.mockResolvedValue({ success: true, conversation: closed });
-    const user = userEvent.setup();
-
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
-
-    const closeButton = screen.getByRole('button', { name: 'Encerrar' });
-    expect(closeButton).toBeEnabled();
-    await user.click(closeButton);
-    await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
-
-    await waitFor(() => {
-      expect(mockedClose).toHaveBeenCalledWith({
-        conversationId: conversation.id,
-        expectedVersion: 8,
-        reason: undefined,
-      });
-    });
-  });
-
-  it('mantém o estado autoritativo quando a API recusa o encerramento aprovado', async () => {
-    const conversation = createWhatsAppConversationFixture({
-      conversationState: 'human-active',
-      flowStep: 'human-service',
-      requestStatus: 'approved',
-      hasApprovedQuoteRequest: true,
-      unreadCount: 0,
-      version: 8,
-    });
-    mockFetchDetail(conversation);
-    mockedClose.mockResolvedValue({
-      success: false,
-      code: 'conflict',
-      message: 'A Tenant API recusou o encerramento.',
-      conversation,
-    });
-    const user = userEvent.setup();
-
-    render(<ConversationWorkspace initialConversations={[conversation]} />);
-
-    await user.click(screen.getByRole('button', { name: 'Encerrar' }));
-    await user.click(screen.getByRole('button', { name: 'Confirmar encerramento' }));
-
-    await waitFor(() =>
-      expect(toastAdd).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-          description: 'Não foi possível concluir a operação.',
-        }),
-      ),
-    );
-    expect(toastAdd).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'error',
-        description: 'Não foi possível encerrar o atendimento. Tente novamente.',
-      }),
-    );
-    expect(
-      toastAdd.mock.calls.some(([notification]) =>
-        JSON.stringify(notification).includes('Tenant API'),
-      ),
-    ).toBe(false);
-    expect(screen.queryByText('A Tenant API recusou o encerramento.')).not.toBeInTheDocument();
-    expect(
-      await screen.findByRole('button', { name: 'Confirmar encerramento' }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Atendimento encerrado\. O próximo contato/)).not.toBeInTheDocument();
-  });
-
-  it('exibe data, responsável e motivo no histórico de encerramentos', async () => {
+  it('exibe o encerramento como temporário, com data, responsável e motivo', async () => {
     const conversation = createWhatsAppConversationFixture({
       conversationState: 'closed',
       flowStep: 'closed',
@@ -1099,7 +946,7 @@ describe('ConversationWorkspace', () => {
     expect(
       screen.getByRole('heading', { name: 'Histórico de ações da conversa' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Atendimento encerrado')).toBeInTheDocument();
+    expect(screen.getByText('Conversa encerrada até novo contato')).toBeInTheDocument();
     expect(screen.getByText('Maria Atendente')).toBeInTheDocument();
     expect(screen.getByText('Cliente recusou o valor.')).toBeInTheDocument();
     expect(screen.getByText(/28\/07\/2026/)).toBeInTheDocument();

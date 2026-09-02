@@ -331,12 +331,8 @@ function PermissionFields({
 
 function CreateUserDialog({
   permissionCatalog,
-  canManageAccess,
-  routingCompanies,
 }: {
   readonly permissionCatalog: PermissionCatalog;
-  readonly canManageAccess: boolean;
-  readonly routingCompanies: readonly { readonly id: string; readonly label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -349,10 +345,10 @@ function CreateUserDialog({
       email: '',
       password: '',
       isAdministrator: false,
-      documentAccessMode: canManageAccess ? 'standard' : 'document-portal',
+      documentAccessMode: 'standard',
       clientCategory: null,
       routingCompanyId: null,
-      requestDocuments: !canManageAccess,
+      requestDocuments: false,
       departments: [],
       permissionCodes: [],
       jobTitle: 'Geral',
@@ -363,16 +359,14 @@ function CreateUserDialog({
   });
   const dependents = useFieldArray({ control: form.control, name: 'dependents' });
   const departments = useWatch({ control: form.control, name: 'departments' });
-  const documentAccessMode = useWatch({
+  useWatch({
     control: form.control,
-    name: 'documentAccessMode',
+    name: ['jobTitle', 'maritalStatus', 'militaryDocumentStatus', 'dependents'],
   });
-  const clientCategory = useWatch({ control: form.control, name: 'clientCategory' });
-  useWatch({ control: form.control });
   const preview = documentPreview(form.getValues());
   const standardPermissions = useMemo(
-    () => (canManageAccess ? compatiblePermissionCodes(permissionCatalog, departments) : []),
-    [canManageAccess, departments, permissionCatalog],
+    () => compatiblePermissionCodes(permissionCatalog, departments),
+    [departments, permissionCatalog],
   );
 
   const reset = () => {
@@ -409,26 +403,7 @@ function CreateUserDialog({
 
   const createUser = form.handleSubmit((values) => {
     startTransition(async () => {
-      const scopedValues =
-        values.documentAccessMode === 'client'
-          ? values
-          : Object.fromEntries(
-              Object.entries(values).filter(
-                ([key]) => !['clientCategory', 'routingCompanyId'].includes(key),
-              ),
-            );
-      const result = await createTenantUserFormAction(
-        canManageAccess
-          ? scopedValues
-          : {
-              ...scopedValues,
-              isAdministrator: false,
-              documentAccessMode: 'document-portal',
-              requestDocuments: true,
-              departments: [],
-              permissionCodes: [],
-            },
-      );
+      const result = await createTenantUserFormAction(values);
       toast.add({
         title: result.success ? 'Usuário cadastrado' : 'Cadastro não concluído',
         description: formatActionResultDescription(result),
@@ -441,9 +416,7 @@ function CreateUserDialog({
     });
   });
 
-  const stepLabels = canManageAccess
-    ? ['Dados básicos', 'Departamentos', 'Permissões']
-    : ['Dados e acesso documental'];
+  const stepLabels = ['Dados básicos', 'Departamentos', 'Permissões'];
 
   return (
     <Dialog
@@ -548,128 +521,13 @@ function CreateUserDialog({
                 />
                 <FieldError errors={[form.formState.errors.password]} />
               </Field>
-              {canManageAccess ? (
-                <Field>
-                  <FieldLabel htmlFor="new-user-document-access">Modo de acesso</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="documentAccessMode"
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          if (value === 'document-portal') {
-                            form.setValue('requestDocuments', true, {
-                              shouldValidate: true,
-                            });
-                            form.setValue('clientCategory', null);
-                            form.setValue('routingCompanyId', null);
-                          } else if (value === 'client') {
-                            form.setValue('requestDocuments', false);
-                            form.setValue('departments', ['client-company'], {
-                              shouldValidate: true,
-                            });
-                          } else {
-                            form.setValue('clientCategory', null);
-                            form.setValue('routingCompanyId', null);
-                            form.setValue('departments', []);
-                          }
-                        }}
-                      >
-                        <SelectTrigger id="new-user-document-access" className="h-11 w-full">
-                          <SelectValue>
-                            {field.value === 'client'
-                              ? 'Cliente - acesso contratado'
-                              : field.value === 'document-portal'
-                                ? 'Candidato — somente documentos'
-                                : 'Colaborador — painel autorizado'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="standard">Colaborador — painel autorizado</SelectItem>
-                          <SelectItem value="document-portal">
-                            Candidato — somente documentos
-                          </SelectItem>
-                          <SelectItem value="client">
-                            Cliente - pessoa jurídica ou física
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldDescription>
-                    Candidatos permanecem restritos ao portal documental após o primeiro acesso.
-                  </FieldDescription>
-                </Field>
-              ) : (
-                <div className="rounded-lg border bg-muted/40 p-4 text-sm">
-                  <p className="font-medium">Acesso inicial somente para documentos</p>
-                  <p className="mt-1 text-muted-foreground">
-                    RH e Departamento Pessoal podem criar este acesso inicial. Departamentos e
-                    demais permissões serão definidos posteriormente por um administrador.
-                  </p>
-                </div>
-              )}
-              {canManageAccess && documentAccessMode === 'client' ? (
-                <>
-                  <Field data-invalid={Boolean(form.formState.errors.clientCategory)}>
-                    <FieldLabel htmlFor="new-user-client-category">Tipo de cliente</FieldLabel>
-                    <Controller
-                      control={form.control}
-                      name="clientCategory"
-                      render={({ field }) => (
-                        <Select value={field.value ?? ''} onValueChange={field.onChange}>
-                          <SelectTrigger id="new-user-client-category" className="h-11 w-full">
-                            <SelectValue>
-                              {field.value === 'legal-entity'
-                                ? 'Pessoa jurídica (PJ)'
-                                : field.value === 'individual'
-                                  ? 'Pessoa física (PF)'
-                                  : 'Selecione'}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="legal-entity">Pessoa jurídica (PJ)</SelectItem>
-                            <SelectItem value="individual">Pessoa física (PF)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <FieldError errors={[form.formState.errors.clientCategory]} />
-                  </Field>
-                  {clientCategory ? (
-                    <Field data-invalid={Boolean(form.formState.errors.routingCompanyId)}>
-                      <FieldLabel htmlFor="new-user-routing-company">Cliente vinculado</FieldLabel>
-                      <Controller
-                        control={form.control}
-                        name="routingCompanyId"
-                        render={({ field }) => (
-                          <Select value={field.value ?? ''} onValueChange={field.onChange}>
-                            <SelectTrigger id="new-user-routing-company" className="h-11 w-full">
-                              <SelectValue>
-                                {routingCompanies.find((company) => company.id === field.value)
-                                  ?.label ?? 'Selecione o cliente'}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {routingCompanies.map((company) => (
-                                <SelectItem key={company.id} value={company.id}>
-                                  {company.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                      <FieldDescription>
-                        O cliente PF ou PJ só acessa e importa dados deste cadastro.
-                      </FieldDescription>
-                      <FieldError errors={[form.formState.errors.routingCompanyId]} />
-                    </Field>
-                  ) : null}
-                </>
-              ) : null}
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+                <p className="font-medium">Tipo de conta: Colaborador</p>
+                <p className="mt-1 text-muted-foreground">
+                  Novos candidatos usarão link seguro e clientes usarão uma área própria quando
+                  esses contratos forem publicados pela Tenant API.
+                </p>
+              </div>
               <Field data-invalid={Boolean(form.formState.errors.requestDocuments)}>
                 <FieldLabel htmlFor="new-user-request-documents">
                   Solicitar documentação?
@@ -681,7 +539,6 @@ function CreateUserDialog({
                     <Select
                       value={field.value ? 'yes' : 'no'}
                       onValueChange={(value) => field.onChange(value === 'yes')}
-                      disabled={documentAccessMode === 'document-portal'}
                     >
                       <SelectTrigger id="new-user-request-documents" className="h-11 w-full">
                         <SelectValue>{field.value ? 'Sim' : 'Não'}</SelectValue>
@@ -694,9 +551,7 @@ function CreateUserDialog({
                   )}
                 />
                 <FieldDescription>
-                  {documentAccessMode === 'document-portal'
-                    ? 'Obrigatório para candidatos.'
-                    : 'Para colaboradores, escolha se a solicitação deve ser criada agora.'}
+                  Para colaboradores, escolha se a solicitação deve ser criada agora.
                 </FieldDescription>
                 <FieldError errors={[form.formState.errors.requestDocuments]} />
               </Field>
@@ -848,20 +703,12 @@ function CreateUserDialog({
                 Selecione um ou mais departamentos. Eles definem o limite das permissões que poderão
                 ser concedidas.
               </FieldDescription>
-              {documentAccessMode === 'client' ? (
-                <p className="rounded-lg border bg-muted/40 p-4 text-sm">
-                  Escopo fixo: Empresa cliente. O isolamento dos dados também é aplicado pela API.
-                </p>
-              ) : (
-                <AssignmentCheckboxes
-                  control={form.control}
-                  name="departments"
-                  values={TENANT_DEPARTMENTS.filter(
-                    (department) => department !== 'client-company',
-                  )}
-                  labels={TENANT_DEPARTMENT_LABELS}
-                />
-              )}
+              <AssignmentCheckboxes
+                control={form.control}
+                name="departments"
+                values={TENANT_DEPARTMENTS.filter((department) => department !== 'client-company')}
+                labels={TENANT_DEPARTMENT_LABELS}
+              />
               <FieldError errors={[form.formState.errors.departments]} />
             </FieldSet>
           ) : null}
@@ -884,12 +731,12 @@ function CreateUserDialog({
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancelar</DialogClose>
-            {canManageAccess && step > 1 ? (
+            {step > 1 ? (
               <Button type="button" variant="outline" onClick={() => setStep((step - 1) as 1 | 2)}>
                 Voltar
               </Button>
             ) : null}
-            {canManageAccess && step < 3 ? (
+            {step < 3 ? (
               <Button type="button" onClick={next}>
                 Continuar
               </Button>
@@ -1499,10 +1346,10 @@ export function UsersManagement({
   canEdit,
   canManageAccess,
   canManageLifecycle = canManageAccess,
+  canResetPassword = canManageLifecycle,
   canDelete = false,
   currentUserId,
   filters = {},
-  routingCompanies = [],
 }: {
   readonly users: TenantUserList;
   readonly permissionCatalog: PermissionCatalog;
@@ -1510,10 +1357,10 @@ export function UsersManagement({
   readonly canEdit: boolean;
   readonly canManageAccess: boolean;
   readonly canManageLifecycle?: boolean;
+  readonly canResetPassword?: boolean;
   readonly canDelete?: boolean;
   readonly currentUserId?: string;
   readonly filters?: UserListFilters;
-  readonly routingCompanies?: readonly { readonly id: string; readonly label: string }[];
 }) {
   const hasFilters = Boolean(
     filters.search || filters.department || filters.permission || filters.status,
@@ -1531,12 +1378,8 @@ export function UsersManagement({
               : `${users.meta.total} contas encontradas nesta organização.`}
           </p>
         </div>
-        {canCreate ? (
-          <CreateUserDialog
-            permissionCatalog={permissionCatalog}
-            canManageAccess={canManageAccess}
-            routingCompanies={routingCompanies}
-          />
+        {canCreate && canManageAccess ? (
+          <CreateUserDialog permissionCatalog={permissionCatalog} />
         ) : null}
       </div>
 
@@ -1554,9 +1397,11 @@ export function UsersManagement({
             <EmptyDescription>
               {hasFilters
                 ? 'Revise os filtros informados ou limpe a pesquisa.'
-                : canCreate
+                : canCreate && canManageAccess
                   ? 'Use “Novo usuário” para criar a primeira conta.'
-                  : 'Nenhuma conta está disponível para consulta.'}
+                  : canCreate
+                    ? 'A criação de candidatos aguarda o contrato de link seguro da Tenant API.'
+                    : 'Nenhuma conta está disponível para consulta.'}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -1631,7 +1476,7 @@ export function UsersManagement({
                     ) : null}
                   </TableCell>
                   <TableCell>
-                    {canEdit || canManageAccess ? (
+                    {canEdit || canManageAccess || canManageLifecycle || canDelete ? (
                       <div className="flex flex-wrap justify-end gap-2">
                         {canEdit ? (
                           <>
@@ -1645,7 +1490,7 @@ export function UsersManagement({
                                 ? 'Editar dados e acessos'
                                 : 'Editar dados documentais'}
                             </Button>
-                            {canManageLifecycle ? <PasswordResetButton userId={user.id} /> : null}
+                            {canResetPassword ? <PasswordResetButton userId={user.id} /> : null}
                           </>
                         ) : null}
                         {canManageLifecycle ? <UserStatusActions user={user} /> : null}

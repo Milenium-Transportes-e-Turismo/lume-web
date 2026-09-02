@@ -62,8 +62,18 @@ describe('tenant session proxy', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
-  it('protects the quote proposal queue with the session proxy', () => {
-    expect(config.matcher).toContain('/quote-proposals/:path*');
+  it('protects every authenticated workspace with the session proxy', () => {
+    expect(config.matcher).toEqual(
+      expect.arrayContaining([
+        '/quote-proposals/:path*',
+        '/routing/:path*',
+        '/registrations/:path*',
+        '/registration-reconciliation/:path*',
+        '/contacts/:path*',
+        '/clients/:path*',
+        '/administration/:path*',
+      ]),
+    );
   });
 
   it('redirects an expiring access token to the refresh Route Handler', async () => {

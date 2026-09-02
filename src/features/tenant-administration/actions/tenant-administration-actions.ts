@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
-import { TenantAdministrationError } from '../application';
+import { TenantAdministrationError, type TenantAdministrationGateway } from '../application';
 import { executeAuthenticatedTenantMutation } from '../server';
 
 const userAssignmentFields = {
@@ -112,15 +112,30 @@ const createUserSchema = z
       .max(72)
       .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/),
     requestDocuments: z.boolean().default(false),
+    documentAccessMode: z
+      .literal('standard', {
+        error:
+          'Novas contas de candidato ou cliente não podem ser criadas pelo Tenant Web neste momento.',
+      })
+      .default('standard'),
+    clientCategory: z
+      .null({
+        error: 'A categoria de cliente não se aplica à criação de colaboradores.',
+      })
+      .optional(),
+    routingCompanyId: z
+      .null({
+        error: 'O vínculo com cliente não se aplica à criação de colaboradores.',
+      })
+      .optional(),
   })
   .superRefine((input, context) => {
     requireDepartmentForStandardUser(input, context);
-    requireClientScope(input, context);
-    if (input.documentAccessMode === 'document-portal' && !input.requestDocuments) {
+    if (input.departments.includes('client-company')) {
       context.addIssue({
         code: 'custom',
-        message: 'A solicitação de documentação é obrigatória para candidatos.',
-        path: ['requestDocuments'],
+        message: 'Empresa cliente não é um departamento válido para uma nova conta de colaborador.',
+        path: ['departments'],
       });
     }
   });
@@ -155,22 +170,72 @@ function withoutAdministratorMutation(input: z.infer<typeof userBaseSchema>) {
   return {
     name: input.name,
     email: input.email,
-    ...(input.documentAccessMode === undefined
-      ? {}
-      : { documentAccessMode: input.documentAccessMode }),
     ...(input.documentAccessMode === 'client'
       ? {
           clientCategory: input.clientCategory,
           routingCompanyId: input.routingCompanyId,
         }
-      : input.documentAccessMode === undefined
-        ? {}
-        : { clientCategory: null, routingCompanyId: null }),
+      : {}),
     departments: input.departments,
     permissionCodes: input.permissionCodes,
     ...employeeProfile,
   };
 }
+
+function haveSameStringValues(left: readonly string[], right: readonly string[]): boolean {
+  const normalizedLeft = [...new Set(left)].sort();
+  const normalizedRight = [...new Set(right)].sort();
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  );
+}
+
+async function updateUserWithoutChangingAccessMode(
+  gateway: TenantAdministrationGateway,
+  userId: string,
+  input: z.infer<typeof userBaseSchema>,
+) {
+  const current = await gateway.getUser(userId);
+  const currentMode = current.documentAccessMode ?? 'standard';
+  const requestedMode = input.documentAccessMode;
+
+  if (requestedMode !== undefined && requestedMode !== currentMode) {
+    throw new TenantAdministrationError(
+      'validation',
+      'O modo de acesso existente não pode ser alterado enquanto a migração de contas legadas não estiver definida.',
+      'ACCESS_MODE_CHANGE_NOT_ALLOWED',
+    );
+  }
+
+  const mutation = withoutAdministratorMutation(input);
+  const assignmentsChanged =
+    !input.isAdministrator &&
+    (!haveSameStringValues(input.departments, current.departments) ||
+      !haveSameStringValues(input.permissionCodes, current.permissionCodes) ||
+      (currentMode === 'client' &&
+        (input.clientCategory !== current.clientCategory ||
+          input.routingCompanyId !== current.routingCompanyId)));
+  const updated = await gateway.updateUser(userId, mutation);
+
+  if (
+    assignmentsChanged &&
+    (!haveSameStringValues(input.departments, updated.departments) ||
+      !haveSameStringValues(input.permissionCodes, updated.permissionCodes) ||
+      (currentMode === 'client' &&
+        (input.clientCategory !== updated.clientCategory ||
+          input.routingCompanyId !== updated.routingCompanyId)))
+  ) {
+    throw new TenantAdministrationError(
+      'conflict',
+      'A Tenant API atualizou os dados, mas não confirmou todos os acessos solicitados. O estado autoritativo deve ser recarregado.',
+      'AUTHORITATIVE_USER_STATE_MISMATCH',
+    );
+  }
+
+  return updated;
+}
+
 function formString(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === 'string' ? value : '';
@@ -187,9 +252,16 @@ function formBoolean(formData: FormData, name: string): boolean {
   return value === 'true' || value === 'on';
 }
 
-function formAccessMode(formData: FormData): 'standard' | 'document-portal' | 'client' {
+function formOptionalAccessMode(
+  formData: FormData,
+): 'standard' | 'document-portal' | 'client' | undefined {
   const mode = formString(formData, 'documentAccessMode');
-  return mode === 'document-portal' || mode === 'client' ? mode : 'standard';
+  if (mode === 'document-portal' || mode === 'client' || mode === 'standard') return mode;
+  return undefined;
+}
+
+function formAccessMode(formData: FormData): 'standard' | 'document-portal' | 'client' {
+  return formOptionalAccessMode(formData) ?? 'standard';
 }
 
 function actionFailureDestination(path: string, error: unknown): never {
@@ -253,7 +325,7 @@ export async function updateTenantUserAction(userId: string, formData: FormData)
     name: formString(formData, 'name'),
     email: formString(formData, 'email'),
     isAdministrator: formBoolean(formData, 'isAdministrator'),
-    documentAccessMode: formAccessMode(formData),
+    documentAccessMode: formOptionalAccessMode(formData),
     clientCategory:
       formString(formData, 'clientCategory') === 'legal-entity'
         ? 'legal-entity'
@@ -276,9 +348,16 @@ export async function updateTenantUserAction(userId: string, formData: FormData)
 
   try {
     await executeAuthenticatedTenantMutation((gateway) =>
-      gateway.updateUser(userId, withoutAdministratorMutation(parsed.data)),
+      updateUserWithoutChangingAccessMode(gateway, userId, parsed.data),
     );
   } catch (error) {
+    if (
+      error instanceof TenantAdministrationError &&
+      error.publicCode === 'AUTHORITATIVE_USER_STATE_MISMATCH'
+    ) {
+      revalidatePath('/users');
+      revalidatePath(`/users/${userId}`);
+    }
     actionFailureDestination(`/users/${userId}`, error);
   }
 
@@ -362,15 +441,22 @@ export async function updateTenantUserFormAction(
 
   try {
     await executeAuthenticatedTenantMutation((gateway) =>
-      gateway.updateUser(userId, withoutAdministratorMutation(parsed.data)),
+      updateUserWithoutChangingAccessMode(gateway, userId, parsed.data),
     );
   } catch (error) {
+    if (
+      error instanceof TenantAdministrationError &&
+      error.publicCode === 'AUTHORITATIVE_USER_STATE_MISMATCH'
+    ) {
+      revalidatePath('/users');
+      revalidatePath(`/users/${userId}`);
+    }
     return tenantUserActionResult(error, 'Não foi possível atualizar o usuário.');
   }
 
   revalidatePath('/users');
   revalidatePath(`/users/${userId}`);
-  return { success: true, message: 'Dados e permissões atualizados com sucesso.' };
+  return { success: true, message: 'Dados do usuário atualizados com sucesso.' };
 }
 
 const deleteTenantUserSchema = z.object({

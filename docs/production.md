@@ -10,12 +10,18 @@ O `Dockerfile` gera o `output: standalone` do Next.js em uma imagem sem
 dependências de desenvolvimento e executa o processo como o usuário não-root
 `nextjs`.
 
-A compilação usa uma pilha tipográfica local do sistema e não baixa fontes
-externas. Isso mantém o artefato reproduzível mesmo quando o ambiente de build
-não possui acesso ao Google Fonts.
+A compilação usa `next/font` para baixar Geist durante o build e incorporá-la ao
+artefato final. O contêiner em runtime não busca fontes externas, mas o builder
+precisa de saída HTTPS durante `npm run build`; uma falha nessa etapa deve
+interromper o deploy antes do smoke test.
 
 ```powershell
-docker build --pull --tag lume-tenant-web:<sha> .
+$tenantName = "Empresa" # Ajuste para o nome público aprovado.
+$productName = "Lume"
+docker build --pull `
+  --build-arg "NEXT_PUBLIC_TENANT_NAME=$tenantName" `
+  --build-arg "NEXT_PUBLIC_TENANT_PRODUCT_NAME=$productName" `
+  --tag lume-tenant-web:<sha> .
 docker run --rm --env-file .env.production -p 3000:3000 lume-tenant-web:<sha>
 ```
 
@@ -76,6 +82,12 @@ lotes pertence à Tenant API e não deve ser montado no frontend.
 - `GET /api/readiness`: valida a configuração e a sonda
   `GET <LUME_TENANT_API_URL>/health/ready`.
 
+Em `NODE_ENV=production`, a readiness também exige `SESSION_SECRET` com pelo
+menos 32 bytes, `AUTH_SIMULATION_ENABLED=false` e
+`LUME_TENANT_WHATSAPP_DATA_SOURCE=api`. Configuração inválida retorna `503`,
+marca `configuration=invalid` e não consulta a API; nenhum valor secreto é
+incluído na resposta.
+
 Use `health` para reinício do contêiner e `readiness` para entrada/remoção no
 balanceador. Nenhuma sonda expõe segredos ou JWTs.
 
@@ -94,20 +106,30 @@ balanceador. Nenhuma sonda expõe segredos ou JWTs.
 7. Execute abertura de conversa, takeover, envio controlado pelo atendente em
    **Abrir chat** e um canário de orçamento criado pelo workspace com PDF não
    sensível. Confirme também a grafia do nome do PDF com caracteres acentuados.
-8. Valide o encerramento de uma conversa sem proposta ativa, confirme no
-   histórico de ações data, atendente e motivo e verifique a mensagem automática
-   de despedida no WhatsApp. Repita com uma proposta já aprovada e confirme que
-   o MVP permite o comando. Confirme também que uma proposta ainda em andamento
-   bloqueia o encerramento e que qualquer recusa da Tenant API é exibida sem
-   simular sucesso.
+8. Em uma conversa `human-active` atribuída ao usuário, valide **Encerrar
+   atendimento** e confirme que o frontend envia o comando versionado
+   `return-to-bot`. A conversa deve permanecer no histórico e voltar ao estado
+   autoritativo do bot; conflito ou recusa da Tenant API não pode ser apresentado
+   como sucesso. Com outro atendente autenticado, confirme que a interface e a
+   Server Action recusam a mesma ação e que uma chamada direta à Tenant API
+   recebe `403` sem alterar a versão. A exceção de Gerência/Diretoria só poderá
+   entrar neste canário depois que a API publicar permissão, motivo e auditoria
+   explícitos. Confirme também que a interface não oferece `close` como sinônimo
+   dessa ação e que um uso autorizado desse comando técnico nunca elimina o
+   histórico: o próximo contato deve reabrir a mesma conversa canônica.
 9. Verifique o sino em usuários de departamentos diferentes e confirme que cada
    um recebe somente notificações do próprio escopo. No Comercial, valide o
    aviso de novo orçamento pendente.
-10. Confirme os grupos **Geral**, **Comercial** e **Administração** na sidebar,
+10. Confirme os grupos **Geral**, **Cadastros**, **Comercial**, **Pessoas** e
+    **Administração** na sidebar,
     o envio de suporte pelo provedor e, ao simular uma falha autorizada, o
-    `mailto:` com identificação do solicitante; confirme também a negativa de
-    `/users` e `/license` fora de Gerência ou sem suas permissões individuais.
-11. Direcione tráfego e acompanhe erros 401, 403, 409, 423, 5xx e falhas de
+    `mailto:` com identificação do solicitante; confirme também que `/users`
+    exige uma permissão `users:*` compatível e que `/license` continua negada
+    fora de Gerência ou sem `license:view`.
+11. Confirme que o cadastro oferece somente conta de colaborador, que payloads
+    de criação `client` e `document-portal` são recusados e que contas legadas
+    continuam editáveis sem permitir troca do modo de acesso.
+12. Direcione tráfego e acompanhe erros 401, 403, 409, 423, 5xx e falhas de
     readiness.
 
 O envio pelo atendente registra primeiro uma mensagem `pending` na Tenant API. A

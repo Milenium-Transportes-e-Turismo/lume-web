@@ -11,8 +11,6 @@ import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 
 import { WhatsAppConversationRepositoryError } from '../application';
 import {
-  closeWhatsAppConversationForDashboard,
-  closeWhatsAppConversationAfterRejectionForDashboard,
   forwardWhatsAppConversationForDashboard,
   markWhatsAppConversationAsReadForDashboard,
   pollWhatsAppConversationForDashboard,
@@ -23,8 +21,6 @@ import {
 } from '../server';
 import { createWhatsAppConversationFixture } from '../testing/whatsapp-conversation-fixture';
 import {
-  closeWhatsAppConversationAction,
-  closeWhatsAppConversationAfterRejectionAction,
   forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
   returnWhatsAppConversationToBotAction,
@@ -38,8 +34,6 @@ jest.mock('@/features/auth/server', () => ({
   getCurrentAuthenticatedSession: jest.fn(),
 }));
 jest.mock('../server', () => ({
-  closeWhatsAppConversationForDashboard: jest.fn(),
-  closeWhatsAppConversationAfterRejectionForDashboard: jest.fn(),
   forwardWhatsAppConversationForDashboard: jest.fn(),
   markWhatsAppConversationAsReadForDashboard: jest.fn(),
   pollWhatsAppConversationForDashboard: jest.fn(),
@@ -50,8 +44,6 @@ jest.mock('../server', () => ({
 }));
 
 const mockedSession = jest.mocked(getCurrentAuthenticatedSession);
-const mockedGeneralClose = jest.mocked(closeWhatsAppConversationForDashboard);
-const mockedClose = jest.mocked(closeWhatsAppConversationAfterRejectionForDashboard);
 const mockedTakeOver = jest.mocked(takeOverWhatsAppConversationForDashboard);
 const mockedReturn = jest.mocked(returnWhatsAppConversationToBotForDashboard);
 const mockedForward = jest.mocked(forwardWhatsAppConversationForDashboard);
@@ -60,7 +52,10 @@ const mockedSendMessage = jest.mocked(sendHumanWhatsAppMessageForDashboard);
 const mockedStartConversation = jest.mocked(startWhatsAppConversationForDashboard);
 const mockedPoll = jest.mocked(pollWhatsAppConversationForDashboard);
 
-function createSession(permissions: readonly Permission[]): AuthenticatedSession {
+function createSession(
+  permissions: readonly Permission[],
+  departments: readonly string[] = ['commercial'],
+): AuthenticatedSession {
   return {
     version: AUTHENTICATED_SESSION_VERSION,
     id: 'session-001',
@@ -68,7 +63,7 @@ function createSession(permissions: readonly Permission[]): AuthenticatedSession
       id: 'employee-001',
       name: 'Usuário Comercial',
       type: 'employee',
-      departments: ['commercial'],
+      departments,
       permissions,
       clientCategory: null,
       isActive: true,
@@ -117,6 +112,21 @@ describe('WhatsApp conversation server actions', () => {
     expect(mockedTakeOver).not.toHaveBeenCalled();
   });
 
+  it('enforces the current Commercial scope even when the permission is present', async () => {
+    mockedSession.mockResolvedValue(
+      createSession(['whatsapp-conversations:manage'], ['operations']),
+    );
+
+    await expect(
+      takeOverWhatsAppConversationAction({
+        conversationId: 'conversation-001',
+        expectedVersion: 3,
+      }),
+    ).resolves.toMatchObject({ success: false, code: 'forbidden' });
+
+    expect(mockedTakeOver).not.toHaveBeenCalled();
+  });
+
   it('passes expectedVersion to takeover and return-to-bot', async () => {
     const taken = createWhatsAppConversationFixture({
       conversationState: 'human-active',
@@ -129,6 +139,14 @@ describe('WhatsApp conversation server actions', () => {
       version: 5,
     });
     mockedTakeOver.mockResolvedValue(taken);
+    mockedPoll.mockResolvedValueOnce(
+      createWhatsAppConversationFixture({
+        conversationState: 'human-active',
+        flowStep: 'human-service',
+        assignedTo: { id: 'employee-001', name: 'Usuário Comercial' },
+        version: 4,
+      }),
+    );
     mockedReturn.mockResolvedValue(returned);
 
     await takeOverWhatsAppConversationAction({
@@ -143,6 +161,29 @@ describe('WhatsApp conversation server actions', () => {
     expect(mockedTakeOver).toHaveBeenCalledWith(taken.id, 3);
     expect(mockedReturn).toHaveBeenCalledWith(returned.id, 4);
     expect(revalidatePath).toHaveBeenCalledWith('/whatsapp-conversations');
+  });
+
+  it("does not return another attendant's conversation to the bot", async () => {
+    const conversation = createWhatsAppConversationFixture({
+      conversationState: 'human-active',
+      flowStep: 'human-service',
+      assignedTo: { id: 'employee-002', name: 'Outro atendente' },
+      version: 4,
+    });
+    mockedPoll.mockResolvedValueOnce(conversation);
+
+    await expect(
+      returnWhatsAppConversationToBotAction({
+        conversationId: conversation.id,
+        expectedVersion: conversation.version,
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      code: 'forbidden',
+      conversation,
+    });
+
+    expect(mockedReturn).not.toHaveBeenCalled();
   });
 
   it('reloads the current conversation and reports a 409 conflict', async () => {
@@ -268,45 +309,6 @@ describe('WhatsApp conversation server actions', () => {
     expect(mockedMarkRead).toHaveBeenNthCalledWith(2, firstReload.id, 9);
     expect(mockedMarkRead).toHaveBeenCalledTimes(2);
     expect(mockedPoll).toHaveBeenCalledTimes(2);
-  });
-
-  it('encaminha o encerramento recusado com versão otimista', async () => {
-    const closed = createWhatsAppConversationFixture({
-      conversationState: 'closed',
-      flowStep: 'closed',
-      requestStatus: 'rejected',
-      closedAt: '2026-07-28T12:00:00.000Z',
-      version: 8,
-    });
-    mockedClose.mockResolvedValue(closed);
-
-    await expect(
-      closeWhatsAppConversationAfterRejectionAction({
-        conversationId: closed.id,
-        expectedVersion: 7,
-      }),
-    ).resolves.toEqual({ success: true, conversation: closed });
-    expect(mockedClose).toHaveBeenCalledWith(closed.id, 7);
-  });
-
-  it('encaminha o encerramento geral com motivo normalizado', async () => {
-    const closed = createWhatsAppConversationFixture({
-      conversationState: 'closed',
-      flowStep: 'closed',
-      requestStatus: 'not-started',
-      closedAt: '2026-07-28T12:00:00.000Z',
-      version: 8,
-    });
-    mockedGeneralClose.mockResolvedValue(closed);
-
-    await expect(
-      closeWhatsAppConversationAction({
-        conversationId: closed.id,
-        expectedVersion: 7,
-        reason: 'Atendimento concluído.',
-      }),
-    ).resolves.toEqual({ success: true, conversation: closed });
-    expect(mockedGeneralClose).toHaveBeenCalledWith(closed.id, 7, 'Atendimento concluído.');
   });
 
   it('sends an idempotent human message and returns the persisted pending message', async () => {

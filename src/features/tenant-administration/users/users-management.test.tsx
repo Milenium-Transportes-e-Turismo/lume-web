@@ -141,7 +141,8 @@ describe('users management permissions', () => {
         permissionCatalog={permissionCatalog}
         canCreate={false}
         canEdit={false}
-        canManageAccess
+        canManageAccess={false}
+        canManageLifecycle
       />,
     );
 
@@ -208,6 +209,24 @@ describe('users management permissions', () => {
 
     expect(screen.getByRole('button', { name: 'Editar dados e acessos' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Recuperar senha' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Desativar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Suspender' })).not.toBeInTheDocument();
+  });
+
+  it('keeps password recovery separate from account status management', () => {
+    render(
+      <UsersManagement
+        users={users}
+        permissionCatalog={permissionCatalog}
+        canCreate={false}
+        canEdit
+        canManageAccess={false}
+        canManageLifecycle={false}
+        canResetPassword
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Recuperar senha' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Desativar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Suspender' })).not.toBeInTheDocument();
   });
@@ -509,7 +528,7 @@ describe('user editor form', () => {
         permissionCatalog={permissionCatalog}
         canCreate
         canEdit={false}
-        canManageAccess={false}
+        canManageAccess
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }));
@@ -528,6 +547,8 @@ describe('user editor form', () => {
 
     expect(screen.queryByLabelText('CPF (opcional)')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Usuário')).toBeDisabled();
+    expect(screen.getByLabelText('Modo de acesso')).toHaveValue('Colaborador');
+    expect(screen.getByLabelText('Modo de acesso')).toHaveAttribute('readonly');
 
     const name = screen.getByLabelText('Nome');
     await interaction.clear(name);
@@ -549,38 +570,20 @@ describe('user editor form', () => {
     });
   });
 
-  it('limits HR and Personnel Department creation to initial document access', async () => {
-    const interaction = userEvent.setup();
+  it('keeps documentary editing for HR and Personnel without creating password accounts', () => {
     render(
       <UsersManagement
         users={users}
         permissionCatalog={permissionCatalog}
         canCreate
-        canEdit={false}
+        canEdit
         canManageAccess={false}
       />,
     );
 
-    await interaction.click(screen.getByRole('button', { name: 'Novo usuário' }));
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Acesso inicial somente para documentos')).toBeInTheDocument();
-    expect(within(dialog).queryByLabelText('Modo de acesso')).not.toBeInTheDocument();
-    expect(within(dialog).queryByText('Departamentos')).not.toBeInTheDocument();
-
-    await interaction.type(within(dialog).getByLabelText('Nome'), 'Novo Candidato');
-    await interaction.type(within(dialog).getByLabelText('Usuário'), 'novo.candidato');
-    await interaction.type(within(dialog).getByLabelText('E-mail'), 'candidato@example.com');
-    await interaction.type(within(dialog).getByLabelText('Senha inicial'), 'SenhaForte@2026');
-    await interaction.click(within(dialog).getByRole('button', { name: 'Cadastrar usuário' }));
-
-    await waitFor(() => expect(createTenantUserFormAction).toHaveBeenCalledTimes(1));
-    expect(jest.mocked(createTenantUserFormAction).mock.calls[0][0]).toEqual(
-      expect.objectContaining({
-        documentAccessMode: 'document-portal',
-        departments: [],
-        permissionCodes: [],
-      }),
-    );
+    expect(screen.queryByRole('button', { name: 'Novo usuário' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Editar dados documentais' })).toBeInTheDocument();
+    expect(createTenantUserFormAction).not.toHaveBeenCalled();
   });
 
   it('uses the three-step creation flow and only shows compatible permissions', async () => {
@@ -598,6 +601,10 @@ describe('user editor form', () => {
     await interaction.click(screen.getByRole('button', { name: 'Novo usuário' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Dados básicos')).toBeInTheDocument();
+    expect(within(dialog).getByText('Tipo de conta: Colaborador')).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Modo de acesso')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Candidato — somente documentos/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Cliente - pessoa jurídica/)).not.toBeInTheDocument();
 
     await interaction.type(within(dialog).getByLabelText('Nome'), 'Maria Financeiro');
     await interaction.type(within(dialog).getByLabelText('Usuário'), 'maria.financeiro');
@@ -678,6 +685,41 @@ describe('user editor form', () => {
     expect(screen.getByRole('checkbox', { name: 'Gerenciar' })).toBeChecked();
     expect(selectAll).toBeChecked();
   });
+
+  it.each([
+    ['document-portal', 'Candidato — acesso documental legado'],
+    ['client', 'Cliente — acesso legado'],
+  ] as const)(
+    'shows an existing %s mode without allowing conversion',
+    (documentAccessMode, label) => {
+      render(
+        <UserEditorForm
+          user={{
+            ...tenantUser,
+            documentAccessMode,
+            ...(documentAccessMode === 'client'
+              ? {
+                  clientCategory: 'legal-entity' as const,
+                  routingCompanyId: '11111111-1111-4111-8111-111111111111',
+                  departments: ['client-company'],
+                }
+              : {}),
+          }}
+          permissionCatalog={permissionCatalog}
+          canManageAccess
+          routingCompanies={[
+            { id: '11111111-1111-4111-8111-111111111111', label: 'Cliente legado' },
+          ]}
+        />,
+      );
+
+      expect(screen.getByLabelText('Modo de acesso')).toHaveValue(label);
+      expect(screen.getByLabelText('Modo de acesso')).toHaveAttribute('readonly');
+      expect(
+        screen.queryByRole('option', { name: /Colaborador|Candidato|Cliente/ }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it('shows the administrator state in the user list', () => {
     render(

@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   Bot,
   Building2,
-  CircleStop,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -69,7 +68,6 @@ import {
 import {
   archiveWhatsAppConversationAction,
   changeWhatsAppConversationDepartmentAction,
-  closeWhatsAppConversationAction,
   forwardWhatsAppConversationAction,
   markWhatsAppConversationAsReadAction,
   returnWhatsAppConversationToBotAction,
@@ -82,7 +80,6 @@ import {
 } from '../actions';
 import { HUMAN_WHATSAPP_MESSAGE_MAX_LENGTH } from '../application';
 import {
-  canCloseWhatsAppConversation,
   canForwardWhatsAppConversation,
   canReturnWhatsAppConversationToBot,
   canSendHumanWhatsAppMessage,
@@ -273,8 +270,8 @@ const TRANSITION_LABELS: Readonly<Record<string, string>> = {
   'return-to-bot': 'Atendimento devolvido ao bot',
   forward: 'Atendimento encaminhado',
   'mark-read': 'Conversa marcada como lida',
-  close: 'Atendimento encerrado',
-  'close-after-rejection': 'Atendimento encerrado após recusa',
+  close: 'Conversa encerrada até novo contato',
+  'close-after-rejection': 'Conversa encerrada após recusa até novo contato',
   'resume-awaited-reply': 'Resposta aguardada retomada',
   'resume-contextual-contact': 'Contato contextual retomado',
 };
@@ -343,7 +340,6 @@ export function ConversationWorkspace({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
-  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const [isStartConversationDialogOpen, setIsStartConversationDialogOpen] = useState(false);
   const [newConversationPhone, setNewConversationPhone] = useState('');
   const [isForwardDialogOpen, setIsForwardDialogOpen] = useState(false);
@@ -354,7 +350,6 @@ export function ConversationWorkspace({
   const [isClientMissingDialogOpen, setIsClientMissingDialogOpen] = useState(false);
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false);
   const [isResolvingClient, startClientLookup] = useTransition();
-  const [closeReason, setCloseReason] = useState('');
   const [manualCommercialStatus, setManualCommercialStatus] =
     useState<ManualCommercialStatus>('under-review');
   const [manualCommercialStatusReason, setManualCommercialStatusReason] = useState('');
@@ -731,6 +726,10 @@ export function ConversationWorkspace({
     selectedConversation !== null &&
     canSendHumanWhatsAppMessage(selectedConversation) &&
     selectedConversation.assignedTo?.id === currentUserId;
+  const canCurrentUserReturnToBot =
+    selectedConversation !== null &&
+    canReturnWhatsAppConversationToBot(selectedConversation) &&
+    selectedConversation.assignedTo?.id === currentUserId;
   const actionHistory = selectedConversation?.transitions ?? [];
 
   function handleClientHeaderClick() {
@@ -770,14 +769,12 @@ export function ConversationWorkspace({
     setFeedbackTone('neutral');
     setDetailError('');
     setMessageDraft('');
-    setIsCloseDialogOpen(false);
     setIsForwardDialogOpen(false);
     setIsDepartmentDialogOpen(false);
     setIsStatusDialogOpen(false);
     setIsHistoryDialogOpen(false);
     setIsQuoteDialogOpen(false);
     setIsMessageSearchOpen(false);
-    setCloseReason('');
     setManualCommercialStatus(
       isManualCommercialStatus(conversation.requestStatus)
         ? conversation.requestStatus
@@ -897,39 +894,6 @@ export function ConversationWorkspace({
       });
       applyActionResult(result, isArchived ? 'Conversa desarquivada.' : 'Conversa arquivada.');
       if (result.success) await refreshList(true);
-    });
-  }
-
-  function handleClose() {
-    if (!selectedConversation) return;
-    setFeedbackMessage('');
-    setFeedbackTone('neutral');
-
-    startConversationTransition(async () => {
-      const result = await closeWhatsAppConversationAction({
-        conversationId: selectedConversation.id,
-        expectedVersion: selectedConversation.version,
-        reason: closeReason.trim() || undefined,
-      });
-      const successMessage =
-        'Atendimento encerrado. O próximo contato será iniciado pelo bot no menu principal.';
-      applyActionResult(result, successMessage);
-
-      toast.add({
-        title: result.success ? 'Atendimento encerrado' : 'Não foi possível encerrar',
-        description: result.success
-          ? successMessage
-          : userFacingMessage(
-              result.message,
-              'Não foi possível encerrar o atendimento. Tente novamente.',
-            ),
-        type: result.success ? 'success' : 'error',
-      });
-
-      if (result.success) {
-        setIsCloseDialogOpen(false);
-        setCloseReason('');
-      }
     });
   }
 
@@ -1705,42 +1669,33 @@ export function ConversationWorkspace({
                       onClick={() =>
                         handleVersionedAction(
                           returnWhatsAppConversationToBotAction,
-                          'Conversa devolvida ao bot na etapa permitida.',
+                          'Atendimento humano encerrado. A conversa continua sob controle do bot.',
                         )
                       }
-                      disabled={
-                        isUpdatingConversation ||
-                        !canReturnWhatsAppConversationToBot(selectedConversation)
-                      }
+                      disabled={isUpdatingConversation || !canCurrentUserReturnToBot}
                       className={styles.actionButton({ action: 'bot' })}
                     >
                       <Bot aria-hidden="true" />
-                      BOT {isWhatsAppBotBlocked(selectedConversation) ? 'inativo' : 'ativo'}
+                      {canCurrentUserReturnToBot
+                        ? 'Encerrar atendimento'
+                        : `BOT ${isWhatsAppBotBlocked(selectedConversation) ? 'inativo' : 'ativo'}`}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        selectedConversation.conversationState === 'closed'
-                          ? handleVersionedAction(
-                              takeOverWhatsAppConversationAction,
-                              'Atendimento iniciado com sucesso.',
-                            )
-                          : setIsCloseDialogOpen(true)
-                      }
-                      disabled={
-                        isUpdatingConversation ||
-                        (selectedConversation.conversationState !== 'closed' &&
-                          !canCloseWhatsAppConversation(selectedConversation))
-                      }
-                      className={styles.actionButton({ action: 'close' })}
-                    >
-                      {selectedConversation.conversationState === 'closed' ? (
+                    {selectedConversation.conversationState === 'closed' ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleVersionedAction(
+                            takeOverWhatsAppConversationAction,
+                            'Atendimento iniciado com sucesso.',
+                          )
+                        }
+                        disabled={isUpdatingConversation}
+                        className={styles.actionButton({ action: 'close' })}
+                      >
                         <Headset aria-hidden="true" />
-                      ) : (
-                        <CircleStop aria-hidden="true" />
-                      )}
-                      {selectedConversation.conversationState === 'closed' ? 'Iniciar' : 'Encerrar'}
-                    </button>
+                        Iniciar
+                      </button>
+                    ) : null}
                   </div>
                   <div className={styles.actions()}>
                     <button
@@ -1914,57 +1869,6 @@ export function ConversationWorkspace({
                         }
                       >
                         Atualizar status
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Encerrar este atendimento?</DialogTitle>
-                      <DialogDescription>
-                        A conversa atual será encerrada e preservada no histórico. Quando o cliente
-                        enviar uma nova mensagem, o bot iniciará outro atendimento pelo menu
-                        principal. O encerramento não é permitido enquanto houver uma proposta em
-                        andamento.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-2">
-                      <label htmlFor="close-reason" className="text-sm font-medium">
-                        Motivo do encerramento
-                        {selectedConversation.requestStatus === 'rejected' ? ' (obrigatório)' : ''}
-                      </label>
-                      <Textarea
-                        id="close-reason"
-                        value={closeReason}
-                        onChange={(event) => setCloseReason(event.target.value)}
-                        minLength={3}
-                        maxLength={500}
-                        required={selectedConversation.requestStatus === 'rejected'}
-                        placeholder={
-                          selectedConversation.requestStatus === 'rejected'
-                            ? 'Informe por que a proposta foi recusada.'
-                            : 'Opcional: registre uma observação sobre o encerramento.'
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {closeReason.length}/500 caracteres
-                      </p>
-                    </div>
-                    <DialogFooter>
-                      <DialogClose render={<Button variant="outline" />}>Voltar</DialogClose>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={handleClose}
-                        disabled={
-                          isUpdatingConversation ||
-                          (selectedConversation.requestStatus === 'rejected' &&
-                            closeReason.trim().length < 3)
-                        }
-                      >
-                        {isUpdatingConversation ? 'Encerrando...' : 'Confirmar encerramento'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

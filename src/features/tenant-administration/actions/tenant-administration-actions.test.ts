@@ -1,10 +1,13 @@
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 import { TenantAdministrationError, type TenantAdministrationGateway } from '../application';
 import { executeAuthenticatedTenantMutation } from '../server';
 import {
+  createTenantUserAction,
   createTenantUserFormAction,
   deleteTenantUserAction,
+  updateTenantUserAction,
   updateTenantUserFormAction,
 } from './tenant-administration-actions';
 
@@ -21,19 +24,31 @@ jest.mock('../server', () => ({
 }));
 
 describe('tenant administration user actions', () => {
+  const mockedRedirect = jest.mocked(redirect);
+  const currentUser = {
+    id: '00000000-0000-4000-8000-000000000001',
+    documentAccessMode: 'standard' as const,
+    departments: ['commercial'],
+    permissionCodes: ['commercial:view'],
+    clientCategory: null,
+    routingCompanyId: null,
+  };
   const createUser = jest.fn();
   const deleteUser = jest.fn();
+  const getUser = jest.fn();
   const updateUser = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     createUser.mockResolvedValue({});
     deleteUser.mockResolvedValue({ deleted: true });
-    updateUser.mockResolvedValue({});
+    getUser.mockResolvedValue(currentUser);
+    updateUser.mockImplementation(async (_userId, input) => ({ ...currentUser, ...input }));
     jest.mocked(executeAuthenticatedTenantMutation).mockImplementation(async (operation) =>
       operation({
         createUser,
         deleteUser,
+        getUser,
         updateUser,
       } as unknown as TenantAdministrationGateway),
     );
@@ -132,22 +147,50 @@ describe('tenant administration user actions', () => {
     );
   });
 
-  it('requires documentation for candidates', async () => {
-    await expect(
-      createTenantUserFormAction({
-        name: 'Novo Candidato',
-        username: 'novo.candidato',
-        email: 'candidato@example.com',
-        password: 'SenhaForte@2026',
-        isAdministrator: false,
-        documentAccessMode: 'document-portal',
-        requestDocuments: false,
-        departments: [],
-        permissionCodes: [],
-      }),
-    ).resolves.toMatchObject({ success: false, errorCode: 'VALIDATION_ERROR' });
-    expect(createUser).not.toHaveBeenCalled();
-  });
+  it.each(['document-portal', 'client'] as const)(
+    'rejects new %s accounts before calling the Tenant API',
+    async (documentAccessMode) => {
+      await expect(
+        createTenantUserFormAction({
+          name: 'Acesso Externo',
+          username: 'acesso.externo',
+          email: 'externo@example.com',
+          password: 'SenhaForte@2026',
+          isAdministrator: false,
+          documentAccessMode,
+          requestDocuments: true,
+          departments: [],
+          permissionCodes: [],
+        }),
+      ).resolves.toEqual({
+        success: false,
+        message:
+          'Novas contas de candidato ou cliente não podem ser criadas pelo Tenant Web neste momento.',
+        errorCode: 'VALIDATION_ERROR',
+      });
+      expect(createUser).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['document-portal', 'client'] as const)(
+    'rejects a forged %s account submitted through FormData',
+    async (documentAccessMode) => {
+      const formData = new FormData();
+      formData.set('name', 'Acesso Externo');
+      formData.set('username', 'acesso.externo');
+      formData.set('email', 'externo@example.com');
+      formData.set('password', 'SenhaForte@2026');
+      formData.set('documentAccessMode', documentAccessMode);
+      mockedRedirect.mockImplementationOnce((destination) => {
+        throw new Error(`NEXT_REDIRECT:${destination}`);
+      });
+
+      await expect(createTenantUserAction(formData)).rejects.toThrow(
+        'NEXT_REDIRECT:/users?error=Revise os dados do novo usuário.',
+      );
+      expect(createUser).not.toHaveBeenCalled();
+    },
+  );
 
   it('deletes a user only through the dedicated authenticated action', async () => {
     const userId = '00000000-0000-4000-8000-000000000001';
@@ -180,6 +223,29 @@ describe('tenant administration user actions', () => {
     });
   });
 
+  it('reports a conflict when the Tenant API discards requested access changes', async () => {
+    const userId = '00000000-0000-4000-8000-000000000001';
+    updateUser.mockResolvedValueOnce(currentUser);
+
+    await expect(
+      updateTenantUserFormAction(userId, {
+        name: 'Usuário Operacional',
+        email: 'operacional@example.com',
+        isAdministrator: false,
+        departments: ['operations'],
+        permissionCodes: ['routes:view'],
+      }),
+    ).resolves.toEqual({
+      success: false,
+      message:
+        'A Tenant API atualizou os dados, mas não confirmou todos os acessos solicitados. O estado autoritativo deve ser recarregado.',
+      errorCode: 'AUTHORITATIVE_USER_STATE_MISMATCH',
+    });
+
+    expect(revalidatePath).toHaveBeenCalledWith('/users');
+    expect(revalidatePath).toHaveBeenCalledWith(`/users/${userId}`);
+  });
+
   it('cannot promote a user through a crafted update payload', async () => {
     await expect(
       updateTenantUserFormAction('00000000-0000-4000-8000-000000000001', {
@@ -195,5 +261,108 @@ describe('tenant administration user actions', () => {
       name: 'Usuário Comercial',
       email: 'comercial@example.com',
     });
+  });
+
+  it('rejects changing the access mode of an existing account', async () => {
+    await expect(
+      updateTenantUserFormAction('00000000-0000-4000-8000-000000000001', {
+        name: 'Usuário Comercial',
+        email: 'comercial@example.com',
+        isAdministrator: false,
+        documentAccessMode: 'document-portal',
+        departments: [],
+        permissionCodes: [],
+      }),
+    ).resolves.toEqual({
+      success: false,
+      message:
+        'O modo de acesso existente não pode ser alterado enquanto a migração de contas legadas não estiver definida.',
+      errorCode: 'ACCESS_MODE_CHANGE_NOT_ALLOWED',
+    });
+
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects an access-mode conversion submitted through FormData', async () => {
+    const userId = '00000000-0000-4000-8000-000000000001';
+    const formData = new FormData();
+    formData.set('name', 'Cliente Forjado');
+    formData.set('email', 'cliente@example.com');
+    formData.set('documentAccessMode', 'client');
+    formData.set('clientCategory', 'legal-entity');
+    formData.set('routingCompanyId', '11111111-1111-4111-8111-111111111111');
+    formData.append('departments', 'client-company');
+    mockedRedirect.mockImplementationOnce((destination) => {
+      throw new Error(`NEXT_REDIRECT:${destination}`);
+    });
+
+    await expect(updateTenantUserAction(userId, formData)).rejects.toThrow('NEXT_REDIRECT:');
+    expect(getUser).toHaveBeenCalledWith(userId);
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it('updates a user from FormData without sending documentAccessMode', async () => {
+    const userId = '00000000-0000-4000-8000-000000000001';
+    const formData = new FormData();
+    formData.set('name', 'Usuário Comercial');
+    formData.set('email', 'comercial@example.com');
+    formData.append('departments', 'commercial');
+    formData.append('permissionCodes', 'commercial:view');
+    mockedRedirect.mockImplementationOnce((destination) => {
+      throw new Error(`NEXT_REDIRECT:${destination}`);
+    });
+
+    await expect(updateTenantUserAction(userId, formData)).rejects.toThrow(
+      `NEXT_REDIRECT:/users/${userId}?success=Usuário atualizado com sucesso.`,
+    );
+    expect(updateUser).toHaveBeenCalledWith(userId, {
+      name: 'Usuário Comercial',
+      email: 'comercial@example.com',
+      departments: ['commercial'],
+      permissionCodes: ['commercial:view'],
+      maritalStatus: 'not-informed',
+      militaryDocumentStatus: 'pending-confirmation',
+      dependents: [],
+    });
+    expect(updateUser).toHaveBeenCalledWith(
+      userId,
+      expect.not.objectContaining({ documentAccessMode: expect.anything() }),
+    );
+  });
+
+  it('preserves and updates an existing legacy client account without converting it', async () => {
+    getUser.mockResolvedValueOnce({
+      ...currentUser,
+      documentAccessMode: 'client',
+      clientCategory: 'legal-entity',
+      routingCompanyId: '11111111-1111-4111-8111-111111111111',
+      departments: ['client-company'],
+      permissionCodes: [],
+    });
+
+    await expect(
+      updateTenantUserFormAction('00000000-0000-4000-8000-000000000001', {
+        name: 'Cliente Legado',
+        email: 'cliente@example.com',
+        isAdministrator: false,
+        documentAccessMode: 'client',
+        clientCategory: 'legal-entity',
+        routingCompanyId: '11111111-1111-4111-8111-111111111111',
+        departments: ['client-company'],
+        permissionCodes: [],
+      }),
+    ).resolves.toMatchObject({ success: true });
+
+    expect(updateUser).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000001',
+      expect.objectContaining({
+        clientCategory: 'legal-entity',
+        routingCompanyId: '11111111-1111-4111-8111-111111111111',
+      }),
+    );
+    expect(updateUser).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000001',
+      expect.not.objectContaining({ documentAccessMode: expect.anything() }),
+    );
   });
 });

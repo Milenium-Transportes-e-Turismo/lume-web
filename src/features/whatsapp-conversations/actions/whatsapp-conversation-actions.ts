@@ -11,8 +11,6 @@ import type {
 import {
   archiveWhatsAppConversationForDashboard,
   changeWhatsAppConversationDepartmentForDashboard,
-  closeWhatsAppConversationForDashboard,
-  closeWhatsAppConversationAfterRejectionForDashboard,
   forwardWhatsAppConversationForDashboard,
   markWhatsAppConversationAsReadForDashboard,
   pollWhatsAppConversationForDashboard,
@@ -22,7 +20,7 @@ import {
   takeOverWhatsAppConversationForDashboard,
   unarchiveWhatsAppConversationForDashboard,
 } from '../server';
-import { hasPermission } from '@/features/auth/domain';
+import { hasCommercialScope, hasPermission } from '@/features/auth/domain';
 import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 
 export interface VersionedWhatsAppConversationActionInput {
@@ -32,10 +30,6 @@ export interface VersionedWhatsAppConversationActionInput {
 
 export interface ForwardWhatsAppConversationActionInput extends VersionedWhatsAppConversationActionInput {
   readonly targetDepartment: unknown;
-}
-
-export interface CloseWhatsAppConversationActionInput extends VersionedWhatsAppConversationActionInput {
-  readonly reason?: unknown;
 }
 
 export interface SendHumanWhatsAppMessageActionInput extends VersionedWhatsAppConversationActionInput {
@@ -109,7 +103,11 @@ export async function startWhatsAppConversationAction(input: {
 
 async function isAuthorized(): Promise<boolean> {
   const session = await getCurrentAuthenticatedSession();
-  return session !== null && hasPermission(session.user, 'whatsapp-conversations:manage');
+  return (
+    session !== null &&
+    hasCommercialScope(session.user) &&
+    hasPermission(session.user, 'whatsapp-conversations:manage')
+  );
 }
 
 async function reloadAfterConflict(
@@ -225,6 +223,16 @@ async function executeAction(
     };
   }
 
+  return executeAuthorizedAction(input, operation);
+}
+
+async function executeAuthorizedAction(
+  input: VersionedWhatsAppConversationActionInput,
+  operation: (
+    conversationId: unknown,
+    expectedVersion: unknown,
+  ) => Promise<WhatsAppConversation | null>,
+): Promise<WhatsAppConversationActionResult> {
   try {
     const conversation = await operation(input.conversationId, input.expectedVersion);
 
@@ -258,7 +266,35 @@ export async function takeOverWhatsAppConversationAction(
 export async function returnWhatsAppConversationToBotAction(
   input: VersionedWhatsAppConversationActionInput,
 ): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, returnWhatsAppConversationToBotForDashboard);
+  const session = await getCurrentAuthenticatedSession();
+  if (
+    session === null ||
+    !hasCommercialScope(session.user) ||
+    !hasPermission(session.user, 'whatsapp-conversations:manage')
+  ) {
+    return {
+      success: false,
+      code: 'forbidden',
+      message: 'Você não tem permissão para alterar esta conversa.',
+    };
+  }
+
+  try {
+    const current = await pollWhatsAppConversationForDashboard(input.conversationId);
+    if (current === null) return invalidVersionedAction();
+    if (current.assignedTo?.id !== session.user.id) {
+      return {
+        success: false,
+        code: 'forbidden',
+        message: 'Somente o atendente responsável pode encerrar este atendimento humano.',
+        conversation: current,
+      };
+    }
+  } catch (error) {
+    return standardActionFailure(error);
+  }
+
+  return executeAuthorizedAction(input, returnWhatsAppConversationToBotForDashboard);
 }
 
 export async function markWhatsAppConversationAsReadAction(
@@ -290,20 +326,6 @@ export async function markWhatsAppConversationAsReadAction(
 
     return standardActionFailure(error);
   }
-}
-
-export async function closeWhatsAppConversationAfterRejectionAction(
-  input: VersionedWhatsAppConversationActionInput,
-): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, closeWhatsAppConversationAfterRejectionForDashboard);
-}
-
-export async function closeWhatsAppConversationAction(
-  input: CloseWhatsAppConversationActionInput,
-): Promise<WhatsAppConversationActionResult> {
-  return executeAction(input, (conversationId, expectedVersion) =>
-    closeWhatsAppConversationForDashboard(conversationId, expectedVersion, input.reason),
-  );
 }
 
 export async function forwardWhatsAppConversationAction(
