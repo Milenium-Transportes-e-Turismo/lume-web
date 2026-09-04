@@ -33,6 +33,7 @@ const mockedPending = jest.mocked(getPendingQuoteProposalsForDashboard);
 function createSession(
   permissions: readonly Permission[],
   departments: readonly string[] = ['commercial'],
+  isAdministrator = false,
 ): AuthenticatedSession {
   return {
     version: AUTHENTICATED_SESSION_VERSION,
@@ -45,6 +46,7 @@ function createSession(
       permissions,
       clientCategory: null,
       isActive: true,
+      isAdministrator,
     },
     issuedAt: '2026-07-21T12:00:00.000Z',
     expiresAt: '2026-07-21T20:00:00.000Z',
@@ -91,6 +93,16 @@ describe('quote proposals parent route', () => {
 
     expect(result.props.initialTab).toBe('approved');
     expect(result.props.pendingTotal).toBe(2);
+    expect(mockedRedirect).not.toHaveBeenCalled();
+  });
+
+  it('renders the queues for an administrator without Commercial department', async () => {
+    mockedSession.mockResolvedValue(createSession([], [], true));
+
+    const result = await Page({ searchParams: Promise.resolve({}) });
+
+    expect(result.props.pendingTotal).toBe(2);
+    expect(result.props.canManage).toBe(true);
     expect(mockedRedirect).not.toHaveBeenCalled();
   });
 

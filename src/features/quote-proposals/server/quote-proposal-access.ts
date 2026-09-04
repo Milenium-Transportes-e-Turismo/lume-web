@@ -8,6 +8,9 @@ const QUOTE_PROPOSAL_READ_PERMISSIONS = [
 ] as const;
 
 export function canReadQuoteProposals(user: User): boolean {
+  if (!user.isActive) return false;
+  if (user.isAdministrator === true) return true;
+
   return (
     hasCommercialScope(user) &&
     QUOTE_PROPOSAL_READ_PERMISSIONS.some((permission) => hasPermission(user, permission))
@@ -15,6 +18,9 @@ export function canReadQuoteProposals(user: User): boolean {
 }
 
 export function canManageQuoteProposals(user: User): boolean {
+  if (!user.isActive) return false;
+  if (user.isAdministrator === true) return true;
+
   return (
     hasCommercialScope(user) &&
     (hasPermission(user, 'whatsapp-conversations:manage') ||
