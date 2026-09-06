@@ -16,7 +16,7 @@ export default async function NewClientPage({
   const search = await searchParams;
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-8">
+      <main className="lume-page max-w-5xl space-y-6">
         <PageFeedbackToast error={search.error} />
         <header className="flex items-end justify-between gap-4">
           <div>

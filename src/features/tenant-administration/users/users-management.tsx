@@ -54,6 +54,7 @@ import {
 } from '@/features/tenant-administration/permissions/permission-labels';
 import { Button } from '@/shared/ui/button';
 import { formatActionResultDescription } from '@/shared/lib/action-result-feedback';
+import { SelectAllCheckbox } from '@/shared/select-all-checkbox';
 import { Checkbox } from '@/shared/ui/checkbox';
 import {
   Dialog,
@@ -83,7 +84,13 @@ import {
 } from '@/shared/ui/field';
 import { Input } from '@/shared/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/shared/ui/native-select';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/form-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { Textarea } from '@/shared/ui/textarea';
 import { toast } from '@/shared/ui/toast';
@@ -147,14 +154,11 @@ function AssignmentCheckboxes({
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {name === 'departments' ? (
         <Field orientation="horizontal" className="sm:col-span-2 lg:col-span-3">
-          <Checkbox
+          <SelectAllCheckbox
             id="departments-all"
+            availableValues={values}
+            selectedValues={field.value}
             disabled={disabled}
-            checked={values.length > 0 && values.every((value) => field.value.includes(value))}
-            indeterminate={
-              values.some((value) => field.value.includes(value)) &&
-              !values.every((value) => field.value.includes(value))
-            }
             onCheckedChange={(checked) => field.onChange(checked ? [...values] : [])}
           />
           <FieldLabel htmlFor="departments-all">Selecionar todos</FieldLabel>
@@ -212,9 +216,6 @@ function PermissionFields({
     <div className="grid gap-3 lg:grid-cols-2">
       {[...groups].map(([resource, codes]) => {
         const resourceLabel = getPermissionResourceLabel(resource);
-        const selectedCount = codes.filter((code) => field.value.includes(code)).length;
-        const allSelected = selectedCount === codes.length;
-        const partiallySelected = selectedCount > 0 && !allSelected;
         const selectAllId = `permission-${resource}-all`;
 
         return (
@@ -224,10 +225,10 @@ function PermissionFields({
               <h3 className="font-semibold">{resourceLabel}</h3>
             </div>
             <Field orientation="horizontal" className="mb-3 border-b pb-3">
-              <Checkbox
+              <SelectAllCheckbox
                 id={selectAllId}
-                checked={allSelected}
-                indeterminate={partiallySelected}
+                availableValues={codes}
+                selectedValues={field.value}
                 disabled={disabled}
                 aria-label={`Selecionar todas em ${resourceLabel}`}
                 onCheckedChange={(checked) => {

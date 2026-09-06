@@ -47,6 +47,7 @@ export interface RouteLocationSuggestion {
   readonly lng: number;
 }
 export interface RoutePlannerGateway {
+  reverseLocation(lat: number, lng: number): Promise<RouteLocationSuggestion>;
   searchLocations(query: string): Promise<readonly RouteLocationSuggestion[]>;
   calculate(payload: CalculateRoutePayload): Promise<RouteCalculation>;
 }

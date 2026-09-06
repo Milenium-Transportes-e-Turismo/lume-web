@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Activity, Clock3, Database, TriangleAlert, UsersRound } from 'lucide-react';
 import Link from 'next/link';
 
@@ -80,12 +81,14 @@ export function paginationItems(
 
 export function ApiUsageDashboard({
   summary,
-  requests,
+  requests = { data: [], meta: { page: 1, pageSize: 25, total: 0, totalPages: 0 } },
+  activity,
   users,
   filters,
 }: {
   readonly summary: ApiUsageSummary;
-  readonly requests: ApiUsageRequestList;
+  readonly requests?: ApiUsageRequestList;
+  readonly activity?: ReactNode;
   readonly users: TenantUserList;
   readonly filters: ApiUsageDashboardFilters;
 }) {
@@ -116,7 +119,7 @@ export function ApiUsageDashboard({
       <header className="space-y-1">
         <p className="text-sm font-medium text-primary-emphasis">Administração da plataforma</p>
         <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-          Uso e desempenho
+          Administração
         </h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Acompanhe volume, transferência e tempo das ações realizadas na Lume. Conteúdo de
@@ -141,7 +144,7 @@ export function ApiUsageDashboard({
           <select
             name="userId"
             defaultValue={filters.userId ?? ''}
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-8 w-full rounded-lg border border-input bg-background pl-2.5 pr-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="">Todos os usuários</option>
             {users.data.map((user) => (
@@ -156,7 +159,7 @@ export function ApiUsageDashboard({
           <select
             name="status"
             defaultValue={filters.status ?? ''}
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-8 w-full rounded-lg border border-input bg-background pl-2.5 pr-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="">Todos os resultados</option>
             <option value="success">Concluídas</option>
@@ -257,133 +260,135 @@ export function ApiUsageDashboard({
         </CardContent>
       </Card>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Atividade recente</CardTitle>
-          <CardDescription>{requests.meta.total} registros encontrados.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Ação</TableHead>
-                  <TableHead>Resultado</TableHead>
-                  <TableHead>Dados</TableHead>
-                  <TableHead>Duração</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.data.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell>{formatDateTime(request.createdAt)}</TableCell>
-                    <TableCell>
-                      <p className="font-medium">{request.user.name}</p>
-                      {request.user.email && (
-                        <p className="text-xs text-muted-foreground">{request.user.email}</p>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-normal">{request.action}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-medium ${resultTone(request.statusCode)}`}
-                      >
-                        {request.result}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {formatBytes(request.requestBytes + request.responseBytes)}
-                    </TableCell>
-                    <TableCell>{request.durationMs} ms</TableCell>
+      {activity ?? (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle>Atividade recente</CardTitle>
+            <CardDescription>{requests.meta.total} registros encontrados.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Ação</TableHead>
+                    <TableHead>Resultado</TableHead>
+                    <TableHead>Dados</TableHead>
+                    <TableHead>Duração</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="grid gap-3 md:hidden">
-            {requests.data.map((request) => (
-              <article key={request.id} className="rounded-lg border p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium">{request.action}</p>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${resultTone(request.statusCode)}`}
-                  >
-                    {request.result}
-                  </span>
-                </div>
-                <p className="mt-2">{request.user.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatDateTime(request.createdAt)} ·{' '}
-                  {formatBytes(request.requestBytes + request.responseBytes)} · {request.durationMs}{' '}
-                  ms
-                </p>
-              </article>
-            ))}
-          </div>
-          {requests.meta.totalPages > 1 && (
-            <nav
-              aria-label="Paginação da atividade"
-              className="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:justify-end"
-            >
-              <Button
-                render={
-                  <Link
-                    href={`/administration?${queryString(filters, Math.max(1, filters.page - 1))}`}
-                  />
-                }
-                variant="outline"
-                disabled={filters.page <= 1}
-              >
-                Anterior
-              </Button>
-              <div
-                className="flex flex-wrap items-center justify-center gap-1"
-                aria-label="Páginas"
-              >
-                {paginationItems(filters.page, requests.meta.totalPages).map((item) =>
-                  typeof item === 'number' ? (
-                    <Button
-                      key={item}
-                      render={
-                        <Link
-                          href={`/administration?${queryString(filters, item)}`}
-                          aria-label={`Ir para a página ${item}`}
-                        />
-                      }
-                      variant={item === filters.page ? 'default' : 'outline'}
-                      size="icon-sm"
-                      aria-current={item === filters.page ? 'page' : undefined}
-                    >
-                      {item}
-                    </Button>
-                  ) : (
+                </TableHeader>
+                <TableBody>
+                  {requests.data.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell>{formatDateTime(request.createdAt)}</TableCell>
+                      <TableCell>
+                        <p className="font-medium">{request.user.name}</p>
+                        {request.user.email && (
+                          <p className="text-xs text-muted-foreground">{request.user.email}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-normal">{request.action}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${resultTone(request.statusCode)}`}
+                        >
+                          {request.result}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {formatBytes(request.requestBytes + request.responseBytes)}
+                      </TableCell>
+                      <TableCell>{request.durationMs} ms</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="grid gap-3 md:hidden">
+              {requests.data.map((request) => (
+                <article key={request.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium">{request.action}</p>
                     <span
-                      key={item}
-                      className="px-1 text-sm text-muted-foreground"
-                      aria-hidden="true"
+                      className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${resultTone(request.statusCode)}`}
                     >
-                      …
+                      {request.result}
                     </span>
-                  ),
-                )}
-              </div>
-              <Button
-                render={
-                  <Link
-                    href={`/administration?${queryString(filters, Math.min(requests.meta.totalPages, filters.page + 1))}`}
-                  />
-                }
-                variant="outline"
-                disabled={filters.page >= requests.meta.totalPages}
+                  </div>
+                  <p className="mt-2">{request.user.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(request.createdAt)} ·{' '}
+                    {formatBytes(request.requestBytes + request.responseBytes)} ·{' '}
+                    {request.durationMs} ms
+                  </p>
+                </article>
+              ))}
+            </div>
+            {requests.meta.totalPages > 1 && (
+              <nav
+                aria-label="Paginação da atividade"
+                className="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:justify-end"
               >
-                Próxima
-              </Button>
-            </nav>
-          )}
-        </CardContent>
-      </Card>
+                <Button
+                  render={
+                    <Link
+                      href={`/administration?${queryString(filters, Math.max(1, filters.page - 1))}`}
+                    />
+                  }
+                  variant="outline"
+                  disabled={filters.page <= 1}
+                >
+                  Anterior
+                </Button>
+                <div
+                  className="flex flex-wrap items-center justify-center gap-1"
+                  aria-label="Páginas"
+                >
+                  {paginationItems(filters.page, requests.meta.totalPages).map((item) =>
+                    typeof item === 'number' ? (
+                      <Button
+                        key={item}
+                        render={
+                          <Link
+                            href={`/administration?${queryString(filters, item)}`}
+                            aria-label={`Ir para a página ${item}`}
+                          />
+                        }
+                        variant={item === filters.page ? 'default' : 'outline'}
+                        size="icon-sm"
+                        aria-current={item === filters.page ? 'page' : undefined}
+                      >
+                        {item}
+                      </Button>
+                    ) : (
+                      <span
+                        key={item}
+                        className="px-1 text-sm text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        …
+                      </span>
+                    ),
+                  )}
+                </div>
+                <Button
+                  render={
+                    <Link
+                      href={`/administration?${queryString(filters, Math.min(requests.meta.totalPages, filters.page + 1))}`}
+                    />
+                  }
+                  variant="outline"
+                  disabled={filters.page >= requests.meta.totalPages}
+                >
+                  Próxima
+                </Button>
+              </nav>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -105,7 +105,7 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage session={employeeSession} conversations={conversations} />);
 
-    expect(document.querySelector('main div.mx-auto')).toHaveClass('py-5', 'sm:py-6');
+    expect(document.querySelector('main .lume-page')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         name: 'Dashboard Comercial',

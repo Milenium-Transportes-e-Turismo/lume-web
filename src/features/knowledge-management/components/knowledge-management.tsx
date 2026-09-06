@@ -693,7 +693,7 @@ export function KnowledgeManagement({
           <section className="rounded-xl border bg-card p-2" aria-label="Documentos">
             <div className="relative mb-2">
               <Search
-                className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground"
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"
                 aria-hidden="true"
               />
               <Input

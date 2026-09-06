@@ -44,7 +44,7 @@ describe('AiAgentsPage', () => {
   it('presents the protected catalog and marks its navigation item as current', () => {
     render(<AiAgentsPage session={session} initialAgents={[]} initialExecutions={null} />);
 
-    expect(document.querySelector('main div.mx-auto')).toHaveClass('max-w-[1800px]');
+    expect(document.querySelector('main .lume-page')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agentes de IA' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Agentes de IA' })[0]).toHaveAttribute(
       'aria-current',

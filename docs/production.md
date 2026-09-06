@@ -165,3 +165,15 @@ sondas. O frontend não executa migrations e seu rollback não deve reverter o
 banco da Tenant API.
 
 > Revisão 2026-09-06: o planejador passou para Leaflet/OpenStreetMap. As referências acima a MapLibre e MAP_STYLE_URL são históricas; essa variável não controla o novo mapa.
+
+## Ajustes de interface e atividade administrativa — setembro de 2026
+
+As páginas de conteúdo usam lume-page para espaçamento responsivo consistente. Roteirização e conversas mantêm suas áreas de trabalho próprias. Os seletores de domínio compõem os componentes instalados por meio de shared/form-select; textos extensos quebram linha sem sobrepor a seta.
+
+SelectAllCheckbox é usado em todos os controles de seleção coletiva de departamentos, permissões e documentos. Somente a seleção de todas as opções disponíveis marca o controle; seleção parcial permanece desmarcada e acionável.
+
+Origem, destino e paradas compartilham a busca de cidade, endereço e CEP. Pontos no mapa são identificados pela Tenant API e os rótulos acompanham as coordenadas no cálculo. Respostas antigas são canceladas ao mudar de campo ou limpar o trajeto.
+
+O modal de pareamento consulta o estado autorizado do canal e o QR atual a cada oito segundos, oculta códigos em falhas/expiração e encerra consultas ao fechar. A conexão só é anunciada após confirmação do provedor e sincronização versionada na API.
+
+O painel administrativo reúne auditoria e uso recente em uma lista com paginação cronológica no servidor. O filtro de resultado limita a registros de requisição, pois eventos de auditoria não possuem código HTTP. Não existe correlação presumida entre requisições e comandos distintos.

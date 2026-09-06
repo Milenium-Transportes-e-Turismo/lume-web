@@ -1,3 +1,4 @@
+import type { ApiUsageResultFilter } from '../domain';
 import { z } from 'zod';
 
 import {
@@ -361,11 +362,23 @@ export class TenantApiAdministrationGateway implements TenantAdministrationGatew
     page?: number;
     pageSize?: number;
     userId?: string;
+    includeActivity?: boolean;
+    status?: ApiUsageResultFilter;
   }) {
     return parseApiResponse(
       z.object({
         data: z.array(
           z.object({
+            kind: z.enum(['operation', 'request']).optional(),
+            request: z
+              .object({
+                statusCode: z.number(),
+                requestBytes: z.number(),
+                responseBytes: z.number(),
+                durationMs: z.number(),
+              })
+              .nullable()
+              .optional(),
             id: z.string(),
             actor: z.string(),
             actorId: z.string().nullable(),
@@ -395,8 +408,17 @@ export class TenantApiAdministrationGateway implements TenantAdministrationGatew
         }),
       }),
       await this.request(
-        '/administration/usage/operations' +
-          searchParams({ ...query, page: query.page ?? 1, pageSize: query.pageSize ?? 25 }),
+        (query.includeActivity
+          ? '/administration/usage/activity'
+          : '/administration/usage/operations') +
+          searchParams({
+            from: query.from,
+            to: query.to,
+            userId: query.userId,
+            status: query.status,
+            page: query.page ?? 1,
+            pageSize: query.pageSize ?? 25,
+          }),
       ),
     );
   }

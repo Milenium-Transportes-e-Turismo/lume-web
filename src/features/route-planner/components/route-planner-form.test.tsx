@@ -50,3 +50,40 @@ it('keeps selected coordinates consistent when reversing and clearing the trip',
     jest.useRealTimers();
   }
 });
+
+it('uses the same intelligent CEP search for stops and removes their selected coordinates', async () => {
+  jest.useFakeTimers();
+  const originalFetch = global.fetch;
+  const stop = {
+    id: 'cep:01001000',
+    label: 'Praça da Sé, São Paulo · CEP 01001-000',
+    lat: -23.55,
+    lng: -46.63,
+  };
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => [stop] });
+  try {
+    const view = render(<RoutePlannerForm canCalculate />);
+    fireEvent.click(screen.getByRole('button', { name: 'Parada' }));
+    const input = screen.getByRole('combobox', { name: 'Parada 1' });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '01001-000' } });
+    await act(async () => {
+      jest.advanceTimersByTime(450);
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('01001-000'),
+      expect.any(Object),
+    );
+    fireEvent.click(screen.getByRole('option', { name: stop.label }));
+    expect(input).toHaveValue(stop.label);
+    const form = view.container.querySelector('form')!;
+    const key = new FormData(form).get('waypointKey') as string;
+    expect(new FormData(form).get(key + 'Lat')).toBe(String(stop.lat));
+    fireEvent.click(screen.getByRole('button', { name: 'Remover parada 1' }));
+    expect(new FormData(form).has('waypointKey')).toBe(false);
+    expect(new FormData(form).has(key + 'Lat')).toBe(false);
+  } finally {
+    global.fetch = originalFetch;
+    jest.useRealTimers();
+  }
+});

@@ -5,7 +5,13 @@ import * as React from 'react';
 
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/form-select';
 
 import {
   filterQuoteProposalsByCategory,

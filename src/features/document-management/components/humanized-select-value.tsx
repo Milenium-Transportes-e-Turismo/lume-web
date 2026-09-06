@@ -1,6 +1,6 @@
 'use client';
 
-import { SelectValue } from '@/shared/ui/select';
+import { SelectValue } from '@/shared/form-select';
 
 export function HumanizedSelectValue({
   labels,

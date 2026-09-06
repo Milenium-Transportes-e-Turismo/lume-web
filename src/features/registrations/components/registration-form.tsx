@@ -18,7 +18,13 @@ import { Checkbox } from '@/shared/ui/checkbox';
 import { Textarea } from '@/shared/ui/textarea';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/form-select';
 import { Switch } from '@/shared/ui/switch';
 import { formatCnpjInput, formatCpfInput } from '@/shared/utils/brazilian-data';
 import { formatPersonName } from '@/shared/utils/person-name';

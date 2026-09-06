@@ -65,6 +65,8 @@ export interface TenantAdministrationGateway {
     page?: number;
     pageSize?: number;
     userId?: string;
+    includeActivity?: boolean;
+    status?: ApiUsageResultFilter;
   }): Promise<import('../domain/api-usage').AuditOperationList>;
   getApiUsageSummary(query?: { from?: string; to?: string }): Promise<ApiUsageSummary>;
   listApiUsageRequests(query?: {

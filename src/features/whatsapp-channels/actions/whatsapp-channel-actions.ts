@@ -12,6 +12,7 @@ import {
   type ManagedWhatsAppChannel,
   type WhatsAppChannelAction,
   type WhatsAppChannelOperationResult,
+  type WhatsAppChannelPairingStatus,
 } from '../domain';
 import {
   executeAuthenticatedWhatsAppChannelMutation,
@@ -257,5 +258,31 @@ export async function executeWhatsAppChannelAction(
     const channel = await conflictChannel(error, parsed.data.channelId);
     const result = failure(error, 'Não foi possível executar a ação no canal.');
     return channel ? { ...result, channel } : result;
+  }
+}
+
+export async function loadWhatsAppChannelPairingAction(
+  channelId: string,
+): Promise<
+  | { readonly success: true; readonly pairing: WhatsAppChannelPairingStatus }
+  | { readonly success: false; readonly message: string; readonly publicCode: string }
+> {
+  if (!(await authorized('whatsapp-channels:connect'))) {
+    return {
+      success: false,
+      message: 'Você não tem permissão para conectar este canal.',
+      publicCode: 'FORBIDDEN',
+    };
+  }
+  if (!z.string().uuid().safeParse(channelId).success) {
+    return { success: false, message: 'Canal inválido.', publicCode: 'VALIDATION_ERROR' };
+  }
+  try {
+    const pairing = await executeAuthenticatedWhatsAppChannelRequest((gateway) =>
+      gateway.pairing(channelId),
+    );
+    return { success: true, pairing };
+  } catch (error) {
+    return failure(error, 'Não foi possível atualizar o QR code. Tente novamente.');
   }
 }

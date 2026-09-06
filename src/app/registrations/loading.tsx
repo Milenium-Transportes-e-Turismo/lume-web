@@ -3,7 +3,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 
 export default function RegistrationsLoading() {
   return (
-    <main className="mx-auto w-full max-w-[96rem] space-y-4 p-4 md:p-6" aria-busy="true">
+    <main className="lume-page space-y-4" aria-busy="true">
       <div className="space-y-2">
         <Skeleton className="h-8 w-52" />
         <Skeleton className="h-4 w-full max-w-xl" />

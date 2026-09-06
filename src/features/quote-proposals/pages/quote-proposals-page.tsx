@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
 import { QuoteProposalArchive, QuoteProposalWorkspace } from '../components';
 import type { PendingQuoteProposal, QuoteProposalCategory } from '../domain';
 
-const contentClassName = 'mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8';
+const contentClassName = 'lume-page';
 
 export type QuoteProposalTab = 'pending' | 'sent' | 'approved' | 'cancelled';
 

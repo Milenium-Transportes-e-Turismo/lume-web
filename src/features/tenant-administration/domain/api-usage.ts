@@ -57,6 +57,13 @@ export type ApiUsageResultFilter = 'success' | 'client-error' | 'server-error';
 
 export interface AuditOperationList {
   readonly data: readonly {
+    readonly kind?: 'operation' | 'request';
+    readonly request?: {
+      readonly statusCode: number;
+      readonly requestBytes: number;
+      readonly responseBytes: number;
+      readonly durationMs: number;
+    } | null;
     readonly id: string;
     readonly actor: string;
     readonly actorId: string | null;

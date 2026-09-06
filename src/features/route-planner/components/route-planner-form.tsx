@@ -1,7 +1,7 @@
 'use client';
 import { ArrowDownUp, Calculator, CirclePlus, MapPin, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useMemo, useState, useRef, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -22,7 +22,7 @@ const INITIAL: RoutePlannerActionState = {
 };
 const RouteMap = dynamic(() => import('./route-map').then((module) => module.RouteMap), {
   ssr: false,
-  loading: () => <div className="h-full min-h-[460px] animate-pulse bg-muted" />,
+  loading: () => <div className="h-full min-h-0 animate-pulse bg-muted" />,
 });
 function currency(value: number | null) {
   return value === null
@@ -77,36 +77,78 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
   const [selectedDestination, setSelectedDestination] = useState<RouteLocationSuggestion | null>(
     null,
   );
-  const [waypoints, setWaypoints] = useState<{ id: number; value: string }[]>([]);
+  const [waypoints, setWaypoints] = useState<
+    { id: number; value: string; selected: RouteLocationSuggestion | null }[]
+  >([]);
   const [target, setTarget] = useState<string>('origin');
   const [changed, setChanged] = useState(false);
   const points = useMemo(
     () => [
       selectedOrigin ? selectedOrigin.lat + ', ' + selectedOrigin.lng : origin,
-      ...waypoints.map((point) => point.value),
+      ...waypoints.map((point) =>
+        point.selected ? point.selected.lat + ', ' + point.selected.lng : point.value,
+      ),
       selectedDestination ? selectedDestination.lat + ', ' + selectedDestination.lng : destination,
     ],
     [origin, destination, waypoints, selectedOrigin, selectedDestination],
   );
   const result = changed || calculating ? null : state.result;
-  function pick(lat: number, lng: number) {
-    const value = lat.toFixed(6) + ', ' + lng.toFixed(6);
+  const pendingPick = useRef<AbortController | null>(null);
+  const waypointSequence = useRef(0);
+  useEffect(() => () => pendingPick.current?.abort(), []);
+  const [picking, setPicking] = useState(false);
+  const [pickError, setPickError] = useState('');
+  function cancelPick() {
+    pendingPick.current?.abort();
+    pendingPick.current = null;
+    setPicking(false);
+  }
+  async function pick(lat: number, lng: number) {
+    cancelPick();
+    const abort = new AbortController();
+    pendingPick.current = abort;
+    const field = target;
+    setPicking(true);
+    setPickError('');
     setChanged(true);
-    if (target === 'origin') {
-      setOrigin(value);
-      setSelectedOrigin(null);
-      setTarget('destination');
-    } else if (target === 'destination') {
-      setDestination(value);
-      setSelectedDestination(null);
-    } else
-      setWaypoints((current) =>
-        current.map((point) => (String(point.id) === target ? { ...point, value } : point)),
-      );
+    try {
+      const response = await fetch('/api/routing/locations/reverse?lat=' + lat + '&lng=' + lng, {
+        signal: abort.signal,
+        cache: 'no-store',
+      });
+      const item = (await response.json()) as RouteLocationSuggestion & { message?: string };
+      if (!response.ok) throw new Error(item.message ?? 'Não foi possível identificar o ponto.');
+      if (abort.signal.aborted) return;
+      if (field === 'origin') {
+        setOrigin(item.label);
+        setSelectedOrigin(item);
+        setTarget('destination');
+      } else if (field === 'destination') {
+        setDestination(item.label);
+        setSelectedDestination(item);
+      } else
+        setWaypoints((current) =>
+          current.map((point) =>
+            String(point.id) === field ? { ...point, value: item.label, selected: item } : point,
+          ),
+        );
+    } catch (error) {
+      if (!abort.signal.aborted)
+        setPickError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível identificar o local. Tente outro ponto ou pesquise o endereço.',
+        );
+    } finally {
+      if (!abort.signal.aborted) {
+        setPicking(false);
+        pendingPick.current = null;
+      }
+    }
   }
   return (
-    <div className="grid overflow-hidden rounded-xl border bg-background lg:h-[calc(100dvh-180px)] lg:min-h-[650px] lg:grid-cols-[380px_minmax(0,1fr)]">
-      <aside className="min-w-0 space-y-5 p-4 lg:overflow-y-auto">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(14rem,45%)] overflow-hidden bg-background lg:grid-cols-[360px_minmax(0,1fr)] lg:grid-rows-1">
+      <aside className="min-h-0 min-w-0 space-y-4 overflow-y-auto p-4">
         <h2 className="font-semibold">Planejar viagem</h2>
         <form
           action={action}
@@ -124,50 +166,72 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
             label="Origem"
             value={origin}
             selected={selectedOrigin}
-            onFocus={() => setTarget('origin')}
+            onFocus={() => {
+              cancelPick();
+              setTarget('origin');
+            }}
             onChange={(value) => {
+              cancelPick();
               setOrigin(value);
               setSelectedOrigin(null);
               setChanged(true);
             }}
             onSelect={(item) => {
+              cancelPick();
               setOrigin(item.label);
               setSelectedOrigin(item);
               setChanged(true);
             }}
           />
           {waypoints.map((point, index) => (
-            <div key={point.id} className="flex items-end gap-2">
-              <div className="min-w-0 flex-1 space-y-2">
-                <Label htmlFor={'waypoint-' + point.id}>Parada {index + 1}</Label>
-                <Input
+            <div key={point.id} className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <input type="hidden" name="waypointKey" value={'waypoint-' + point.id} />
+                <RouteLocationInput
+                  trailingAction={
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      aria-label={'Remover parada ' + (index + 1)}
+                      onClick={() => {
+                        cancelPick();
+                        setWaypoints((current) => current.filter((item) => item.id !== point.id));
+                        setChanged(true);
+                        setTarget('destination');
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  }
                   id={'waypoint-' + point.id}
-                  name="waypoint"
+                  label={'Parada ' + (index + 1)}
                   value={point.value}
-                  onFocus={() => setTarget(String(point.id))}
-                  onChange={(event) =>
+                  selected={point.selected}
+                  onFocus={() => {
+                    cancelPick();
+                    setTarget(String(point.id));
+                  }}
+                  onChange={(value) => {
+                    cancelPick();
                     setWaypoints((current) =>
                       current.map((item) =>
-                        item.id === point.id ? { ...item, value: event.target.value } : item,
+                        item.id === point.id ? { ...item, value, selected: null } : item,
                       ),
-                    )
-                  }
-                  required
+                    );
+                    setChanged(true);
+                  }}
+                  onSelect={(selected) => {
+                    cancelPick();
+                    setWaypoints((current) =>
+                      current.map((item) =>
+                        item.id === point.id ? { ...item, value: selected.label, selected } : item,
+                      ),
+                    );
+                    setChanged(true);
+                  }}
                 />
               </div>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                aria-label={'Remover parada ' + (index + 1)}
-                onClick={() => {
-                  setWaypoints((current) => current.filter((item) => item.id !== point.id));
-                  setChanged(true);
-                  setTarget('destination');
-                }}
-              >
-                <Trash2 />
-              </Button>
             </div>
           ))}
           <RouteLocationInput
@@ -175,13 +239,18 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
             label="Destino"
             value={destination}
             selected={selectedDestination}
-            onFocus={() => setTarget('destination')}
+            onFocus={() => {
+              cancelPick();
+              setTarget('destination');
+            }}
             onChange={(value) => {
+              cancelPick();
               setDestination(value);
               setSelectedDestination(null);
               setChanged(true);
             }}
             onSelect={(item) => {
+              cancelPick();
               setDestination(item.label);
               setSelectedDestination(item);
               setChanged(true);
@@ -194,8 +263,9 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
               size="sm"
               disabled={waypoints.length >= 10}
               onClick={() => {
-                const id = Date.now();
-                setWaypoints((current) => [...current, { id, value: '' }]);
+                cancelPick();
+                const id = ++waypointSequence.current;
+                setWaypoints((current) => [...current, { id, value: '', selected: null }]);
                 setTarget(String(id));
                 setChanged(true);
               }}
@@ -207,6 +277,7 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
               variant="outline"
               size="sm"
               onClick={() => {
+                cancelPick();
                 setSelectedOrigin(selectedDestination);
                 setSelectedDestination(selectedOrigin);
                 setOrigin(destination);
@@ -222,6 +293,7 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
               variant="ghost"
               size="sm"
               onClick={() => {
+                cancelPick();
                 setSelectedOrigin(null);
                 setSelectedDestination(null);
                 setOrigin('');
@@ -239,6 +311,16 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
             {target === 'origin' ? 'a origem' : target === 'destination' ? 'o destino' : 'a parada'}
             . Selecione outro campo para mudar.
           </p>
+          {picking ? (
+            <p role="status" className="text-sm">
+              Identificando o local no mapa…
+            </p>
+          ) : null}
+          {pickError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {pickError}
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="vehicleType">Veículo</Label>
@@ -246,7 +328,7 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
                 id="vehicleType"
                 name="vehicleType"
                 defaultValue="bus"
-                className="h-9 w-full rounded-lg border bg-background px-2 text-sm"
+                className="h-8 min-w-0 w-full rounded-lg border border-input bg-background pl-2.5 pr-8 text-sm"
               >
                 <option value="car">Automóvel</option>
                 <option value="van">Van</option>
@@ -310,7 +392,7 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
             <input type="checkbox" name="roundTrip" className="size-4 accent-primary" /> Calcular
             ida e volta
           </label>
-          <Submit allowed={canCalculate} />
+          <Submit allowed={canCalculate && !picking} />
         </form>
         {state.status === 'error' && (
           <div
@@ -358,7 +440,7 @@ export function RoutePlannerForm({ canCalculate }: { readonly canCalculate: bool
         )}
       </aside>
       <section
-        className="h-[55dvh] min-h-[460px] border-t lg:h-full lg:border-l lg:border-t-0"
+        className="h-full min-h-0 border-t lg:border-l lg:border-t-0"
         aria-label="Trajeto no mapa"
       >
         <RouteMap calculation={result} points={points} onPick={pick} />

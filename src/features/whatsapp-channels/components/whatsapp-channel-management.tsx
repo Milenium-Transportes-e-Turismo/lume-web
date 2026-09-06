@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { WhatsAppChannelPairingDialog } from './whatsapp-channel-pairing-dialog';
 import { useMemo, useRef, useState, useTransition } from 'react';
 import {
   AlertTriangle,
@@ -27,7 +27,6 @@ import {
 import {
   WHATSAPP_CHANNEL_CONNECTION_STATUSES,
   WHATSAPP_CHANNEL_ORGANIZATIONAL_STATUSES,
-  whatsappChannelQrDataUrl,
   type ManagedWhatsAppChannel,
   type WhatsAppChannelAction,
   type WhatsAppChannelConnectionStatus,
@@ -58,7 +57,7 @@ import {
 import { Input } from '@/shared/ui/input';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { Label } from '@/shared/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/form-select';
 
 const ORGANIZATIONAL_LABELS: Record<WhatsAppChannelOrganizationalStatus, string> = {
   pending: 'Configuração pendente',
@@ -297,7 +296,10 @@ export function WhatsAppChannelManagement({
   const [editOpen, setEditOpen] = useState(false);
   const [createDraft, setCreateDraft] = useState<ChannelDraft>(EMPTY_DRAFT);
   const [editDraft, setEditDraft] = useState<ChannelDraft>(EMPTY_DRAFT);
-  const [qrCode, setQrCode] = useState<WhatsAppChannelQrCode | null>(null);
+  const [pairingSession, setPairingSession] = useState<{
+    channelId: string;
+    qrCode: WhatsAppChannelQrCode | null;
+  } | null>(null);
   const [confirmation, setConfirmation] = useState<WhatsAppChannelAction | null>(null);
   const [isPending, startTransition] = useTransition();
   const createCommandId = useRef<string | null>(null);
@@ -370,7 +372,12 @@ export function WhatsAppChannelManagement({
         return;
       }
       replaceChannel(result.operation.channel);
-      setQrCode(result.operation.qrCode);
+      if (result.operation.qrCode) {
+        setPairingSession({
+          channelId: result.operation.channel.id,
+          qrCode: result.operation.qrCode,
+        });
+      }
       showSuccess(result.operation.providerIssue?.message ?? result.message);
       setCreateDraft(EMPTY_DRAFT);
       createCommandId.current = null;
@@ -424,7 +431,12 @@ export function WhatsAppChannelManagement({
         return;
       }
       replaceChannel(result.operation.channel);
-      setQrCode(result.operation.qrCode);
+      if (result.operation.qrCode) {
+        setPairingSession({
+          channelId: result.operation.channel.id,
+          qrCode: result.operation.qrCode,
+        });
+      }
       showSuccess(result.operation.providerIssue?.message ?? result.message);
     });
   }
@@ -849,37 +861,19 @@ export function WhatsAppChannelManagement({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={qrCode !== null}
-        onOpenChange={(open) => {
-          if (!open) setQrCode(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Conectar ao WhatsApp</DialogTitle>
-            <DialogDescription>
-              Abra o WhatsApp no celular e escaneie este código. O QR expira no provedor.
-            </DialogDescription>
-          </DialogHeader>
-          {qrCode ? (
-            <div className="mx-auto rounded-xl border bg-white p-3">
-              <Image
-                src={whatsappChannelQrDataUrl(qrCode)}
-                alt="QR code para conectar o canal WhatsApp"
-                width={280}
-                height={280}
-                unoptimized
-              />
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button type="button" onClick={() => setQrCode(null)}>
-              Concluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {pairingSession ? (
+        <WhatsAppChannelPairingDialog
+          key={pairingSession.channelId}
+          channelId={pairingSession.channelId}
+          initialQrCode={pairingSession.qrCode}
+          onClose={() => setPairingSession(null)}
+          onConnected={(channel) => {
+            replaceChannel(channel);
+            setPairingSession(null);
+            showSuccess('WhatsApp conectado com sucesso.');
+          }}
+        />
+      ) : null}
 
       <AlertDialog
         open={confirmation !== null}

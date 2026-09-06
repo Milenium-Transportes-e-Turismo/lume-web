@@ -35,7 +35,7 @@ export default async function DocumentsPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
+      <div className="lume-page space-y-6">
         <header>
           <p className="text-sm font-medium text-primary-emphasis">Área segura</p>
           <h1 className="text-2xl font-bold tracking-tight">Meus documentos</h1>

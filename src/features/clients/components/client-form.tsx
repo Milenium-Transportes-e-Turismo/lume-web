@@ -108,7 +108,7 @@ export function ClientForm({ action, client, initialValues }: ClientFormProps) {
               id="status"
               name="status"
               defaultValue={client?.status ?? 'active'}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="h-9 w-full rounded-md border bg-background pl-3 pr-8 text-sm"
             >
               <option value="active">Ativo</option>
               <option value="inactive">Inativo</option>

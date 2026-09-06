@@ -60,3 +60,10 @@ export function whatsappChannelQrDataUrl(qrCode: WhatsAppChannelQrCode): string 
     ? qrCode.base64
     : `data:image/png;base64,${qrCode.base64}`;
 }
+
+export interface WhatsAppChannelPairingStatus {
+  readonly channel: ManagedWhatsAppChannel;
+  readonly connectionStatus: WhatsAppChannelConnectionStatus;
+  readonly qrCode: WhatsAppChannelQrCode | null;
+  readonly providerIssue: WhatsAppChannelOperationResult['providerIssue'];
+}

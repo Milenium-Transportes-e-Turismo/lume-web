@@ -19,7 +19,7 @@ export default async function SupportRoute() {
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
+      <div className="lume-page max-w-6xl">
         <SupportPage
           requester={{
             name: profile.name,

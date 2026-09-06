@@ -1,5 +1,6 @@
 import type {
   ManagedWhatsAppChannel,
+  WhatsAppChannelPairingStatus,
   WhatsAppChannelAction,
   WhatsAppChannelOperationResult,
   WhatsAppChannelRoutingMode,
@@ -48,6 +49,7 @@ export interface ExecuteWhatsAppChannelActionInput {
 }
 
 export interface WhatsAppChannelGateway {
+  pairing(channelId: string): Promise<WhatsAppChannelPairingStatus>;
   listDepartments(): Promise<readonly { id: string; name: string }[]>;
   list(): Promise<readonly ManagedWhatsAppChannel[]>;
   get(channelId: string): Promise<ManagedWhatsAppChannel>;

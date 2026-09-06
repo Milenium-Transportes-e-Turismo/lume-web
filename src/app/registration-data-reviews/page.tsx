@@ -37,7 +37,7 @@ export default async function RegistrationDataReviewsPage() {
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 lg:p-5">
+      <div className="lume-page ">
         <RegistrationDataReviewWorkspace initialReviews={reviews} initialError={initialError} />
       </div>
     </AuthenticatedShell>

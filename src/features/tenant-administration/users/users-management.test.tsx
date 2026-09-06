@@ -662,14 +662,16 @@ describe('user editor form', () => {
     expect(createTenantUserFormAction).not.toHaveBeenCalled();
   });
 
-  it('supports an accessible indeterminate select-all checkbox per permission block', async () => {
+  it('leaves partial permission groups unchecked and selects the remaining permissions on click', async () => {
     const interaction = userEvent.setup();
     render(
       <UserEditorForm user={tenantUser} permissionCatalog={permissionCatalog} canManageAccess />,
     );
 
+    expect(screen.getByRole('checkbox', { name: 'Selecionar todos' })).not.toBeChecked();
     const selectAll = screen.getByRole('checkbox', { name: 'Selecionar todas em Comercial' });
-    expect(selectAll).toHaveAttribute('aria-checked', 'mixed');
+    expect(selectAll).not.toBeChecked();
+    expect(selectAll).not.toBePartiallyChecked();
 
     await interaction.click(selectAll);
     expect(screen.getByRole('checkbox', { name: 'Selecionar todas em Comercial' })).toBe(selectAll);

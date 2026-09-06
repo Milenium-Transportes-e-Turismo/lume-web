@@ -47,7 +47,7 @@ export default async function WhatsAppChannelsPage() {
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-[1700px] p-3 sm:p-4 lg:p-6">
+      <div className="lume-page ">
         <WhatsAppChannelManagement
           initialChannels={channels}
           initialError={[initialError, departmentError].filter(Boolean).join(' ')}

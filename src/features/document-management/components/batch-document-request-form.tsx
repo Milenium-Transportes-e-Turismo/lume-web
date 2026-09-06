@@ -10,9 +10,16 @@ import {
 } from '@/features/document-management/domain';
 import type { TenantUser } from '@/features/tenant-administration/domain';
 import { Button } from '@/shared/ui/button';
+import { SelectAllCheckbox } from '@/shared/select-all-checkbox';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { Input } from '@/shared/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/form-select';
 import { Textarea } from '@/shared/ui/textarea';
 
 function userLabel(user: TenantUser): string {
@@ -47,10 +54,6 @@ export function BatchDocumentRequestForm({
   const candidateOptions = availableUsers
     .filter((user) => !selectedUserIds.includes(user.id))
     .map((user) => ({ value: user.id, label: userLabel(user) }));
-  const allDocumentsSelected =
-    availableDocumentTypes.length > 0 &&
-    selectedDocumentTypeIds.length === availableDocumentTypes.length;
-  const partiallySelected = selectedDocumentTypeIds.length > 0 && !allDocumentsSelected;
 
   function addUser() {
     if (!candidateUserId || selectedUserIds.includes(candidateUserId)) return;
@@ -161,9 +164,9 @@ export function BatchDocumentRequestForm({
       <fieldset className="space-y-3 rounded-xl border p-4">
         <legend className="px-1 font-semibold">Documentos solicitados</legend>
         <label className="flex items-center gap-3 border-b pb-3 text-sm font-medium">
-          <Checkbox
-            checked={allDocumentsSelected}
-            indeterminate={partiallySelected}
+          <SelectAllCheckbox
+            availableValues={availableDocumentTypes.map((item) => item.id)}
+            selectedValues={selectedDocumentTypeIds}
             aria-label="Selecionar todos os documentos"
             onCheckedChange={(checked) =>
               setSelectedDocumentTypeIds(

@@ -35,7 +35,7 @@ export default async function ManagedDocumentRequestPage({
   const returnPath = `/document-management/${requestId}${query.embedded === '1' ? '?embedded=1' : ''}`;
 
   const content = (
-    <div className="mx-auto w-full max-w-6xl space-y-4 p-3 sm:p-4 md:p-6">
+    <div className="lume-page max-w-6xl space-y-4">
       <PageFeedbackToast error={query.error} success={query.success} />
       <DocumentRequestWorkspace
         request={request}

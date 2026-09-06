@@ -70,7 +70,7 @@ export default async function DocumentManagementPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-[1600px] space-y-5 p-3 sm:p-4 md:space-y-6 md:p-6">
+      <div className="lume-page space-y-5 md:space-y-6">
         <header>
           <div>
             <p className="text-sm font-medium text-primary-emphasis">RH e Departamento Pessoal</p>

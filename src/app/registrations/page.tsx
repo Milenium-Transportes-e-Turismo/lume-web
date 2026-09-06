@@ -98,7 +98,7 @@ export default async function RegistrationsPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-[92rem] space-y-4 p-4 md:p-6">
+      <main className="lume-page space-y-4">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-3xl">

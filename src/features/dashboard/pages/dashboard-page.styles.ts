@@ -1,7 +1,7 @@
 import { cva } from 'class-variance-authority';
 
 export const dashboardPageStyles = {
-  content: cva('mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6 lg:px-8'),
+  content: cva('lume-page'),
 
   eyebrow: cva('text-sm font-semibold text-primary-emphasis'),
 

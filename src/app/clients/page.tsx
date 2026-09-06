@@ -64,7 +64,7 @@ export default async function ClientsPage({
   const pages = Math.max(1, Math.ceil(result.total / pageSize));
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
+      <main className="lume-page space-y-4">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -92,7 +92,7 @@ export default async function ClientsPage({
               <select
                 name="status"
                 defaultValue={search.status}
-                className="h-9 rounded-md border bg-background px-3 text-sm"
+                className="h-9 rounded-md border bg-background pl-3 pr-8 text-sm"
               >
                 <option value="">Todas as situações</option>
                 <option value="active">Ativos</option>
@@ -101,7 +101,7 @@ export default async function ClientsPage({
               <select
                 name="type"
                 defaultValue={search.type}
-                className="h-9 rounded-md border bg-background px-3 text-sm"
+                className="h-9 rounded-md border bg-background pl-3 pr-8 text-sm"
               >
                 <option value="">Todos os tipos</option>
                 <option value="pf">Pessoa física</option>
@@ -110,7 +110,7 @@ export default async function ClientsPage({
               <select
                 name="sort"
                 defaultValue={search.sort}
-                className="h-9 rounded-md border bg-background px-3 text-sm"
+                className="h-9 rounded-md border bg-background pl-3 pr-8 text-sm"
               >
                 <option value="name">Ordenar por nome</option>
                 <option value="status">Ordenar por situação</option>

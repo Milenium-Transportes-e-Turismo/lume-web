@@ -243,3 +243,15 @@ html.dark[data-accent] {
     transition-timing-function: var(--motion-easing-standard);
   }
 }
+
+/* Shared spacing for content pages; immersive map and conversation workspaces own their layout. */
+@utility lume-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 100rem;
+  margin-inline: auto;
+  padding: 1rem;
+  @media (min-width: 48rem) {
+    padding: 1.5rem;
+  }
+}

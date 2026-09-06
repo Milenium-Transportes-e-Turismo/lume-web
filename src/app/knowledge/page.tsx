@@ -52,7 +52,7 @@ export default async function KnowledgePage() {
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-[1800px] p-3 sm:p-4 lg:p-5">
+      <div className="lume-page ">
         <KnowledgeManagement
           initialDepartments={
             departmentsResult.status === 'fulfilled' ? departmentsResult.value : []

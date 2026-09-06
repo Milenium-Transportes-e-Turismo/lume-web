@@ -117,6 +117,37 @@ export class TenantApiRoutePlannerGateway implements RoutePlannerGateway {
     private readonly timeoutMs = 30_000,
   ) {}
 
+  async reverseLocation(lat: number, lng: number) {
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        this.baseUrl.replace(/\/+$/, '') + '/routing/locations/reverse?lat=' + lat + '&lng=' + lng,
+        {
+          cache: 'no-store',
+          headers: { Accept: 'application/json', Authorization: 'Bearer ' + this.accessToken },
+          signal: AbortSignal.timeout(this.timeoutMs),
+        },
+      );
+    } catch {
+      throw new RoutePlannerError(
+        'service-unavailable',
+        'Não foi possível identificar o local no mapa.',
+      );
+    }
+    if (!response.ok) await this.throwResponseError(response);
+    const parsed = z
+      .object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      })
+      .safeParse(await response.json().catch(() => null));
+    if (!parsed.success)
+      throw new RoutePlannerError('invalid-response', 'A API retornou um local inválido.');
+    return parsed.data;
+  }
+
   async searchLocations(query: string) {
     let response: Response;
     try {

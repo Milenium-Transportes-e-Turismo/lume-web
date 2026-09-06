@@ -53,7 +53,7 @@ export default async function LightweightDocumentUploadPage({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-2xl space-y-4 p-3 sm:p-4 md:p-6">
+      <main className="lume-page max-w-2xl space-y-4">
         <Link
           href={`/documents/${requestId}`}
           prefetch={false}

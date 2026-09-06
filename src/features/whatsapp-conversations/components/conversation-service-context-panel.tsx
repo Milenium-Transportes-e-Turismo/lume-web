@@ -21,7 +21,7 @@ import {
 
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/form-select';
 import { CustomerContextPanel } from '@/features/customer-context/components';
 
 import {

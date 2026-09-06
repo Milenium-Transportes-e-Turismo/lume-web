@@ -92,7 +92,7 @@ export function RouteMap({
     <div
       ref={container}
       aria-label="Mapa interativo da rota"
-      className="relative z-0 h-full min-h-[460px] w-full bg-muted"
+      className="relative z-0 h-full min-h-0 w-full bg-muted"
     />
   );
 }

@@ -22,7 +22,13 @@ import { Button, buttonVariants } from '@/shared/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Input } from '@/shared/ui/input';
 import { Progress } from '@/shared/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/form-select';
 import { toast } from '@/shared/ui/toast';
 
 import {
@@ -1378,7 +1384,7 @@ export function WhatsAppHistoryImportPage() {
     : 0;
 
   return (
-    <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
+    <main className="lume-page ">
       <Link
         href="/whatsapp-conversations"
         className={buttonVariants({ variant: 'ghost', className: 'mb-3' })}

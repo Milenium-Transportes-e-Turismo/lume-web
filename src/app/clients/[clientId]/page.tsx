@@ -67,7 +67,7 @@ export default async function ClientPage({
   const name = clientDisplayName(client);
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8">
+      <main className="lume-page max-w-6xl space-y-6">
         <PageFeedbackToast error={search.error} success={search.success} />
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>

@@ -18,12 +18,10 @@ export default async function EditClientPage({
 }) {
   const session = await requireTenantSession(['clients:update']);
   const [{ clientId }, search] = await Promise.all([params, searchParams]);
-  const client = await executeAuthenticatedClientRequest((gateway) =>
-    gateway.get(clientId),
-  );
+  const client = await executeAuthenticatedClientRequest((gateway) => gateway.get(clientId));
   return (
     <AuthenticatedShell user={session.user}>
-      <main className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-8">
+      <main className="lume-page max-w-5xl space-y-6">
         <PageFeedbackToast error={search.error} />
         <header className="flex items-end justify-between gap-4">
           <div>

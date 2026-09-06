@@ -24,7 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui/collapsible';
 import { Input } from '@/shared/ui/input';
 import { Progress } from '@/shared/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/form-select';
 import { Textarea } from '@/shared/ui/textarea';
 
 const REQUIREMENT_LABELS: Readonly<Record<string, string>> = {

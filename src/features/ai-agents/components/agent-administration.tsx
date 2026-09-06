@@ -28,7 +28,7 @@ import {
 } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/form-select';
 import { Textarea } from '@/shared/ui/textarea';
 
 import {

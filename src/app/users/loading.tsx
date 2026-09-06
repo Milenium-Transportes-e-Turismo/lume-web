@@ -2,7 +2,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 
 export default function UsersLoading() {
   return (
-    <main className="mx-auto w-full max-w-[1600px] space-y-5 p-4 md:p-6" aria-busy="true">
+    <main className="lume-page space-y-5" aria-busy="true">
       <div className="flex items-end justify-between">
         <div className="space-y-2">
           <Skeleton className="h-4 w-44" />

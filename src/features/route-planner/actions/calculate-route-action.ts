@@ -38,7 +38,7 @@ function selectedLocation(data: FormData, key: string): RouteLocationPayload {
       Math.abs(latitude) <= 90 &&
       Math.abs(longitude) <= 180
     ) {
-      return { lat: latitude, lng: longitude };
+      return { lat: latitude, lng: longitude, address: text(data, key) };
     }
     throw new RoutePlannerError('validation', 'Selecione um local válido.');
   }
@@ -49,18 +49,23 @@ export async function calculateRouteAction(
   _previous: RoutePlannerActionState,
   data: FormData,
 ): Promise<RoutePlannerActionState> {
-  const waypoints = data
+  const legacyWaypoints = data
     .getAll('waypoint')
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean)
     .map(location);
+  const waypointKeys = data
+    .getAll('waypointKey')
+    .filter((key): key is string => typeof key === 'string');
   try {
     const result = await executeAuthenticatedRoutePlannerMutation((gateway) =>
       gateway.calculate({
         origin: selectedLocation(data, 'origin'),
         destination: selectedLocation(data, 'destination'),
-        waypoints,
+        waypoints: waypointKeys.length
+          ? waypointKeys.map((key) => selectedLocation(data, key))
+          : legacyWaypoints,
         roundTrip: data.get('roundTrip') === 'on',
         vehicle: {
           type: text(data, 'vehicleType') as 'car' | 'van' | 'minibus' | 'bus' | 'truck',

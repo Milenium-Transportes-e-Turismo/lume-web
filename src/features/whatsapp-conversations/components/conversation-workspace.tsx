@@ -51,7 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/form-select';
 import { Textarea } from '@/shared/ui/textarea';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';

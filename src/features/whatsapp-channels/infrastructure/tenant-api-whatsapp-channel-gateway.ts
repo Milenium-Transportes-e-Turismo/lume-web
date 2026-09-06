@@ -101,6 +101,19 @@ export class TenantApiWhatsAppChannelGateway implements WhatsAppChannelGateway {
     this.baseUrl = baseUrl.replace(/\/+$/u, '');
   }
 
+  async pairing(channelId: string) {
+    return parse(
+      operationSchema.omit({ infrastructureCleanupPending: true }).extend({
+        connectionStatus: z.enum(WHATSAPP_CHANNEL_CONNECTION_STATUSES),
+      }),
+      await this.request(
+        '/whatsapp/channels/' + encodeURIComponent(channelId) + '/pairing',
+        {},
+        20_000,
+      ),
+    );
+  }
+
   async listDepartments() {
     return parse(
       z.array(z.object({ id: z.string().uuid(), name: z.string().min(1) })),
@@ -153,6 +166,7 @@ export class TenantApiWhatsAppChannelGateway implements WhatsAppChannelGateway {
   private async request(
     path: string,
     input: { readonly method?: string; readonly body?: unknown } = {},
+    timeoutMs = this.timeoutMs,
   ): Promise<unknown> {
     let response: Response;
     try {
@@ -165,7 +179,7 @@ export class TenantApiWhatsAppChannelGateway implements WhatsAppChannelGateway {
           ...(input.body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         body: input.body === undefined ? undefined : JSON.stringify(input.body),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new WhatsAppChannelGatewayError(

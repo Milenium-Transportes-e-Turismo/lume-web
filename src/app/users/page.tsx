@@ -83,7 +83,7 @@ export default async function UsersRoute({
 
   return (
     <AuthenticatedShell user={session.user}>
-      <div className="mx-auto w-full max-w-[1600px] p-4 md:p-6">
+      <div className="lume-page ">
         <PageFeedbackToast error={query.error} success={query.success} />
         <UsersManagement
           users={users}

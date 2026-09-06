@@ -183,7 +183,7 @@ export function RegistrationDataReviewWorkspace({
           <div className="grid gap-2 border-b pb-2 sm:grid-cols-[1fr_auto]">
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground"
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"
                 aria-hidden="true"
               />
               <Input

@@ -1,7 +1,7 @@
 'use client';
 
 import { MapPin, Search } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import type { RouteLocationSuggestion } from '../application/route-planner-gateway';
@@ -15,14 +15,18 @@ type SearchState = {
 
 export function RouteLocationInput({
   id,
+  name,
   label,
   value,
   selected,
   onChange,
   onSelect,
   onFocus,
+  trailingAction,
 }: {
+  readonly trailingAction?: ReactNode;
   readonly id: string;
+  readonly name?: string;
   readonly label: string;
   readonly value: string;
   readonly selected: RouteLocationSuggestion | null;
@@ -91,62 +95,65 @@ export function RouteLocationInput({
   return (
     <div className="relative space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          name={id}
-          value={value}
-          maxLength={180}
-          required
-          autoComplete="off"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={eligible && items.length > 0}
-          aria-controls={listId}
-          aria-activedescendant={active >= 0 && items[active] ? listId + '-' + active : undefined}
-          aria-describedby={id + '-search-status'}
-          className="pr-9"
-          placeholder="Cidade, endereço ou ponto no mapa"
-          onFocus={() => {
-            onFocus();
-            setOpen(true);
-          }}
-          onBlur={() => setOpen(false)}
-          onChange={(event) => {
-            onChange(event.target.value);
-            setOpen(true);
-            setActive(-1);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setOpen(false);
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Input
+            id={id}
+            name={name ?? id}
+            value={value}
+            maxLength={180}
+            required
+            autoComplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={eligible && items.length > 0}
+            aria-controls={listId}
+            aria-activedescendant={active >= 0 && items[active] ? listId + '-' + active : undefined}
+            aria-describedby={id + '-search-status'}
+            className="pr-9"
+            placeholder="Cidade, endereço ou CEP"
+            onFocus={() => {
+              onFocus();
+              setOpen(true);
+            }}
+            onBlur={() => setOpen(false)}
+            onChange={(event) => {
+              onChange(event.target.value);
+              setOpen(true);
               setActive(-1);
-              return;
-            }
-            if (!items.length) return;
-            if (event.key === 'ArrowDown') {
-              event.preventDefault();
-              setActive((index) => (index + 1) % items.length);
-            } else if (event.key === 'ArrowUp') {
-              event.preventDefault();
-              setActive((index) => (index <= 0 ? items.length - 1 : index - 1));
-            } else if (event.key === 'Enter') {
-              event.preventDefault();
-              choose(items[Math.max(0, active)]);
-            }
-          }}
-        />
-        {hasSelection ? (
-          <MapPin
-            aria-hidden="true"
-            className="pointer-events-none absolute right-3 top-2.5 size-4 text-primary"
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setOpen(false);
+                setActive(-1);
+                return;
+              }
+              if (!items.length) return;
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setActive((index) => (index + 1) % items.length);
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setActive((index) => (index <= 0 ? items.length - 1 : index - 1));
+              } else if (event.key === 'Enter') {
+                event.preventDefault();
+                choose(items[Math.max(0, active)]);
+              }
+            }}
           />
-        ) : (
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute right-3 top-2.5 size-4 text-muted-foreground"
-          />
-        )}
+          {hasSelection ? (
+            <MapPin
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-primary"
+            />
+          ) : (
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground"
+            />
+          )}
+        </div>
+        {trailingAction}
       </div>
       {hasSelection && (
         <>
