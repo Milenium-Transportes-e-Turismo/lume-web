@@ -226,9 +226,14 @@ duração, geometria, pedágios e custos. A Tenant API resolve endereços pelo P
 e calcula rotas pelo OpenRouteService; o navegador não chama a HeiGIT, banco ou
 agente de IA diretamente e não executa cálculos de negócio.
 
-O resultado é renderizado com MapLibre sobre um estilo configurado por
-`MAP_STYLE_URL`; o padrão é o OpenFreeMap Liberty. O mapa desenha ida, volta,
-origem, destino, paradas e pedágios sem alterar os cálculos autoritativos da API.
+O planejador usa Leaflet.js com mosaicos OpenStreetMap, atribuição visível e sem
+prefetch/offline. Origem, destino e paradas aceitam endereço ou coordenadas do mapa.
+O painel lateral reúne os parâmetros e resultados; ida e volta usam trajetos
+calculados pela API, com ajuste automático dos limites. MAP_STYLE_URL é legado
+e não configura o novo planejador. Não há integração com QualP.
+
+Documentação: [Leaflet](https://leafletjs.com/reference.html) e
+[política de mosaicos OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/).
 
 Novas contas são somente de colaborador. Os modos candidato e cliente aparecem
 apenas em contas legadas e não podem ser escolhidos nem convertidos.
@@ -248,3 +253,22 @@ npm.cmd test -- --runInBand
 npm.cmd run build
 git diff --check
 ```
+
+### Revisão de Cadastro e acesso
+
+Cadastro mantém endereço, perfil documental PF (função, situação civil e militar,
+dependentes) e instruções específicas de atendimento. Usuários administra contas,
+departamentos e permissões; criar uma conta exige escolher o tipo suportado.
+Solicitações documentais podem ter uma pessoa do Cadastro como titular sem login.
+As instruções de atendimento são adicionais às regras dos agentes e exigem
+identidade confirmada no atendimento.
+
+A Administração apresenta ações agrupadas por comando e ator, com detalhes dos
+eventos originais. As métricas de requisições continuam disponíveis na seção técnica.
+
+
+### Busca de locais na roteirização
+
+Origem e destino consultam o endpoint autenticado /api/routing/locations da Web, que encaminha a pesquisa à Tenant API. Sugestões usam o autocomplete Pelias já configurado na API; credenciais permanecem no servidor. A consulta começa com três caracteres, aguarda 450 ms e descarta respostas substituídas. Selecionar um resultado envia suas coordenadas; editar, limpar e inverter mantêm a seleção coerente.
+
+Referência do serviço: [Geocode Autocomplete na documentação ORS/HeiGIT](https://openrouteservice.org/dev/).

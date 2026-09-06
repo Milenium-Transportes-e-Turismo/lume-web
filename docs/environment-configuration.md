@@ -68,3 +68,5 @@ A troca de `SESSION_SECRET` invalida cookies existentes e exige novo login. Faç
 a rotação de forma coordenada. Credenciais individuais de agentes OpenAI não
 pertencem ao Tenant Web nem a `NEXT_PUBLIC_*`: devem ficar no cofre/backend e a
 interface pode receber apenas estado seguro da credencial, nunca a chave.
+
+> Revisão 2026-09-06: o planejador passou para Leaflet/OpenStreetMap. As referências acima a MapLibre e MAP_STYLE_URL são históricas; essa variável não controla o novo mapa.

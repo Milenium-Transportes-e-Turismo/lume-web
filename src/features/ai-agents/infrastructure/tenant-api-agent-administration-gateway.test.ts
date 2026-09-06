@@ -40,7 +40,7 @@ function apiAgent(overrides: Record<string, unknown> = {}) {
         provider: 'openai',
         model: 'gpt-5-mini',
         credentialIdentifier: 'server-secret-reference',
-        credentialVersion: 2,
+        credentialVersion: '2',
         status: 'active',
         activatedAt: '2026-08-29T10:00:00.000Z',
         deactivatedAt: null,

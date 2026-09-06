@@ -60,6 +60,30 @@ const relationshipSchema = z.object({
   relatedRegistration: relatedRegistrationSchema,
 });
 const registrationSchema = z.object({
+  address: z
+    .object({
+      street: z.string(),
+      number: z.string(),
+      complement: nullableString,
+      district: z.string(),
+      postalCode: z.string(),
+      city: z.string(),
+      state: z.string(),
+    })
+    .nullable()
+    .optional(),
+  documentProfile: z
+    .object({
+      jobTitle: nullableString,
+      maritalStatus: nullableString,
+      militaryDocumentStatus: z.enum(['applicable', 'not-applicable', 'pending-confirmation']),
+      dependents: z.array(
+        z.object({ name: z.string(), birthDate: z.string(), relationship: z.string().optional() }),
+      ),
+    })
+    .nullable()
+    .optional(),
+  serviceInstructions: z.string().max(4000).nullable().optional(),
   id: z.string().uuid(),
   type: z.enum(['pf', 'pj']),
   status: z.enum(['active', 'inactive']),
@@ -216,6 +240,10 @@ export class TenantApiRegistrationGateway implements RegistrationGateway {
     private readonly fetcher: Fetcher = fetch,
     private readonly timeoutMs = 30_000,
   ) {}
+
+  createTag(input: { name: string; color?: string }) {
+    return this.json('/registrations/catalog/tags', tagSchema, { method: 'POST', body: input });
+  }
 
   catalog() {
     return this.json(

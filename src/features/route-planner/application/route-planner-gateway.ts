@@ -40,6 +40,13 @@ export interface RouteLocationPayload {
   readonly lng?: number;
 }
 
+export interface RouteLocationSuggestion {
+  readonly id: string;
+  readonly label: string;
+  readonly lat: number;
+  readonly lng: number;
+}
 export interface RoutePlannerGateway {
+  searchLocations(query: string): Promise<readonly RouteLocationSuggestion[]>;
   calculate(payload: CalculateRoutePayload): Promise<RouteCalculation>;
 }

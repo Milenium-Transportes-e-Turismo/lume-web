@@ -28,6 +28,7 @@ export class RegistrationGatewayError extends Error {
 
 export interface RegistrationGateway {
   catalog(): Promise<RegistrationCatalog>;
+  createTag(input: { name: string; color?: string }): Promise<RegistrationCatalog['tags'][number]>;
   list(
     query?: Record<string, string | number | undefined>,
   ): Promise<RegistrationList<Registration>>;

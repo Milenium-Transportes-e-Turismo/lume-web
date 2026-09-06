@@ -163,3 +163,5 @@ Mantenha a imagem anterior e o conjunto de variáveis compatível. Para rollback
 retire a imagem nova do balanceador, restaure a imagem anterior e valide as duas
 sondas. O frontend não executa migrations e seu rollback não deve reverter o
 banco da Tenant API.
+
+> Revisão 2026-09-06: o planejador passou para Leaflet/OpenStreetMap. As referências acima a MapLibre e MAP_STYLE_URL são históricas; essa variável não controla o novo mapa.

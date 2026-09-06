@@ -35,12 +35,23 @@ export default async function WhatsAppChannelsPage() {
       };
     });
 
+  const { departments, departmentError } = await executeAuthenticatedWhatsAppChannelRequest(
+    (gateway) => gateway.listDepartments(),
+  )
+    .then((departments) => ({ departments, departmentError: '' }))
+    .catch(() => ({
+      departments: [],
+      departmentError:
+        'Não foi possível carregar os departamentos. Recarregue a página para provisionar ou editar canais.',
+    }));
+
   return (
     <AuthenticatedShell user={session.user}>
       <div className="mx-auto w-full max-w-[1700px] p-3 sm:p-4 lg:p-6">
         <WhatsAppChannelManagement
           initialChannels={channels}
-          initialError={initialError}
+          initialError={[initialError, departmentError].filter(Boolean).join(' ')}
+          departments={departments}
           permissions={{
             canView: hasPermission(session.user, 'whatsapp-channels:view'),
             canCreate: hasPermission(session.user, 'whatsapp-channels:create'),

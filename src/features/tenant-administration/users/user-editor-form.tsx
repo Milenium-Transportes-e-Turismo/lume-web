@@ -1,17 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { LoaderCircle, Plus, ShieldCheck, X } from 'lucide-react';
+import { LoaderCircle, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useTransition } from 'react';
-import {
-  Controller,
-  useController,
-  useFieldArray,
-  useForm,
-  useWatch,
-  type Control,
-} from 'react-hook-form';
+import { Controller, useController, useForm, useWatch, type Control } from 'react-hook-form';
 
 import { updateTenantUserFormAction } from '@/features/tenant-administration/actions';
 import {
@@ -47,36 +40,15 @@ import {
 } from './permission-assignment';
 import { userEditorFormSchema, type UserEditorFormValues } from './user-form-schema';
 
-const USER_CLASSIFICATION_LABELS = {
-  Administrativo: 'Administrativo',
-  Geral: 'Geral',
-  Motorista: 'Motorista',
-} as const;
-
-const MARITAL_STATUS_LABELS = {
-  'not-informed': 'Não informado',
-  single: 'Solteiro(a)',
-  married: 'Casado(a)',
-  'stable-union': 'União estável',
-  divorced: 'Divorciado(a)',
-  widowed: 'Viúvo(a)',
-} as const;
-
-const MILITARY_STATUS_LABELS = {
-  'pending-confirmation': 'Pendente de confirmação',
-  applicable: 'Aplicável',
-  'not-applicable': 'Não aplicável',
-} as const;
-
 const ACCESS_MODE_LABELS = {
-  standard: 'Colaborador',
+  standard: 'Usuário interno',
   'document-portal': 'Candidato — acesso documental legado',
   client: 'Cliente — acesso legado',
 } as const;
 
 function classificationFromStoredValue(
   value: string | null,
-): keyof typeof USER_CLASSIFICATION_LABELS {
+): 'Administrativo' | 'Geral' | 'Motorista' {
   const normalized =
     value
       ?.normalize('NFD')
@@ -96,8 +68,24 @@ function DepartmentCheckboxes({
 }) {
   const { field } = useController({ control, name: 'departments' });
 
+  const available = TENANT_DEPARTMENTS.filter(
+    (department) => department !== 'client-company' || field.value.includes(department),
+  );
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <Field orientation="horizontal" className="sm:col-span-2 lg:col-span-3">
+        <Checkbox
+          id="edit-departments-all"
+          disabled={disabled}
+          checked={available.every((department) => field.value.includes(department))}
+          indeterminate={
+            available.some((department) => field.value.includes(department)) &&
+            !available.every((department) => field.value.includes(department))
+          }
+          onCheckedChange={(checked) => field.onChange(checked ? [...available] : [])}
+        />
+        <FieldLabel htmlFor="edit-departments-all">Selecionar todos</FieldLabel>
+      </Field>
       {TENANT_DEPARTMENTS.filter(
         (department) => department !== 'client-company' || field.value.includes(department),
       ).map((department) => {
@@ -243,7 +231,6 @@ export function UserEditorForm({
       dependents: (user.dependents ?? []).map((dependent) => ({ ...dependent })),
     },
   });
-  const dependents = useFieldArray({ control: form.control, name: 'dependents' });
   const isAdministrator = user.isAdministrator;
   const departments = useWatch({ control: form.control, name: 'departments' });
   const documentAccessMode = useWatch({
@@ -295,23 +282,14 @@ export function UserEditorForm({
                 ([key]) => !['clientCategory', 'routingCompanyId'].includes(key),
               ),
             );
-      const supportsEmployeeProfile =
-        user.jobTitle !== undefined ||
-        user.maritalStatus !== undefined ||
-        user.militaryDocumentStatus !== undefined ||
-        user.dependents !== undefined;
       const result = await updateTenantUserFormAction(
         user.id,
-        supportsEmployeeProfile
-          ? scopedValues
-          : Object.fromEntries(
-              Object.entries(scopedValues).filter(
-                ([key]) =>
-                  !['jobTitle', 'maritalStatus', 'militaryDocumentStatus', 'dependents'].includes(
-                    key,
-                  ),
-              ),
-            ),
+        Object.fromEntries(
+          Object.entries(scopedValues).filter(
+            ([key]) =>
+              !['jobTitle', 'maritalStatus', 'militaryDocumentStatus', 'dependents'].includes(key),
+          ),
+        ),
       );
       toast.add({
         title: result.success ? 'Usuário atualizado' : 'Alteração não concluída',
@@ -438,129 +416,9 @@ export function UserEditorForm({
             ) : null}
           </div>
 
-          <FieldSet>
-            <FieldLegend>Perfil para documentação</FieldLegend>
-            <FieldDescription>
-              Estes dados determinam as exigências aplicáveis. Alterações não apagam arquivos já
-              enviados.
-            </FieldDescription>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field>
-                <FieldLabel htmlFor="edit-user-job-title">Classificação do usuário</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="jobTitle"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange} required>
-                      <SelectTrigger id="edit-user-job-title" className="w-full">
-                        <SelectValue>{USER_CLASSIFICATION_LABELS[field.value]}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(USER_CLASSIFICATION_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="edit-user-marital-status">Situação civil</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="maritalStatus"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="edit-user-marital-status" className="w-full">
-                        <SelectValue>
-                          {MARITAL_STATUS_LABELS[field.value ?? 'not-informed']}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not-informed">Não informado</SelectItem>
-                        <SelectItem value="single">Solteiro(a)</SelectItem>
-                        <SelectItem value="married">Casado(a)</SelectItem>
-                        <SelectItem value="stable-union">União estável</SelectItem>
-                        <SelectItem value="divorced">Divorciado(a)</SelectItem>
-                        <SelectItem value="widowed">Viúvo(a)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="edit-user-military-status">Documentação militar</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="militaryDocumentStatus"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="edit-user-military-status" className="w-full">
-                        <SelectValue>
-                          {MILITARY_STATUS_LABELS[field.value ?? 'pending-confirmation']}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending-confirmation">
-                          Pendente de confirmação
-                        </SelectItem>
-                        <SelectItem value="applicable">Aplicável</SelectItem>
-                        <SelectItem value="not-applicable">Não aplicável</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">Filhos e dependentes</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  dependents.append({ name: '', birthDate: '', relationship: 'filho(a)' })
-                }
-              >
-                <Plus className="size-4" /> Adicionar dependente
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {dependents.fields.map((dependent, index) => (
-                <div
-                  key={dependent.id}
-                  className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1fr_11rem_10rem_auto]"
-                >
-                  <Input
-                    aria-label={`Nome do dependente ${index + 1}`}
-                    placeholder="Nome completo"
-                    {...form.register(`dependents.${index}.name`)}
-                  />
-                  <Input
-                    aria-label={`Nascimento do dependente ${index + 1}`}
-                    type="date"
-                    {...form.register(`dependents.${index}.birthDate`)}
-                  />
-                  <Input
-                    aria-label={`Vínculo do dependente ${index + 1}`}
-                    placeholder="Vínculo"
-                    {...form.register(`dependents.${index}.relationship`)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remover dependente ${index + 1}`}
-                    onClick={() => dependents.remove(index)}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </FieldSet>
+          <p className="text-sm text-muted-foreground">
+            Perfil documental e dependentes são gerenciados na pessoa do Cadastro.
+          </p>
 
           {canManageAccess && isAdministrator ? (
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
@@ -580,7 +438,7 @@ export function UserEditorForm({
                   ? 'Todos os departamentos estão incluídos automaticamente.'
                   : documentAccessMode === 'document-portal'
                     ? 'O departamento pode ser preparado agora ou definido ao promover o candidato.'
-                    : 'O colaborador deve permanecer vinculado a ao menos um departamento.'}
+                    : 'O usuário deve permanecer vinculado a ao menos um departamento.'}
               </FieldDescription>
               <DepartmentCheckboxes
                 control={form.control}

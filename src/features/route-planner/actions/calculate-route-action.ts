@@ -1,6 +1,6 @@
 'use server';
 
-import { RoutePlannerError } from '../application/route-planner-gateway';
+import { RoutePlannerError, type RouteLocationPayload } from '../application/route-planner-gateway';
 import type { RouteCalculation } from '../domain/route-calculation';
 import { executeAuthenticatedRoutePlannerMutation } from '../server/execute-authenticated-route-planner-request';
 
@@ -20,6 +20,31 @@ function decimal(data: FormData, key: string): number {
   return Number(text(data, key).replace(',', '.'));
 }
 
+function location(value: string): RouteLocationPayload {
+  const match = value.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (match) return { lat: Number(match[1]), lng: Number(match[2]) };
+  return { address: value };
+}
+
+function selectedLocation(data: FormData, key: string): RouteLocationPayload {
+  const lat = text(data, key + 'Lat');
+  const lng = text(data, key + 'Lng');
+  if (lat !== '' && lng !== '') {
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      Math.abs(latitude) <= 90 &&
+      Math.abs(longitude) <= 180
+    ) {
+      return { lat: latitude, lng: longitude };
+    }
+    throw new RoutePlannerError('validation', 'Selecione um local válido.');
+  }
+  return location(text(data, key));
+}
+
 export async function calculateRouteAction(
   _previous: RoutePlannerActionState,
   data: FormData,
@@ -29,12 +54,12 @@ export async function calculateRouteAction(
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean)
-    .map((address) => ({ address }));
+    .map(location);
   try {
     const result = await executeAuthenticatedRoutePlannerMutation((gateway) =>
       gateway.calculate({
-        origin: { address: text(data, 'origin') },
-        destination: { address: text(data, 'destination') },
+        origin: selectedLocation(data, 'origin'),
+        destination: selectedLocation(data, 'destination'),
         waypoints,
         roundTrip: data.get('roundTrip') === 'on',
         vehicle: {

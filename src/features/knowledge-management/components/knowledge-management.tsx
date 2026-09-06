@@ -582,7 +582,7 @@ export function KnowledgeManagement({
             Operação assistida
           </p>
           <h1 id="knowledge-title" className="text-xl font-semibold tracking-tight">
-            Knowledge Base
+            Conhecimento
           </h1>
           <p className="text-sm text-muted-foreground">
             Conteúdo versionado, revisão de evidências e lacunas observadas pelos agentes.

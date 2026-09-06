@@ -146,7 +146,9 @@ export function DocumentRequestWorkspace({
               <>
                 <Button
                   render={
-                    <Link href={`/document-management/users/${request.subject.id}/export.xlsx`} />
+                    <Link
+                      href={`/document-management/${request.subject.registrationId ? 'registrations' : 'users'}/${request.subject.id}/export.xlsx`}
+                    />
                   }
                   nativeButton={false}
                   variant="outline"
@@ -156,7 +158,9 @@ export function DocumentRequestWorkspace({
                 </Button>
                 <Button
                   render={
-                    <Link href={`/document-management/users/${request.subject.id}/files.zip`} />
+                    <Link
+                      href={`/document-management/${request.subject.registrationId ? 'registrations' : 'users'}/${request.subject.id}/files.zip`}
+                    />
                   }
                   nativeButton={false}
                   variant="outline"

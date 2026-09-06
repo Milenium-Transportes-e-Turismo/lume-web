@@ -56,6 +56,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
+import { Checkbox } from '@/shared/ui/checkbox';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select';
 
@@ -133,9 +134,11 @@ function ConfigurationFields({
   onChange,
   includePhone,
   disabled,
+  departments,
 }: {
   readonly value: ChannelDraft;
   readonly onChange: (value: ChannelDraft) => void;
+  readonly departments: readonly { id: string; name: string }[];
   readonly includePhone: boolean;
   readonly disabled: boolean;
 }) {
@@ -198,30 +201,59 @@ function ConfigurationFields({
         <Label htmlFor={`${includePhone ? 'create' : 'edit'}-department-id`}>
           Departamento proprietário {value.routingMode === 'general-triage' ? '(opcional)' : ''}
         </Label>
-        <Input
-          id={`${includePhone ? 'create' : 'edit'}-department-id`}
-          value={value.departmentId}
-          onChange={(event) => onChange({ ...value, departmentId: event.target.value })}
-          placeholder="UUID publicado pela Tenant API"
-          required={value.routingMode === 'department-owned'}
-          disabled={disabled}
-        />
-        <p className="text-xs text-muted-foreground">
-          O catálogo nominal de departamentos ainda não é publicado por esta API; o identificador é
-          validado no servidor.
-        </p>
+        <Select
+          value={value.departmentId || '__none__'}
+          disabled={disabled || departments.length === 0}
+          onValueChange={(id) =>
+            onChange({ ...value, departmentId: id === '__none__' ? '' : (id ?? '') })
+          }
+        >
+          <SelectTrigger
+            id={includePhone ? 'create-department-id' : 'edit-department-id'}
+            className="w-full"
+          >
+            <span>
+              {departments.find((department) => department.id === value.departmentId)?.name ??
+                'Selecione um departamento'}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {value.routingMode === 'general-triage' ? (
+              <SelectItem value="__none__">Sem departamento proprietário</SelectItem>
+            ) : null}
+            {departments.map((department) => (
+              <SelectItem key={department.id} value={department.id}>
+                {department.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor={`${includePhone ? 'create' : 'edit'}-allowed-departments`}>
-          Destinos automáticos permitidos
-        </Label>
-        <Input
-          id={`${includePhone ? 'create' : 'edit'}-allowed-departments`}
-          value={value.allowedDepartmentIds}
-          onChange={(event) => onChange({ ...value, allowedDepartmentIds: event.target.value })}
-          placeholder="UUIDs separados por vírgula"
-          disabled={disabled}
-        />
+      <fieldset className="space-y-2 sm:col-span-2" disabled={disabled}>
+        <legend className="text-sm font-medium">Destinos automáticos permitidos</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {departments.map((department) => (
+            <Label key={department.id} className="flex items-center gap-2 rounded-lg border p-3">
+              <Checkbox
+                checked={identifiers(value.allowedDepartmentIds).includes(department.id)}
+                onCheckedChange={(checked) => {
+                  const selected = new Set(identifiers(value.allowedDepartmentIds));
+                  if (checked) selected.add(department.id);
+                  else selected.delete(department.id);
+                  onChange({ ...value, allowedDepartmentIds: [...selected].join(', ') });
+                }}
+              />
+              {department.name}
+            </Label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="sm:col-span-2">
+        {departments.length === 0 ? (
+          <p role="alert" className="text-sm text-destructive">
+            Departamentos indisponíveis. Recarregue a página.
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -230,6 +262,7 @@ function ConfigurationFields({
 export interface WhatsAppChannelManagementProps {
   readonly initialChannels: readonly ManagedWhatsAppChannel[];
   readonly initialError?: string;
+  readonly departments?: readonly { id: string; name: string }[];
   readonly permissions: {
     readonly canView: boolean;
     readonly canCreate: boolean;
@@ -243,6 +276,7 @@ export interface WhatsAppChannelManagementProps {
 export function WhatsAppChannelManagement({
   initialChannels,
   initialError = '',
+  departments = [],
   permissions,
 }: WhatsAppChannelManagementProps) {
   const [channels, setChannels] = useState(initialChannels);
@@ -617,7 +651,11 @@ export function WhatsAppChannelManagement({
                   ['Estado organizacional', ORGANIZATIONAL_LABELS[selected.organizationalStatus]],
                   ['Conexão', CONNECTION_LABELS[selected.connectionStatus]],
                   ['Roteamento', ROUTING_LABELS[selected.routingMode]],
-                  ['Departamento', shortId(selected.departmentId)],
+                  [
+                    'Departamento',
+                    departments.find((department) => department.id === selected.departmentId)
+                      ?.name ?? 'Não definido',
+                  ],
                   ['Instância técnica', selected.evolutionInstanceName],
                   ['ID no provedor', shortId(selected.evolutionInstanceId)],
                 ].map(([term, value]) => (
@@ -752,6 +790,7 @@ export function WhatsAppChannelManagement({
               </DialogDescription>
             </DialogHeader>
             <ConfigurationFields
+              departments={departments}
               value={createDraft}
               onChange={(draft) => {
                 setCreateDraft(draft);
@@ -787,6 +826,7 @@ export function WhatsAppChannelManagement({
               </DialogDescription>
             </DialogHeader>
             <ConfigurationFields
+              departments={departments}
               value={editDraft}
               onChange={setEditDraft}
               includePhone={false}

@@ -117,6 +117,40 @@ export class TenantApiRoutePlannerGateway implements RoutePlannerGateway {
     private readonly timeoutMs = 30_000,
   ) {}
 
+  async searchLocations(query: string) {
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        this.baseUrl.replace(/\/+$/, '') + '/routing/locations?q=' + encodeURIComponent(query),
+        {
+          cache: 'no-store',
+          headers: { Accept: 'application/json', Authorization: 'Bearer ' + this.accessToken },
+          signal: AbortSignal.timeout(this.timeoutMs),
+        },
+      );
+    } catch {
+      throw new RoutePlannerError(
+        'service-unavailable',
+        'Não foi possível buscar os locais. Tente novamente.',
+      );
+    }
+    if (!response.ok) await this.throwResponseError(response);
+    const schema = z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          label: z.string().min(1),
+          lat: z.number().finite().min(-90).max(90),
+          lng: z.number().finite().min(-180).max(180),
+        }),
+      )
+      .max(6);
+    const parsed = schema.safeParse(await response.json().catch(() => null));
+    if (!parsed.success)
+      throw new RoutePlannerError('invalid-response', 'A busca retornou locais incompatíveis.');
+    return parsed.data;
+  }
+
   async calculate(payload: CalculateRoutePayload) {
     let response: Response;
     try {

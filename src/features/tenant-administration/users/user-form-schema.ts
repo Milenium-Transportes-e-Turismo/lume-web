@@ -9,9 +9,11 @@ const userAssignmentFields = {
   routingCompanyId: z.string().uuid('Selecione o cliente vinculado.').nullable().optional(),
   departments: z.array(z.string()),
   permissionCodes: z.array(z.string()),
-  jobTitle: z.enum(['Administrativo', 'Geral', 'Motorista'], {
-    error: 'Selecione a classificação do usuário.',
-  }),
+  jobTitle: z
+    .enum(['Administrativo', 'Geral', 'Motorista'], {
+      error: 'Selecione a classificação do usuário.',
+    })
+    .optional(),
   maritalStatus: z
     .enum(['single', 'married', 'stable-union', 'divorced', 'widowed', 'not-informed'])
     .default('not-informed'),

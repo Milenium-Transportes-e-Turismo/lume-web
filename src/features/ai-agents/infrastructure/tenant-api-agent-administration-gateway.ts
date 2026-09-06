@@ -26,7 +26,7 @@ const runtimeConfigurationSchema = z.object({
   version: z.number().int().positive(),
   provider: z.string().min(1),
   model: z.string().min(1),
-  credentialVersion: z.number().int().positive().nullable(),
+  credentialVersion: z.string().min(1).max(80).nullable(),
   status: z.string().min(1),
   activatedAt: nullableIsoDate,
   deactivatedAt: nullableIsoDate,

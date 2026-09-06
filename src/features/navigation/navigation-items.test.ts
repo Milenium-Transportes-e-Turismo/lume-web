@@ -78,7 +78,7 @@ describe('getAuthorizedNavigationItems', () => {
         getAuthorizedNavigationItems(createEmployee([permission], true, ['purchasing'])).map(
           (item) => item.label,
         ),
-      ).toContain('Knowledge Base');
+      ).toContain('Conhecimento');
     }
   });
 

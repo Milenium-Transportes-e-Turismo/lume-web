@@ -6,6 +6,13 @@ import {
 
 describe('permission labels', () => {
   it.each([
+    ['service', 'Sessões de atendimento'],
+    ['service-confirmations', 'Confirmação de serviços'],
+    ['tenant', 'Administração do tenant'],
+    ['routing-companies', 'Empresas da roteirização'],
+    ['routing-contracts', 'Contratos de transporte'],
+    ['passengers', 'Passageiros'],
+    ['routes', 'Planos de rotas'],
     ['dashboard', 'Painel'],
     ['users', 'Usuários'],
     ['human-resources', 'Recursos Humanos'],
@@ -19,6 +26,14 @@ describe('permission labels', () => {
   });
 
   it.each([
+    ['attend', 'Atender conversas'],
+    ['assume', 'Assumir atendimento'],
+    ['respond', 'Responder atendimento'],
+    ['transfer', 'Transferir atendimento'],
+    ['close', 'Encerrar atendimento'],
+    ['priority', 'Alterar prioridade'],
+    ['history', 'Consultar histórico'],
+    ['import', 'Importar'],
     ['view', 'Visualizar'],
     ['create', 'Criar'],
     ['update', 'Editar'],

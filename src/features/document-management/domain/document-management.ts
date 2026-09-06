@@ -27,7 +27,13 @@ export interface DocumentRequestSummary {
   readonly status: DocumentRequestStatus;
   readonly deadline: string | null;
   readonly version: number;
-  readonly subject: { readonly id: string; readonly name: string; readonly email: string };
+  readonly subject: {
+    readonly id: string;
+    readonly name: string;
+    readonly email: string;
+    readonly registrationId?: string | null;
+    readonly userId?: string | null;
+  };
   readonly checklist: {
     readonly id: string;
     readonly code: string;

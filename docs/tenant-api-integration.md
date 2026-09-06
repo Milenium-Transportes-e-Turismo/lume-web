@@ -709,3 +709,5 @@ sessão. Leitura exige `service:view`; decisões exigem `service:respond` e envi
 `commandId` mais `expectedUpdatedAt`. Aprovação e descarte só atualizam a tela
 após recarga autoritativa; conflitos também tentam devolver esse snapshot. O
 campo de proveniência é exibido com remoção recursiva de chaves sensíveis.
+
+> Revisão 2026-09-06: o planejador passou para Leaflet/OpenStreetMap. As referências acima a MapLibre e MAP_STYLE_URL são históricas; essa variável não controla o novo mapa.

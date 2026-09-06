@@ -510,40 +510,20 @@ describe('users management permissions', () => {
 });
 
 describe('user editor form', () => {
-  it('keeps dependent fields stacked until the large breakpoint in edit and create flows', () => {
-    const dependent = {
-      name: 'Maria Dependente',
-      birthDate: '2018-08-20',
-      relationship: 'filha',
-    };
-    const editor = render(
-      <UserEditorForm
-        user={{ ...tenantUser, dependents: [dependent] }}
-        permissionCatalog={permissionCatalog}
-        canManageAccess
-      />,
-    );
-
-    const editorRow = screen.getByLabelText('Nome do dependente 1').parentElement;
-    expect(editorRow).toHaveClass('lg:grid-cols-[1fr_11rem_10rem_auto]');
-    expect(editorRow).not.toHaveClass('sm:grid-cols-[1fr_11rem_10rem_auto]');
-    editor.unmount();
-
+  it('keeps personal documentary data in Cadastro rather than the access editor', () => {
     render(
-      <UsersManagement
-        users={users}
+      <UserEditorForm
+        user={{
+          ...tenantUser,
+          dependents: [{ name: 'Maria Dependente', birthDate: '2018-08-20' }],
+        }}
         permissionCatalog={permissionCatalog}
-        canCreate
-        canEdit={false}
         canManageAccess
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /dependente/ }));
-
-    const createRow = screen.getByLabelText('Nome do dependente 1').parentElement;
-    expect(createRow).toHaveClass('lg:grid-cols-[1fr_11rem_10rem_auto]');
-    expect(createRow).not.toHaveClass('sm:grid-cols-[1fr_11rem_10rem_auto]');
+    expect(screen.queryByLabelText('Nome do dependente 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Documentação militar')).not.toBeInTheDocument();
+    expect(screen.getByText(/Perfil documental e dependentes são gerenciados/)).toBeInTheDocument();
   });
 
   it('updates departments and direct permissions without exposing CPF', async () => {
@@ -554,7 +534,7 @@ describe('user editor form', () => {
 
     expect(screen.queryByLabelText('CPF (opcional)')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Usuário')).toBeDisabled();
-    expect(screen.getByLabelText('Modo de acesso')).toHaveValue('Colaborador');
+    expect(screen.getByLabelText('Modo de acesso')).toHaveValue('Usuário interno');
     expect(screen.getByLabelText('Modo de acesso')).toHaveAttribute('readonly');
 
     const name = screen.getByLabelText('Nome');
@@ -568,10 +548,6 @@ describe('user editor form', () => {
       email: tenantUser.email,
       isAdministrator: false,
       documentAccessMode: 'standard',
-      jobTitle: 'Geral',
-      maritalStatus: 'not-informed',
-      militaryDocumentStatus: 'pending-confirmation',
-      dependents: [],
       departments: ['commercial'],
       permissionCodes: ['commercial:view'],
     });
@@ -593,7 +569,7 @@ describe('user editor form', () => {
     expect(createTenantUserFormAction).not.toHaveBeenCalled();
   });
 
-  it('uses the three-step creation flow and only shows compatible permissions', async () => {
+  it('requires explicit account type before the three setup steps and only shows compatible permissions', async () => {
     const interaction = userEvent.setup();
     render(
       <UsersManagement
@@ -607,8 +583,12 @@ describe('user editor form', () => {
 
     await interaction.click(screen.getByRole('button', { name: 'Novo usuário' }));
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Continuar' })).toBeDisabled();
+    expect(within(dialog).queryByLabelText('Nome')).not.toBeInTheDocument();
+    await interaction.click(within(dialog).getByRole('radio', { name: /Usuário interno/ }));
+    await interaction.click(within(dialog).getByRole('button', { name: 'Continuar' }));
     expect(within(dialog).getByText('Dados básicos')).toBeInTheDocument();
-    expect(within(dialog).getByText('Tipo de conta: Colaborador')).toBeInTheDocument();
+    expect(within(dialog).getByText('Tipo de conta: Usuário interno')).toBeInTheDocument();
     expect(within(dialog).queryByLabelText('Modo de acesso')).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Candidato — somente documentos/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Cliente - pessoa jurídica/)).not.toBeInTheDocument();
@@ -665,6 +645,10 @@ describe('user editor form', () => {
 
     await interaction.click(screen.getByRole('button', { name: 'Novo usuário' }));
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Continuar' })).toBeDisabled();
+    expect(within(dialog).queryByLabelText('Nome')).not.toBeInTheDocument();
+    await interaction.click(within(dialog).getByRole('radio', { name: /Usuário interno/ }));
+    await interaction.click(within(dialog).getByRole('button', { name: 'Continuar' }));
     await interaction.type(within(dialog).getByLabelText('Nome'), 'Admin Lume');
     await interaction.type(within(dialog).getByLabelText('Usuário'), 'admin.lume');
     await interaction.type(within(dialog).getByLabelText('E-mail'), 'admin@example.com');
@@ -688,6 +672,8 @@ describe('user editor form', () => {
     expect(selectAll).toHaveAttribute('aria-checked', 'mixed');
 
     await interaction.click(selectAll);
+    expect(screen.getByRole('checkbox', { name: 'Selecionar todas em Comercial' })).toBe(selectAll);
+    expect(selectAll).toHaveFocus();
     expect(screen.getByRole('checkbox', { name: 'Visualizar' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Gerenciar' })).toBeChecked();
     expect(selectAll).toBeChecked();

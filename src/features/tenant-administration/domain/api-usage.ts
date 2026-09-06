@@ -54,3 +54,31 @@ export interface ApiUsageRequestList {
 }
 
 export type ApiUsageResultFilter = 'success' | 'client-error' | 'server-error';
+
+export interface AuditOperationList {
+  readonly data: readonly {
+    readonly id: string;
+    readonly actor: string;
+    readonly actorId: string | null;
+    readonly createdAt: string;
+    readonly module: string;
+    readonly action: string;
+    readonly result: string;
+    readonly target: string;
+    readonly targetId: string;
+    readonly changes: readonly string[];
+    readonly events: readonly {
+      readonly id: string;
+      readonly code: string;
+      readonly source: string;
+      readonly targetType: string;
+      readonly targetId: string;
+    }[];
+  }[];
+  readonly meta: {
+    readonly page: number;
+    readonly pageSize: number;
+    readonly total: number;
+    readonly totalPages: number;
+  };
+}

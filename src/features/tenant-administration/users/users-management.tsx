@@ -30,14 +30,7 @@ import {
   useTransition,
   type KeyboardEvent,
 } from 'react';
-import {
-  Controller,
-  useController,
-  useFieldArray,
-  useForm,
-  useWatch,
-  type Control,
-} from 'react-hook-form';
+import { useController, useForm, useWatch, type Control } from 'react-hook-form';
 
 import {
   createTenantUserFormAction,
@@ -127,74 +120,7 @@ const SUSPENSION_MODE_LABELS = {
   date: 'Até uma data',
 } as const;
 
-const GENERAL_DOCUMENTS = [
-  'Foto 3x4 digital',
-  'CPF',
-  'RG',
-  'CTPS',
-  'CNH',
-  'Comprovante de residência com CEP',
-  'Cartão do PIS',
-  'Título de eleitor',
-  'Certidão criminal estadual',
-  'Certidão criminal civil/federal',
-] as const;
-
-const USER_CLASSIFICATION_LABELS = {
-  Administrativo: 'Administrativo',
-  Geral: 'Geral',
-  Motorista: 'Motorista',
-} as const;
-
-const MARITAL_STATUS_LABELS = {
-  'not-informed': 'Não informado',
-  single: 'Solteiro(a)',
-  married: 'Casado(a)',
-  'stable-union': 'União estável',
-  divorced: 'Divorciado(a)',
-  widowed: 'Viúvo(a)',
-} as const;
-
-const MILITARY_STATUS_LABELS = {
-  'pending-confirmation': 'Pendente de confirmação',
-  applicable: 'Aplicável',
-  'not-applicable': 'Não aplicável',
-} as const;
-
-function documentPreview(values: UserFormValues): string[] {
-  const result: string[] = [...GENERAL_DOCUMENTS];
-  if (['married', 'stable-union'].includes(values.maritalStatus ?? '')) {
-    result.push('Certidão de casamento/união estável', 'RG e CPF do(a) cônjuge');
-  }
-  const dependents = values.dependents ?? [];
-  if (dependents.length > 0) result.push('Certidão de nascimento de cada dependente');
-  const ages = dependents.map((dependent) => {
-    const birth = new Date(`${dependent.birthDate}T00:00:00`);
-    return Math.floor((Date.now() - birth.getTime()) / 31_556_952_000);
-  });
-  if (ages.some((age) => age >= 0 && age < 7))
-    result.push('Carteira de vacinação dos dependentes menores de 7 anos');
-  if (ages.some((age) => age > 7 && age <= 16)) {
-    result.push('Atestado escolar dos dependentes acima de 7 anos até 16 anos');
-  }
-  if (values.militaryDocumentStatus === 'applicable') result.push('Documento militar');
-  if (values.militaryDocumentStatus === 'pending-confirmation') {
-    result.push('Pendência do DP: confirmar documentação militar');
-  }
-  if (values.jobTitle === 'Motorista') {
-    result.push(
-      'CNH com categoria D, EAR e validade (sem duplicar a CNH)',
-      'Curso de Transporte Coletivo de Passageiros',
-      'Prontuário de habilitação — nada consta',
-      'Certidão negativa de débitos municipais',
-      'Cartão de vacina atualizado',
-    );
-  }
-  return result;
-}
-
 type SuspensionMode = keyof typeof SUSPENSION_MODE_LABELS;
-
 export interface UserListFilters {
   readonly search?: string;
   readonly department?: string;
@@ -219,6 +145,21 @@ function AssignmentCheckboxes({
 
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {name === 'departments' ? (
+        <Field orientation="horizontal" className="sm:col-span-2 lg:col-span-3">
+          <Checkbox
+            id="departments-all"
+            disabled={disabled}
+            checked={values.length > 0 && values.every((value) => field.value.includes(value))}
+            indeterminate={
+              values.some((value) => field.value.includes(value)) &&
+              !values.every((value) => field.value.includes(value))
+            }
+            onCheckedChange={(checked) => field.onChange(checked ? [...values] : [])}
+          />
+          <FieldLabel htmlFor="departments-all">Selecionar todos</FieldLabel>
+        </Field>
+      ) : null}
       {values.map((value) => {
         const id = `${name}-${value}`;
         return (
@@ -336,7 +277,8 @@ function CreateUserDialog({
   readonly permissionCatalog: PermissionCatalog;
 }) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
+  const [accountType, setAccountType] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -346,25 +288,19 @@ function CreateUserDialog({
       email: '',
       password: '',
       isAdministrator: false,
-      documentAccessMode: 'standard',
+      documentAccessMode: undefined,
       clientCategory: null,
       routingCompanyId: null,
       requestDocuments: false,
       departments: [],
       permissionCodes: [],
-      jobTitle: 'Geral',
+      jobTitle: undefined,
       maritalStatus: 'not-informed',
       militaryDocumentStatus: 'pending-confirmation',
       dependents: [],
     },
   });
-  const dependents = useFieldArray({ control: form.control, name: 'dependents' });
   const departments = useWatch({ control: form.control, name: 'departments' });
-  useWatch({
-    control: form.control,
-    name: ['jobTitle', 'maritalStatus', 'militaryDocumentStatus', 'dependents'],
-  });
-  const preview = documentPreview(form.getValues());
   const standardPermissions = useMemo(
     () => compatiblePermissionCodes(permissionCatalog, departments),
     [departments, permissionCatalog],
@@ -372,10 +308,17 @@ function CreateUserDialog({
 
   const reset = () => {
     form.reset();
-    setStep(1);
+    setAccountType(null);
+    setStep(0);
   };
 
   const next = async () => {
+    if (step === 0) {
+      if (accountType !== 'standard') return;
+      form.setValue('documentAccessMode', 'standard');
+      setStep(1);
+      return;
+    }
     if (step === 1) {
       const valid = await form.trigger([
         'name',
@@ -404,7 +347,14 @@ function CreateUserDialog({
 
   const createUser = form.handleSubmit((values) => {
     startTransition(async () => {
-      const result = await createTenantUserFormAction(values);
+      const result = await createTenantUserFormAction(
+        Object.fromEntries(
+          Object.entries(values).filter(
+            ([key]) =>
+              !['jobTitle', 'maritalStatus', 'militaryDocumentStatus', 'dependents'].includes(key),
+          ),
+        ),
+      );
       toast.add({
         title: result.success ? 'Usuário cadastrado' : 'Cadastro não concluído',
         description: formatActionResultDescription(result),
@@ -417,7 +367,7 @@ function CreateUserDialog({
     });
   });
 
-  const stepLabels = ['Dados básicos', 'Departamentos', 'Permissões'];
+  const stepLabels = ['Tipo de conta', 'Dados básicos', 'Departamentos', 'Permissões'];
 
   return (
     <Dialog
@@ -440,11 +390,11 @@ function CreateUserDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ol className="grid gap-2 sm:grid-cols-3" aria-label="Etapas do cadastro">
+        <ol className="grid gap-2 sm:grid-cols-4" aria-label="Etapas do cadastro">
           {stepLabels.map((label, index) => {
             const number = index + 1;
-            const current = number === step;
-            const complete = number < step;
+            const current = index === step;
+            const complete = index < step;
             return (
               <li
                 key={label}
@@ -469,6 +419,33 @@ function CreateUserDialog({
           noValidate
           data-testid="create-user-form"
         >
+          {step === 0 ? (
+            <Field>
+              <p className="font-medium">Tipo de conta</p>
+              <label
+                htmlFor="new-user-account-type"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border p-4"
+              >
+                <input
+                  id="new-user-account-type"
+                  type="radio"
+                  name="accountTypeChoice"
+                  value="standard"
+                  checked={accountType === 'standard'}
+                  onChange={() => setAccountType('standard')}
+                  className="mt-1 size-4 accent-primary"
+                />
+                <span>
+                  <span className="block font-medium">Usuário interno</span>
+                  <span className="text-sm text-muted-foreground">Conta para acessar o Lume.</span>
+                </span>
+              </label>
+              <FieldDescription>
+                Acesso ao Lume com departamentos e permissões definidos. A conta não determina o
+                vínculo de trabalho da pessoa.
+              </FieldDescription>
+            </Field>
+          ) : null}
           {step === 1 ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field data-invalid={Boolean(form.formState.errors.name)}>
@@ -523,177 +500,16 @@ function CreateUserDialog({
                 <FieldError errors={[form.formState.errors.password]} />
               </Field>
               <div className="rounded-lg border bg-muted/40 p-4 text-sm">
-                <p className="font-medium">Tipo de conta: Colaborador</p>
+                <p className="font-medium">Tipo de conta: Usuário interno</p>
                 <p className="mt-1 text-muted-foreground">
                   Novos candidatos usarão link seguro e clientes usarão uma área própria quando
                   esses contratos forem publicados pela Tenant API.
                 </p>
               </div>
-              <Field data-invalid={Boolean(form.formState.errors.requestDocuments)}>
-                <FieldLabel htmlFor="new-user-request-documents">
-                  Solicitar documentação?
-                </FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="requestDocuments"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ? 'yes' : 'no'}
-                      onValueChange={(value) => field.onChange(value === 'yes')}
-                    >
-                      <SelectTrigger id="new-user-request-documents" className="h-11 w-full">
-                        <SelectValue>{field.value ? 'Sim' : 'Não'}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yes">Sim</SelectItem>
-                        <SelectItem value="no">Não</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldDescription>
-                  Para colaboradores, escolha se a solicitação deve ser criada agora.
-                </FieldDescription>
-                <FieldError errors={[form.formState.errors.requestDocuments]} />
-              </Field>
-              <Field data-invalid={Boolean(form.formState.errors.jobTitle)}>
-                <FieldLabel htmlFor="new-user-job-title">Classificação do usuário</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="jobTitle"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange} required>
-                      <SelectTrigger id="new-user-job-title" className="h-11 w-full">
-                        <SelectValue>{USER_CLASSIFICATION_LABELS[field.value]}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(USER_CLASSIFICATION_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldError errors={[form.formState.errors.jobTitle]} />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="new-user-marital-status">Situação civil</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="maritalStatus"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="new-user-marital-status" className="h-11 w-full">
-                        <SelectValue>
-                          {MARITAL_STATUS_LABELS[field.value ?? 'not-informed']}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not-informed">Não informado</SelectItem>
-                        <SelectItem value="single">Solteiro(a)</SelectItem>
-                        <SelectItem value="married">Casado(a)</SelectItem>
-                        <SelectItem value="stable-union">União estável</SelectItem>
-                        <SelectItem value="divorced">Divorciado(a)</SelectItem>
-                        <SelectItem value="widowed">Viúvo(a)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="new-user-military-status">
-                  Situação da documentação militar
-                </FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="militaryDocumentStatus"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="new-user-military-status" className="h-11 w-full">
-                        <SelectValue>
-                          {MILITARY_STATUS_LABELS[field.value ?? 'pending-confirmation']}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending-confirmation">
-                          Pendente de confirmação
-                        </SelectItem>
-                        <SelectItem value="applicable">Aplicável</SelectItem>
-                        <SelectItem value="not-applicable">Não aplicável</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                <FieldDescription>
-                  A regra não utiliza gênero e pode ser decidida manualmente.
-                </FieldDescription>
-              </Field>
-              <FieldSet className="sm:col-span-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <FieldLegend>Filhos e dependentes</FieldLegend>
-                    <FieldDescription>
-                      Adicione cada dependente com sua data de nascimento.
-                    </FieldDescription>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      dependents.append({ name: '', birthDate: '', relationship: 'filho(a)' })
-                    }
-                  >
-                    <Plus className="size-4" /> Adicionar dependente
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {dependents.fields.map((dependent, index) => (
-                    <div
-                      key={dependent.id}
-                      className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[1fr_11rem_10rem_auto]"
-                    >
-                      <Input
-                        aria-label={`Nome do dependente ${index + 1}`}
-                        placeholder="Nome completo"
-                        {...form.register(`dependents.${index}.name`)}
-                      />
-                      <Input
-                        aria-label={`Nascimento do dependente ${index + 1}`}
-                        type="date"
-                        {...form.register(`dependents.${index}.birthDate`)}
-                      />
-                      <Input
-                        aria-label={`Vínculo do dependente ${index + 1}`}
-                        placeholder="Vínculo"
-                        {...form.register(`dependents.${index}.relationship`)}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Remover dependente ${index + 1}`}
-                        onClick={() => dependents.remove(index)}
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </FieldSet>
-              <section className="rounded-xl border bg-muted/30 p-4 sm:col-span-2">
-                <h3 className="font-semibold">Prévia da documentação personalizada</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  A lista é recalculada automaticamente; nenhum documento aparece duplicado.
-                </p>
-                <ul className="mt-3 grid gap-1 text-sm sm:grid-cols-2">
-                  {preview.map((document) => (
-                    <li key={document}>• {document}</li>
-                  ))}
-                </ul>
-              </section>
+              <p className="text-sm text-muted-foreground sm:col-span-2">
+                Os dados pessoais, dependentes e solicitações documentais são gerenciados em
+                Cadastro.
+              </p>
             </div>
           ) : null}
 
@@ -732,13 +548,21 @@ function CreateUserDialog({
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancelar</DialogClose>
-            {step > 1 ? (
-              <Button type="button" variant="outline" onClick={() => setStep((step - 1) as 1 | 2)}>
+            {step > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep((step - 1) as 0 | 1 | 2)}
+              >
                 Voltar
               </Button>
             ) : null}
             {step < 3 ? (
-              <Button type="button" onClick={next}>
+              <Button
+                type="button"
+                onClick={next}
+                disabled={step === 0 && accountType !== 'standard'}
+              >
                 Continuar
               </Button>
             ) : (

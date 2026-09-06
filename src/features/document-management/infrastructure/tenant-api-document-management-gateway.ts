@@ -73,9 +73,11 @@ const itemStatusSchema = z.enum([
   'cancelled',
 ]);
 const subjectSchema = z.object({
+  registrationId: z.string().uuid().nullable().optional(),
+  userId: z.string().uuid().nullable().optional(),
   id: z.string().uuid(),
   name: z.string().min(1),
-  email: z.string().email(),
+  email: z.union([z.string().email(), z.literal('')]),
 });
 const checklistReferenceSchema = z.object({
   id: z.string().uuid(),
@@ -405,15 +407,21 @@ export class TenantApiDocumentManagementGateway implements DocumentManagementGat
     return response;
   }
 
-  async downloadUserExport(subjectUserId: string): Promise<Response> {
+  async downloadUserExport(
+    subjectUserId: string,
+    kind: 'users' | 'registrations' = 'users',
+  ): Promise<Response> {
     return this.download(
-      `/document-management/users/${encodeURIComponent(subjectUserId)}/export.xlsx`,
+      `/document-management/${kind}/${encodeURIComponent(subjectUserId)}/export.xlsx`,
     );
   }
 
-  async downloadUserFiles(subjectUserId: string): Promise<Response> {
+  async downloadUserFiles(
+    subjectUserId: string,
+    kind: 'users' | 'registrations' = 'users',
+  ): Promise<Response> {
     return this.download(
-      `/document-management/users/${encodeURIComponent(subjectUserId)}/files.zip`,
+      `/document-management/${kind}/${encodeURIComponent(subjectUserId)}/files.zip`,
     );
   }
 

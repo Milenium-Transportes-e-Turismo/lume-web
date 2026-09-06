@@ -40,7 +40,8 @@ export interface DocumentManagementGateway {
   listDocumentTypes(): Promise<readonly DocumentTypeSummary[]>;
   createRequest(input: {
     commandId: string;
-    subjectUserId: string;
+    subjectUserId?: string;
+    subjectRegistrationId?: string;
     checklistId: string;
     context: DocumentRequestContext;
     deadline?: string;
@@ -112,6 +113,6 @@ export interface DocumentManagementGateway {
   ): Promise<DocumentRequestDetail>;
   getFile(fileId: string): Promise<Response>;
   downloadExport(): Promise<Response>;
-  downloadUserExport(subjectUserId: string): Promise<Response>;
-  downloadUserFiles(subjectUserId: string): Promise<Response>;
+  downloadUserExport(subjectUserId: string, kind?: 'users' | 'registrations'): Promise<Response>;
+  downloadUserFiles(subjectUserId: string, kind?: 'users' | 'registrations'): Promise<Response>;
 }

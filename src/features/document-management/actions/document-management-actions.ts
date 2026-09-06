@@ -31,7 +31,8 @@ function failure(path: string, error: unknown): never {
 }
 
 const createRequestSchema = z.object({
-  subjectUserId: z.string().uuid(),
+  subjectUserId: z.string().uuid().optional(),
+  subjectRegistrationId: z.string().uuid().optional(),
   checklistId: z.string().uuid(),
   context: z.enum([
     'admission',
@@ -107,7 +108,8 @@ export async function createBatchDocumentRequestsAction(formData: FormData): Pro
 
 export async function createDocumentRequestAction(formData: FormData): Promise<void> {
   const parsed = createRequestSchema.safeParse({
-    subjectUserId: value(formData, 'subjectUserId'),
+    subjectUserId: value(formData, 'subjectUserId') || undefined,
+    subjectRegistrationId: value(formData, 'subjectRegistrationId') || undefined,
     checklistId: value(formData, 'checklistId'),
     context: value(formData, 'context'),
     deadline: value(formData, 'deadline') || undefined,

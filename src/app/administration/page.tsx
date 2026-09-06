@@ -1,3 +1,4 @@
+import { AuditOperations } from '@/features/tenant-administration/components/audit-operations';
 import { redirect } from 'next/navigation';
 
 import { AuthenticatedShell } from '@/features/navigation';
@@ -18,6 +19,7 @@ export default async function AdministrationPage({
     userId?: string;
     status?: string;
     page?: string;
+    operationPage?: string;
   }>;
 }) {
   const session = await requireTenantSession(['settings:view']);
@@ -33,17 +35,40 @@ export default async function AdministrationPage({
     status,
     page: Math.max(1, Number.parseInt(query.page ?? '1', 10) || 1),
   };
-  const [summary, requests, users] = await executeAuthenticatedTenantRequest((gateway) =>
-    Promise.all([
-      gateway.getApiUsageSummary({ from: filters.from, to: filters.to }),
-      gateway.listApiUsageRequests({ ...filters, pageSize: 25 }),
-      gateway.listUsers({ page: 1, pageSize: 100 }),
-    ]),
+  const [summary, requests, users, operations] = await executeAuthenticatedTenantRequest(
+    (gateway) =>
+      Promise.all([
+        gateway.getApiUsageSummary({ from: filters.from, to: filters.to }),
+        gateway.listApiUsageRequests({ ...filters, pageSize: 25 }),
+        gateway.listUsers({ page: 1, pageSize: 100 }),
+        gateway.listAuditOperations({
+          from: filters.from,
+          to: filters.to,
+          userId: filters.userId,
+          page: Math.max(1, Number.parseInt(query.operationPage ?? '1', 10) || 1),
+          pageSize: 25,
+        }),
+      ]),
   ).catch((error: unknown) => rethrowTenantPageError(error));
   return (
     <AuthenticatedShell user={session.user}>
       <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-5 lg:p-6">
-        <ApiUsageDashboard summary={summary} requests={requests} users={users} filters={filters} />
+        <h1 className="mb-5 text-3xl font-semibold">Administração</h1>
+        <AuditOperations
+          operations={operations}
+          query={{ from: filters.from, to: filters.to, userId: filters.userId }}
+        />
+        <details>
+          <summary className="mb-4 cursor-pointer font-semibold">
+            Uso da API e registros técnicos de requisições
+          </summary>
+          <ApiUsageDashboard
+            summary={summary}
+            requests={requests}
+            users={users}
+            filters={filters}
+          />
+        </details>
       </main>
     </AuthenticatedShell>
   );

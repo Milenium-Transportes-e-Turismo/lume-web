@@ -1,7 +1,9 @@
 'use client';
+import { RegistrationDocumentProfileFields } from './registration-document-profile-fields';
 
 import { useId, useState } from 'react';
-import { MailPlus, PhoneCall, Plus, Trash2 } from 'lucide-react';
+import { RegistrationTagDialog } from './registration-tag-dialog';
+import { MailPlus, PhoneCall, Plus, Trash2, Search } from 'lucide-react';
 
 import type {
   Registration,
@@ -13,6 +15,7 @@ import type {
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Checkbox } from '@/shared/ui/checkbox';
+import { Textarea } from '@/shared/ui/textarea';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
@@ -41,6 +44,7 @@ export interface RegistrationFormInitialValues {
 }
 
 interface RegistrationFormProps {
+  readonly canManageTags?: boolean;
   readonly action: (data: FormData) => void | Promise<void>;
   readonly catalog: RegistrationCatalog;
   readonly registration?: Registration;
@@ -360,6 +364,7 @@ function ContactEmails({
 export function RegistrationForm({
   action,
   catalog,
+  canManageTags = false,
   registration,
   initialValues,
   submitLabel,
@@ -368,6 +373,7 @@ export function RegistrationForm({
   formId,
 }: RegistrationFormProps) {
   const instanceId = useId();
+  const [hasAddress, setHasAddress] = useState(Boolean(registration?.address));
   const [type, setType] = useState<RegistrationType>(
     registration?.type ?? initialValues?.type ?? 'pf',
   );
@@ -395,11 +401,13 @@ export function RegistrationForm({
     initialEmails(registration, initialValues),
   );
   const [tagSearch, setTagSearch] = useState('');
+  const [tags, setTags] = useState(catalog.tags);
+  const [tagSearchOpen, setTagSearchOpen] = useState(false);
   const selectedRoles = new Set(
-    registration?.roles.map((role) => role.code) ?? initialValues?.roleCodes ?? ['client'],
+    registration?.roles.map((role) => role.code) ?? initialValues?.roleCodes ?? [],
   );
-  const selectedTags = new Set(
-    registration?.tags.map((tag) => tag.code) ?? initialValues?.tagCodes ?? [],
+  const [selectedTags, setSelectedTags] = useState(
+    () => new Set(registration?.tags.map((tag) => tag.code) ?? initialValues?.tagCodes ?? []),
   );
 
   return (
@@ -572,17 +580,56 @@ export function RegistrationForm({
             </div>
           </fieldset>
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">Marcadores</legend>
-            <Input
-              type="search"
-              value={tagSearch}
-              onChange={(event) => setTagSearch(event.target.value)}
-              aria-label="Pesquisar Marcadores"
-              placeholder="Pesquisar Marcadores"
-              className="max-w-md"
-            />
+            <legend className="w-full">
+              <span className="flex min-h-8 items-center justify-between gap-3">
+                <span className="text-sm font-medium">Marcadores</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="size-8 shrink-0 p-0"
+                    aria-label="Pesquisar Marcadores"
+                    title="Pesquisar marcadores"
+                    aria-expanded={tagSearchOpen}
+                    onClick={() => {
+                      setTagSearchOpen(!tagSearchOpen);
+                      setTagSearch('');
+                    }}
+                  >
+                    <Search aria-hidden="true" />
+                  </Button>
+                  {canManageTags ? (
+                    <RegistrationTagDialog
+                      onCreated={(tag) => {
+                        setTags((current) =>
+                          current.some((entry) => entry.id === tag.id)
+                            ? current
+                            : [...current, tag],
+                        );
+                        setSelectedTags((current) => new Set([...current, tag.code]));
+                      }}
+                    />
+                  ) : null}
+                </span>
+              </span>
+            </legend>
+            {[...selectedTags].map((code) => (
+              <input key={code} type="hidden" name="tagCodes" value={code} />
+            ))}
+            {tagSearchOpen ? (
+              <Input
+                autoFocus
+                type="search"
+                value={tagSearch}
+                onChange={(event) => setTagSearch(event.target.value)}
+                aria-label="Pesquisar Marcadores"
+                placeholder="Pesquisar Marcadores"
+                className="max-w-md"
+              />
+            ) : null}
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {catalog.tags
+              {tags
                 .filter(
                   (tag) =>
                     tag.active !== false &&
@@ -596,15 +643,22 @@ export function RegistrationForm({
                     className="flex min-h-10 items-center gap-3 rounded-lg border px-3 py-2"
                   >
                     <Checkbox
-                      name="tagCodes"
                       value={tag.code}
-                      defaultChecked={selectedTags.has(tag.code)}
+                      checked={selectedTags.has(tag.code)}
+                      onCheckedChange={(checked) =>
+                        setSelectedTags((current) => {
+                          const next = new Set(current);
+                          if (checked) next.add(tag.code);
+                          else next.delete(tag.code);
+                          return next;
+                        })
+                      }
                     />
                     {tag.name}
                   </Label>
                 ))}
             </div>
-            {catalog.tags.filter(
+            {tags.filter(
               (tag) =>
                 tag.active !== false &&
                 tag.name
@@ -665,6 +719,71 @@ export function RegistrationForm({
         </CardContent>
       </Card>
 
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Endereço</CardTitle>
+          <CardDescription>Endereço da pessoa ou empresa, reutilizado na operação.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Label className="flex items-center gap-2">
+            <Checkbox checked={hasAddress} onCheckedChange={setHasAddress} />
+            Informar endereço
+          </Label>
+          <input type="hidden" name="hasAddress" value={hasAddress ? 'yes' : 'no'} />
+          {hasAddress ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ['Street', 'Logradouro', 'street', 160],
+                  ['Number', 'Número', 'number', 30],
+                  ['Complement', 'Complemento', 'complement', 120],
+                  ['District', 'Bairro', 'district', 120],
+                  ['PostalCode', 'CEP', 'postalCode', 10],
+                  ['City', 'Cidade', 'city', 120],
+                  ['State', 'UF', 'state', 2],
+                ] as const
+              ).map(([suffix, label, key, maxLength]) => (
+                <div className="space-y-1.5" key={key}>
+                  <Label htmlFor={instanceId + '-address-' + key}>{label}</Label>
+                  <Input
+                    id={instanceId + '-address-' + key}
+                    name={'address' + suffix}
+                    defaultValue={registration?.address?.[key] ?? ''}
+                    maxLength={maxLength}
+                    required={key !== 'complement'}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Instruções para atendimento</CardTitle>
+          <CardDescription>
+            Preferências específicas desta pessoa ou empresa. Os agentes as consideram quando a
+            identidade é confirmada no atendimento.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor={instanceId + '-service-instructions'}>Como atender este cadastro</Label>
+          <Textarea
+            id={instanceId + '-service-instructions'}
+            name="serviceInstructions"
+            defaultValue={registration?.serviceInstructions ?? ''}
+            maxLength={4000}
+            placeholder="Ex.: usar linguagem objetiva e confirmar o local de embarque antes de concluir."
+            rows={5}
+          />
+          <p className="text-xs text-muted-foreground">
+            Estas instruções complementam as regras existentes e não alteram permissões ou
+            segurança. Não inclua senhas ou chaves.
+          </p>
+        </CardContent>
+      </Card>
+
+      <RegistrationDocumentProfileFields profile={registration?.documentProfile} type={type} />
       {children ?? (
         <div className="flex justify-end">
           <Button type="submit">

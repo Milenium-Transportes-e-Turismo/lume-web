@@ -59,6 +59,13 @@ export interface TenantAdministrationGateway {
   updateUser(userId: string, input: UpdateTenantUserInput): Promise<TenantUser>;
   updateUserStatus(userId: string, input: UpdateTenantUserStatusInput): Promise<TenantUser>;
   deleteUser(userId: string, password: string): Promise<{ readonly deleted: true }>;
+  listAuditOperations(query: {
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+  }): Promise<import('../domain/api-usage').AuditOperationList>;
   getApiUsageSummary(query?: { from?: string; to?: string }): Promise<ApiUsageSummary>;
   listApiUsageRequests(query?: {
     from?: string;

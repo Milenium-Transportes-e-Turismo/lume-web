@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { hasPermission } from '@/features/auth/domain';
 import Link from 'next/link';
 
 import { AuthenticatedShell } from '@/features/navigation';
@@ -44,6 +45,7 @@ export default async function NewRegistrationPage({
           </Button>
         </header>
         <RegistrationForm
+          canManageTags={hasPermission(session.user, 'clients:manage')}
           action={createRegistrationAction}
           catalog={catalog}
           initialValues={{

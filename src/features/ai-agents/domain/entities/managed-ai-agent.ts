@@ -23,7 +23,7 @@ export interface AiAgentRuntimeConfiguration {
   readonly version: number;
   readonly provider: string;
   readonly model: string;
-  readonly credentialVersion: number | null;
+  readonly credentialVersion: string | null;
   readonly status: string;
   readonly activatedAt: string | null;
   readonly deactivatedAt: string | null;

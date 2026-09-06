@@ -48,6 +48,7 @@ export interface ExecuteWhatsAppChannelActionInput {
 }
 
 export interface WhatsAppChannelGateway {
+  listDepartments(): Promise<readonly { id: string; name: string }[]>;
   list(): Promise<readonly ManagedWhatsAppChannel[]>;
   get(channelId: string): Promise<ManagedWhatsAppChannel>;
   create(input: CreateWhatsAppChannelInput): Promise<WhatsAppChannelOperationResult>;

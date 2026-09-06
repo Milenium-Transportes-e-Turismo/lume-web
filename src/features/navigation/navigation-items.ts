@@ -85,7 +85,7 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
     group: 'administration',
   },
   {
-    label: 'Knowledge Base',
+    label: 'Conhecimento',
     href: '/knowledge',
     permission: 'knowledge:view',
     alternativePermissions: ['knowledge:manage', 'knowledge:publish'],

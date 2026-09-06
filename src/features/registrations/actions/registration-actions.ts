@@ -35,6 +35,29 @@ function jsonArray(data: FormData, key: string): Record<string, unknown>[] {
 
 function registrationPayload(data: FormData) {
   return {
+    ...(data.get('hasDocumentProfile') === 'yes'
+      ? {
+          documentProfile: {
+            jobTitle: text(data, 'documentJobTitle') || null,
+            maritalStatus: text(data, 'documentMaritalStatus') || null,
+            militaryDocumentStatus: text(data, 'documentMilitaryStatus'),
+            dependents: jsonArray(data, 'documentDependents'),
+          },
+        }
+      : {}),
+    serviceInstructions: text(data, 'serviceInstructions') || null,
+    address:
+      data.get('hasAddress') === 'yes'
+        ? {
+            street: text(data, 'addressStreet'),
+            number: text(data, 'addressNumber'),
+            complement: text(data, 'addressComplement') || null,
+            district: text(data, 'addressDistrict'),
+            postalCode: text(data, 'addressPostalCode'),
+            city: text(data, 'addressCity'),
+            state: text(data, 'addressState'),
+          }
+        : null,
     type: text(data, 'type'),
     status: text(data, 'status') || 'active',
     avicExternalId: text(data, 'avicExternalId') || null,
@@ -203,11 +226,12 @@ export async function reviewRegistrationCandidateAction(data: FormData): Promise
   } catch (error) {
     fail(`/registration-reconciliation/${candidateId}`, error);
   }
+  revalidatePath('/registrations');
   revalidatePath('/registration-reconciliation');
   revalidatePath(`/registration-reconciliation/${candidateId}`);
   redirect(
     `/registration-reconciliation/${candidateId}?success=${encodeURIComponent(
-      action === 'approve' ? 'Candidato aprovado.' : 'Revisão registrada.',
+      action === 'approve' ? 'Candidato aprovado e incluído no Cadastro.' : 'Revisão registrada.',
     )}`,
   );
 }
@@ -226,6 +250,7 @@ export async function promoteRegistrationCandidateAction(data: FormData): Promis
   } catch (error) {
     fail(`/registration-reconciliation/${candidateId}`, error);
   }
+  revalidatePath('/registrations');
   revalidatePath('/registration-reconciliation');
   revalidatePath('/registrations');
   redirect(
@@ -233,4 +258,22 @@ export async function promoteRegistrationCandidateAction(data: FormData): Promis
       'Candidato promovido ao Cadastro oficial.',
     )}`,
   );
+}
+
+export async function createRegistrationTagAction(input: { name: string; color?: string }) {
+  try {
+    const tag = await executeAuthenticatedRegistrationMutation((gateway) =>
+      gateway.createTag(input),
+    );
+    revalidatePath('/registrations');
+    return { success: true as const, tag };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof RegistrationGatewayError
+          ? error.message
+          : 'Não foi possível criar o marcador.',
+    };
+  }
 }

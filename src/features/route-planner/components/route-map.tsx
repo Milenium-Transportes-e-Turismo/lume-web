@@ -1,146 +1,98 @@
 'use client';
-
-import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef, useState } from 'react';
-
+import * as L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef } from 'react';
 import type { RouteCalculation } from '../domain/route-calculation';
-import {
-  allRouteCoordinates,
-  routeLineFeatures,
-  routeMapMarkers,
-  type RouteMapMarker,
-} from './route-map-data';
-
-const MARKER_COLORS: Record<RouteMapMarker['kind'], string> = {
-  origin: '#16a34a',
-  waypoint: '#2563eb',
-  destination: '#dc2626',
-  toll: '#f59e0b',
-};
-
-const MARKER_TEXT: Record<RouteMapMarker['kind'], string> = {
-  origin: 'O',
-  waypoint: 'P',
-  destination: 'D',
-  toll: '$',
-};
-
-function markerElement(marker: RouteMapMarker): HTMLDivElement {
-  const element = document.createElement('div');
-  element.setAttribute('role', 'img');
-  element.setAttribute('aria-label', marker.label);
-  element.title = marker.label;
-  element.textContent = MARKER_TEXT[marker.kind];
-  Object.assign(element.style, {
-    alignItems: 'center',
-    background: MARKER_COLORS[marker.kind],
-    border: '2px solid white',
-    borderRadius: '9999px',
-    boxShadow: '0 1px 5px rgb(0 0 0 / 35%)',
-    color: 'white',
-    display: 'flex',
-    fontSize: marker.kind === 'toll' ? '10px' : '11px',
-    fontWeight: '700',
-    height: marker.kind === 'toll' ? '20px' : '24px',
-    justifyContent: 'center',
-    width: marker.kind === 'toll' ? '20px' : '24px',
-  });
-  return element;
-}
+import { routeLineFeatures, routeMapMarkers, allRouteCoordinates } from './route-map-data';
 
 export function RouteMap({
   calculation,
-  styleUrl,
+  onPick,
+  points,
 }: {
-  readonly calculation: RouteCalculation;
-  readonly styleUrl: string;
+  readonly calculation: RouteCalculation | null;
+  readonly onPick: (lat: number, lng: number) => void;
+  readonly points: readonly string[];
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [mapError, setMapError] = useState(false);
-
+  const container = useRef<HTMLDivElement>(null);
+  const map = useRef<L.Map | null>(null);
+  const pick = useRef(onPick);
   useEffect(() => {
-    if (!containerRef.current) return;
-    setMapError(false);
-    const map = new MapLibreMap({
-      container: containerRef.current,
-      style: styleUrl,
-      center: [
-        calculation.locations.origin.coordinates.lng,
-        calculation.locations.origin.coordinates.lat,
-      ],
-      zoom: 7,
-    });
-    const markers: Marker[] = [];
-    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-    map.on('error', () => setMapError(true));
-    map.on('load', () => {
-      map.addSource('lume-route', {
-        type: 'geojson',
-        data: routeLineFeatures(calculation),
-      });
-      map.addLayer({
-        id: 'lume-route-outbound',
-        type: 'line',
-        source: 'lume-route',
-        filter: ['==', ['get', 'direction'], 'outbound'],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#059669', 'line-opacity': 0.9, 'line-width': 6 },
-      });
-      map.addLayer({
-        id: 'lume-route-return',
-        type: 'line',
-        source: 'lume-route',
-        filter: ['==', ['get', 'direction'], 'return'],
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': '#f59e0b',
-          'line-dasharray': [2, 2],
-          'line-opacity': 0.9,
-          'line-width': 4,
-        },
-      });
-      for (const marker of routeMapMarkers(calculation)) {
-        markers.push(
-          new Marker({ element: markerElement(marker) }).setLngLat(marker.coordinates).addTo(map),
-        );
-      }
-      const bounds = new LngLatBounds();
-      for (const coordinate of allRouteCoordinates(calculation)) bounds.extend(coordinate);
-      if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 0 });
-    });
+    pick.current = onPick;
+  }, [onPick]);
+  useEffect(() => {
+    if (!container.current) return;
+    const instance = L.map(container.current, { zoomControl: false }).setView([-23.55, -46.63], 9);
+    map.current = instance;
+    L.control.zoom({ position: 'topright' }).addTo(instance);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(instance);
+    instance.on('click', (event: L.LeafletMouseEvent) =>
+      pick.current(event.latlng.lat, event.latlng.lng),
+    );
+    const resize = new ResizeObserver(() => instance.invalidateSize());
+    resize.observe(container.current);
     return () => {
-      for (const marker of markers) marker.remove();
-      map.remove();
+      resize.disconnect();
+      instance.remove();
+      map.current = null;
     };
-  }, [calculation, styleUrl]);
-
+  }, []);
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    const group = L.featureGroup().addTo(instance);
+    if (calculation) {
+      L.geoJSON(routeLineFeatures(calculation), {
+        style: (feature) => ({
+          color: feature?.properties.direction === 'return' ? '#e88717' : '#147c70',
+          weight: 5,
+          dashArray: feature?.properties.direction === 'return' ? '8 6' : undefined,
+        }),
+      }).addTo(group);
+      for (const marker of routeMapMarkers(calculation)) {
+        const tooltip = document.createElement('span');
+        tooltip.textContent = marker.label;
+        L.circleMarker([marker.coordinates[1], marker.coordinates[0]], {
+          radius: marker.kind === 'toll' ? 7 : 10,
+          color: '#fff',
+          weight: 2,
+          fillOpacity: 1,
+          fillColor: marker.kind === 'toll' ? '#d55d16' : '#147c70',
+        })
+          .bindTooltip(tooltip)
+          .addTo(group);
+      }
+      const coordinates = allRouteCoordinates(calculation);
+      if (coordinates.length)
+        instance.fitBounds(L.latLngBounds(coordinates.map(([lng, lat]) => [lat, lng])), {
+          padding: [30, 30],
+          maxZoom: 14,
+        });
+    } else {
+      for (const [index, point] of points.entries()) {
+        const match = point.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+        if (!match) continue;
+        L.circleMarker([Number(match[1]), Number(match[2])], {
+          radius: 9,
+          color: '#147c70',
+          fillOpacity: 0.8,
+        })
+          .bindTooltip(index === 0 ? 'Origem' : index === points.length - 1 ? 'Destino' : 'Parada')
+          .addTo(group);
+      }
+    }
+    return () => {
+      group.remove();
+    };
+  }, [calculation, points]);
   return (
-    <div className="space-y-3">
-      <div
-        ref={containerRef}
-        className="h-[420px] w-full overflow-hidden rounded-xl border bg-muted md:h-[520px]"
-        aria-label="Mapa da rota calculada"
-      />
-      {mapError && (
-        <p role="alert" className="text-sm text-destructive">
-          O mapa de fundo não pôde ser carregado. O cálculo e os dados da rota continuam válidos.
-        </p>
-      )}
-      <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
-        <span>
-          <strong className="text-emerald-600">Linha verde:</strong> ida
-        </span>
-        {calculation.route.return && (
-          <span>
-            <strong className="text-amber-600">Linha tracejada:</strong> volta
-          </span>
-        )}
-        <span>O: origem</span>
-        <span>P: parada</span>
-        <span>D: destino</span>
-        <span>$: pedágio</span>
-      </div>
-    </div>
+    <div
+      ref={container}
+      aria-label="Mapa interativo da rota"
+      className="relative z-0 h-full min-h-[460px] w-full bg-muted"
+    />
   );
 }

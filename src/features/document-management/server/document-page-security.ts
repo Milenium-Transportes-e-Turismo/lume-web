@@ -13,6 +13,7 @@ export async function requireDocumentSession(manage = false) {
   }
   if (
     manage &&
+    !session.user.isAdministrator &&
     !session.user.departments.some((department) =>
       ['management', 'personnel-department', 'human-resources'].includes(department),
     )

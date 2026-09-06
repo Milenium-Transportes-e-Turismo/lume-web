@@ -355,6 +355,52 @@ export class TenantApiAdministrationGateway implements TenantAdministrationGatew
     );
   }
 
+  async listAuditOperations(query: {
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+  }) {
+    return parseApiResponse(
+      z.object({
+        data: z.array(
+          z.object({
+            id: z.string(),
+            actor: z.string(),
+            actorId: z.string().nullable(),
+            createdAt: isoDate,
+            module: z.string(),
+            action: z.string(),
+            result: z.string(),
+            target: z.string(),
+            targetId: z.string(),
+            changes: z.array(z.string()),
+            events: z.array(
+              z.object({
+                id: z.string(),
+                code: z.string(),
+                source: z.string(),
+                targetType: z.string(),
+                targetId: z.string(),
+              }),
+            ),
+          }),
+        ),
+        meta: z.object({
+          page: z.number(),
+          pageSize: z.number(),
+          total: z.number(),
+          totalPages: z.number(),
+        }),
+      }),
+      await this.request(
+        '/administration/usage/operations' +
+          searchParams({ ...query, page: query.page ?? 1, pageSize: query.pageSize ?? 25 }),
+      ),
+    );
+  }
+
   async getApiUsageSummary(query: { from?: string; to?: string } = {}) {
     return parseApiResponse(
       apiUsageSummarySchema,

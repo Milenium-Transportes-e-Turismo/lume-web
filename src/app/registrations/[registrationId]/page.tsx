@@ -1,3 +1,5 @@
+import { executeAuthenticatedDocumentRequest } from '@/features/document-management/server';
+import { RegistrationDocumentRequestForm } from '@/features/registrations/components/registration-document-request-form';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
@@ -93,6 +95,16 @@ export default async function RegistrationDetailPage({
         )
       : Promise.resolve({ items: [], total: 0 }),
   ]);
+  const canRequestDocuments =
+    hasPermission(session.user, 'documents:manage') &&
+    (session.user.isAdministrator ||
+      session.user.departments.some((department) =>
+        ['human-resources', 'personnel-department'].includes(department),
+      ));
+  const checklists =
+    canRequestDocuments && registration.type === 'pf'
+      ? await executeAuthenticatedDocumentRequest((gateway) => gateway.listChecklists())
+      : [];
   const document =
     registration.type === 'pf'
       ? registration.cpf
@@ -136,6 +148,53 @@ export default async function RegistrationDetailPage({
           </div>
         </header>
 
+        {registration.address && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Endereço</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {registration.address.street}, {registration.address.number}
+              {registration.address.complement ? ' · ' + registration.address.complement : ''}
+              <br />
+              {registration.address.district} · {registration.address.city}/
+              {registration.address.state} · CEP {registration.address.postalCode}
+            </CardContent>
+          </Card>
+        )}
+        {registration.serviceInstructions && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Instruções para atendimento</CardTitle>
+            </CardHeader>
+            <CardContent className="whitespace-pre-wrap">
+              {registration.serviceInstructions}
+            </CardContent>
+          </Card>
+        )}
+        {canRequestDocuments && registration.type === 'pf' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Solicitar documentos</CardTitle>
+              <CardDescription>
+                A solicitação fica vinculada a esta pessoa, independentemente de uma conta de
+                acesso.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {checklists.length ? (
+                <RegistrationDocumentRequestForm
+                  registrationId={registration.id}
+                  checklists={checklists}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Cadastre uma lista de documentos na Gestão documental.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
         <Tabs
           defaultValue={
             ['identity', 'contacts', 'relationships', 'history'].includes(search.tab ?? '')

@@ -53,7 +53,31 @@ export interface RegistrationRelationship {
   };
 }
 
+export interface RegistrationAddress {
+  readonly street: string;
+  readonly number: string;
+  readonly complement?: string | null;
+  readonly district: string;
+  readonly postalCode: string;
+  readonly city: string;
+  readonly state: string;
+}
+
+export interface RegistrationDocumentProfile {
+  readonly jobTitle: string | null;
+  readonly maritalStatus: string | null;
+  readonly militaryDocumentStatus: 'applicable' | 'not-applicable' | 'pending-confirmation';
+  readonly dependents: readonly {
+    readonly name: string;
+    readonly birthDate: string;
+    readonly relationship?: string;
+  }[];
+}
+
 export interface Registration {
+  readonly documentProfile?: RegistrationDocumentProfile | null;
+  readonly address?: RegistrationAddress | null;
+  readonly serviceInstructions?: string | null;
   readonly id: string;
   readonly type: RegistrationType;
   readonly status: RegistrationStatus;

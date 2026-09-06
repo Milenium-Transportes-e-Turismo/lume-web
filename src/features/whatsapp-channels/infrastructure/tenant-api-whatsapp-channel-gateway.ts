@@ -101,6 +101,13 @@ export class TenantApiWhatsAppChannelGateway implements WhatsAppChannelGateway {
     this.baseUrl = baseUrl.replace(/\/+$/u, '');
   }
 
+  async listDepartments() {
+    return parse(
+      z.array(z.object({ id: z.string().uuid(), name: z.string().min(1) })),
+      await this.request('/whatsapp/channels/departments'),
+    );
+  }
+
   async list() {
     return parse(z.array(channelSchema), await this.request('/whatsapp/channels'));
   }

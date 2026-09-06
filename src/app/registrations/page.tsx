@@ -21,7 +21,8 @@ import {
   EmptyTitle,
 } from '@/shared/ui/empty';
 import { Input } from '@/shared/ui/input';
-import { NativeSelect, NativeSelectOption } from '@/shared/ui/native-select';
+import { NativeSelectOption } from '@/shared/ui/native-select';
+import { ReadableNativeSelect as NativeSelect } from '@/shared/readable-native-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 
 export const metadata: Metadata = {
@@ -132,7 +133,7 @@ export default async function RegistrationsPage({
                 tagCodes: search.tagCodes,
                 sort: search.sort,
               })}
-              className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(17rem,1fr)_10rem_10rem_11rem_11rem_11rem]"
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-[minmax(17rem,1fr)_repeat(5,minmax(12rem,1fr))]"
             >
               <div className="relative md:col-span-2 xl:col-span-1">
                 <Search
@@ -207,7 +208,7 @@ export default async function RegistrationsPage({
                 <NativeSelectOption value="updated">Atualização recente</NativeSelectOption>
                 <NativeSelectOption value="status">Situação</NativeSelectOption>
               </NativeSelect>
-              <p className="flex items-center justify-between gap-3 text-xs text-muted-foreground md:col-span-2 xl:col-span-6">
+              <p className="flex items-center justify-between gap-3 text-xs text-muted-foreground sm:col-span-2 lg:col-span-3 2xl:col-span-6">
                 <span>Os filtros são aplicados automaticamente.</span>
                 <Link className="font-medium text-primary hover:underline" href="/registrations">
                   Limpar filtros

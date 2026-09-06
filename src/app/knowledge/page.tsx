@@ -9,7 +9,7 @@ import { executeAuthenticatedKnowledgeRequest } from '@/features/knowledge-manag
 import { AuthenticatedShell } from '@/features/navigation';
 
 export const metadata: Metadata = {
-  title: 'Knowledge Base | Lume',
+  title: 'Conhecimento | Lume',
   description: 'Gestão de conteúdo versionado e evidências dos agentes.',
 };
 
