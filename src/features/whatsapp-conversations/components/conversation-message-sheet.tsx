@@ -710,9 +710,11 @@ export function ConversationMessageSheet({
             ) : null}
             {conversation.messages.map((message, messageIndex) => {
               const isOutbound = message.direction === 'outbound';
-              const failedAttempt = [...message.attempts]
-                .reverse()
-                .find((attempt) => attempt.status === 'failed');
+              const failedAttempt =
+                message.deliveryStatus === 'failed' ||
+                (message.deliveryStatus === 'pending' &&
+                  [...message.attempts].sort((a, b) => b.attemptNumber - a.attemptNumber).at(0)
+                    ?.status === 'failed');
               const messageTime = TIME_FORMATTER.format(new Date(message.occurredAt));
               const messageSender = getWhatsAppMessageActorLabel(
                 message,
@@ -800,14 +802,20 @@ export function ConversationMessageSheet({
                             {failedAttempt ? (
                               <p className="flex items-start gap-1 text-xs text-destructive-emphasis">
                                 <AlertCircle aria-hidden="true" className="mt-0.5 size-3.5" />
-                                <span>Não foi possível enviar esta mensagem. Tente novamente.</span>
+                                <span>Esta mensagem não foi enviada ao WhatsApp.</span>
                               </p>
                             ) : null}
                             <small
                               className="ml-auto block w-fit text-[10px] leading-none text-muted-foreground/80"
                               data-occurred-at={message.occurredAt}
                             >
-                              {isOutbound ? `Enviada por ${messageSender}` : messageSender}
+                              {isOutbound
+                                ? message.deliveryStatus === 'pending'
+                                  ? 'Aguardando envio por ' + messageSender
+                                  : message.deliveryStatus === 'failed'
+                                    ? 'Não enviada por ' + messageSender
+                                    : 'Enviada por ' + messageSender
+                                : messageSender}
                               {messageSource ? ` via ${messageSource}` : ''} · {messageTime}
                             </small>
                           </div>

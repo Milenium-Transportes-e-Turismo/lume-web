@@ -108,6 +108,7 @@ export function getWhatsAppMessageActorLabel(
   message: WhatsAppMessage,
   customerName: string,
 ): string {
+  if (message.actor?.type === 'AI_AGENT') return 'Milena IA';
   if (message.actor?.type === 'EXTERNAL_HUMAN') {
     return message.actor.name
       ? `${message.actor.name} (externo no WhatsApp)`
@@ -119,7 +120,7 @@ export function getWhatsAppMessageActorLabel(
     CUSTOMER: customerName,
     HUMAN_USER: message.sentBy?.name ?? 'Atendente Lume',
     EXTERNAL_HUMAN: 'Atendente externo (WhatsApp)',
-    AI_AGENT: 'IA Lume',
+    AI_AGENT: 'Milena IA',
     SYSTEM: 'Sistema Lume',
   };
 

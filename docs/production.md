@@ -184,3 +184,9 @@ Atualizar primeiro a Tenant API e aplicar a migration
 20260907211000_channel_agents_enabled. Depois atualizar a Web. Não são necessárias
 novas variáveis de ambiente. Confirmar a edição versionada do canal e a apresentação
 de Agentes de IA habilitados. A atualização preserva a ativação dos canais existentes.
+
+## Atualização de autoria e envio
+
+Disponibilizar a API com actor/source no presenter e depois a Web. Não há novas
+variáveis de ambiente. Validar autoria da IA, autoria humana e mensagens
+pendentes/falhas. Exibição no painel não comprova entrega ao dispositivo.

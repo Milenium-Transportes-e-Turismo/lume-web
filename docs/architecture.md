@@ -320,3 +320,10 @@ e pelo gateway da Tenant API. A Web apresenta a preferência retornada pela API;
 não decide se uma mensagem será automatizada. O gateway aceita ausência do campo
 em respostas anteriores como true. O corpo de atualização exclui channelId,
 utilizado exclusivamente no caminho da requisição.
+
+## Autoria e entrega no painel
+
+ConversationMessageSheet usa a autoria e o deliveryStatus retornados pela API.
+AI_AGENT é apresentado como Milena IA; nomes de atendentes humanos e autoria
+externa permanecem distintos. Mensagens pendentes não são apresentadas como
+enviadas e falhas anteriores não se sobrepõem ao estado atual de entrega.

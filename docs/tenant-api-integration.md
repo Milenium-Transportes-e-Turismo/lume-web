@@ -732,3 +732,10 @@ PATCH preserva o valor quando omitido. A edição envia channelId apenas na URL,
 mantendo commandId e expectedVersion no corpo. agentsEnabled=false suspende agentes
 do canal sem bloquear mensagens e atendimento humano. São mantidas as permissões
 whatsapp-channels:create e whatsapp-channels:manage nos respectivos comandos.
+
+## Identificação e status das mensagens
+
+O presenter da API inclui actor e source também nos endpoints de mensagens
+da conversa. A Web usa actor.type=AI_AGENT para exibir Milena IA, sem atribuir
+mensagens humanas à IA. deliveryStatus pending/failed/sent/delivered/read é
+a autoridade para as indicações de envio no painel.

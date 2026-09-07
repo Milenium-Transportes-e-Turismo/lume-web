@@ -292,3 +292,9 @@ somente ao canal selecionado. Desabilitar preserva mensagens e atendimento human
 Novos canais vêm com a opção marcada e canais existentes mantêm a IA habilitada
 após a atualização. A atuação também depende de conexão, roteamento, configuração
 dos agentes e de a conversa estar sob controle da IA.
+
+## Autoria da IA e estado de envio
+
+O painel identifica respostas de IA como Milena IA. Mensagens pendentes exibem
+Aguardando envio; falhas exibem Não enviada. A indicação Enviada é reservada a
+mensagens que a API informa como enviadas, entregues ou lidas.

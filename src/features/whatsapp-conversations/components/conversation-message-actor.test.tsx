@@ -48,3 +48,50 @@ describe('autoria real das mensagens', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('Milena IA e status real de envio', () => {
+  it.each([
+    ['sent', 'Enviada por Milena IA'],
+    ['pending', 'Aguardando envio por Milena IA'],
+    ['failed', 'Não enviada por Milena IA'],
+  ] as const)('apresenta autoria e estado %s', (deliveryStatus, label) => {
+    const message: WhatsAppMessage = {
+      id: '00000000-0000-4000-8000-000000000799',
+      direction: 'outbound',
+      deliveryStatus,
+      kind: 'text',
+      text: 'Qual sua preferência de veículo?',
+      attachment: null,
+      sentBy: null,
+      actor: { type: 'AI_AGENT', id: null, name: 'Atendimento Lume' },
+      source: 'AUTOMATION',
+      occurredAt: '2026-09-07T22:45:00Z',
+      attempts: [],
+    };
+    render(
+      <ConversationMessageSheet
+        conversation={createWhatsAppConversationFixture({ messages: [message] })}
+        isLoading={false}
+        isLoaded
+        detailError=""
+        onRetry={jest.fn()}
+        onLoadOlder={jest.fn()}
+        isLoadingOlder={false}
+        searchOpen={false}
+        onSearchOpenChange={jest.fn()}
+        messageDraft=""
+        onMessageDraftChange={jest.fn()}
+        selectedAttachment={null}
+        onSelectedAttachmentChange={jest.fn()}
+        canSendMessage={false}
+        isSendingMessage={false}
+        onSendMessage={jest.fn()}
+        feedbackMessage=""
+        feedbackTone="neutral"
+      />,
+    );
+    expect(screen.getByText(new RegExp(label))).toBeInTheDocument();
+    if (deliveryStatus !== 'sent')
+      expect(screen.queryByText(/^Enviada por Milena IA/)).not.toBeInTheDocument();
+  });
+});

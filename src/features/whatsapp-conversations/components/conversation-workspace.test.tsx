@@ -475,10 +475,8 @@ describe('ConversationWorkspace', () => {
     expect(screen.queryByText('Resumo confirmado')).not.toBeInTheDocument();
     await openMessages(user);
     expect(await screen.findByText('proposta.pdf')).toBeInTheDocument();
-    expect(screen.getByText(/Enviada por .* · \d{2}:\d{2}/)).toBeInTheDocument();
-    expect(
-      screen.getByText('Não foi possível enviar esta mensagem. Tente novamente.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Não enviada por .* · \d{2}:\d{2}/)).toBeInTheDocument();
+    expect(screen.getByText('Esta mensagem não foi enviada ao WhatsApp.')).toBeInTheDocument();
     expect(screen.queryByText('Evolution não respondeu.')).not.toBeInTheDocument();
     expect(screen.queryByText(/PROVIDER_TIMEOUT/)).not.toBeInTheDocument();
     expect(screen.queryByText('Dados adicionais confirmados')).not.toBeInTheDocument();
@@ -1387,7 +1385,7 @@ describe('ConversationWorkspace', () => {
       });
     });
     expect(await screen.findAllByText(message.text)).toHaveLength(2);
-    expect(screen.getAllByText(/Enviada por .* · \d{2}:\d{2}/)).not.toHaveLength(0);
+    expect(screen.getAllByText(/Aguardando envio por .* · \d{2}:\d{2}/)).not.toHaveLength(0);
     expect(
       screen.getAllByText('Mensagem salva. Aguardando confirmação de envio.'),
     ).not.toHaveLength(0);
@@ -1518,10 +1516,12 @@ describe('ConversationWorkspace', () => {
     await user.type(input, secondMessage.text);
     fireEvent.keyDown(input, { key: 'Enter', code: 'NumpadEnter' });
     await waitFor(() => expect(mockedSendMessage).toHaveBeenCalledTimes(2));
-    const firstMetadata = await screen.findByText('Enviada por Usuário Comercial · 19:47');
+    const firstMetadata = await screen.findByText('Aguardando envio por Usuário Comercial · 19:47');
     expect(firstMetadata).toHaveClass('ml-auto', 'block', 'w-fit', 'text-[10px]');
     expect(firstMetadata).not.toHaveClass('min-w-max', 'whitespace-nowrap');
-    expect(await screen.findByText('Enviada por Usuário Comercial · 19:48')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Aguardando envio por Usuário Comercial · 19:48'),
+    ).toBeInTheDocument();
   });
 
   it('permite reparar uma atribuição bloqueada pela ação consolidada do atendente', async () => {
@@ -1763,13 +1763,11 @@ describe('ConversationWorkspace', () => {
     render(<ConversationWorkspace initialConversations={[summary]} />);
     await openMessages(user);
 
-    expect(await screen.findAllByText(/Enviada por .* · \d{2}:\d{2}/)).not.toHaveLength(0);
+    expect(await screen.findAllByText(/Aguardando envio por .* · \d{2}:\d{2}/)).not.toHaveLength(0);
     await user.click(screen.getByRole('button', { name: 'Atualizar conversas' }));
 
-    expect(await screen.findAllByText(/Enviada por .* · \d{2}:\d{2}/)).not.toHaveLength(0);
-    expect(
-      screen.getByText('Não foi possível enviar esta mensagem. Tente novamente.'),
-    ).toBeInTheDocument();
+    expect(await screen.findAllByText(/Não enviada por .* · \d{2}:\d{2}/)).not.toHaveLength(0);
+    expect(screen.getByText('Esta mensagem não foi enviada ao WhatsApp.')).toBeInTheDocument();
     expect(screen.queryByText('Evolution indisponível.')).not.toBeInTheDocument();
     expect(screen.queryByText(/EVOLUTION_UNAVAILABLE/)).not.toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(3);
