@@ -20,6 +20,7 @@ export const WHATSAPP_CHANNEL_ROUTING_MODES = ['department-owned', 'general-tria
 export type WhatsAppChannelRoutingMode = (typeof WHATSAPP_CHANNEL_ROUTING_MODES)[number];
 
 export interface ManagedWhatsAppChannel {
+  readonly agentsEnabled?: boolean;
   readonly id: string;
   readonly companyId: string;
   readonly providerId: string;

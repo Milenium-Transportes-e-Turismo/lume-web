@@ -283,3 +283,12 @@ Origem, destino e paradas compartilham a busca de cidade, endereço e CEP. Ponto
 O modal de pareamento consulta o estado autorizado do canal e o QR atual a cada oito segundos, oculta códigos em falhas/expiração e encerra consultas ao fechar. A conexão só é anunciada após confirmação do provedor e sincronização versionada na API.
 
 O painel administrativo reúne auditoria e uso recente em uma lista com paginação cronológica no servidor. O filtro de resultado limita a registros de requisição, pois eventos de auditoria não possuem código HTTP. Não existe correlação presumida entre requisições e comandos distintos.
+
+## Agentes por canal WhatsApp
+
+Em Canais WhatsApp, selecione o canal, abra Editar configuração e marque ou
+desmarque Agentes de IA habilitados. Salvar configuração aplica a preferência
+somente ao canal selecionado. Desabilitar preserva mensagens e atendimento humano.
+Novos canais vêm com a opção marcada e canais existentes mantêm a IA habilitada
+após a atualização. A atuação também depende de conexão, roteamento, configuração
+dos agentes e de a conversa estar sob controle da IA.

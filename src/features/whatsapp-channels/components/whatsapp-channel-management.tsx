@@ -78,6 +78,7 @@ const ROUTING_LABELS: Record<WhatsAppChannelRoutingMode, string> = {
 };
 
 interface ChannelDraft {
+  agentsEnabled: boolean;
   displayName: string;
   phoneNumber: string;
   routingMode: WhatsAppChannelRoutingMode;
@@ -86,6 +87,7 @@ interface ChannelDraft {
 }
 
 const EMPTY_DRAFT: ChannelDraft = {
+  agentsEnabled: true,
   displayName: '',
   phoneNumber: '',
   routingMode: 'general-triage',
@@ -107,6 +109,7 @@ function identifiers(value: string): string[] {
 function draftFromChannel(channel: ManagedWhatsAppChannel): ChannelDraft {
   return {
     displayName: channel.displayName,
+    agentsEnabled: channel.agentsEnabled ?? true,
     phoneNumber: channel.phoneNumber,
     routingMode: channel.routingMode,
     departmentId: channel.departmentId ?? '',
@@ -227,6 +230,20 @@ function ConfigurationFields({
             ))}
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-2 rounded-lg border p-3 sm:col-span-2">
+        <Label className="flex items-center gap-2">
+          <Checkbox
+            checked={value.agentsEnabled}
+            disabled={disabled}
+            onCheckedChange={(checked) => onChange({ ...value, agentsEnabled: checked === true })}
+          />
+          Agentes de IA habilitados
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          Ativa o atendimento automático e a análise de mídias neste canal. Ao desabilitar, as
+          mensagens continuam disponíveis para atendimento humano.
+        </p>
       </div>
       <fieldset className="space-y-2 sm:col-span-2" disabled={disabled}>
         <legend className="text-sm font-medium">Destinos automáticos permitidos</legend>
@@ -364,6 +381,7 @@ export function WhatsAppChannelManagement({
         phoneNumber: createDraft.phoneNumber,
         departmentId: createDraft.departmentId.trim() || null,
         routingMode: createDraft.routingMode,
+        agentsEnabled: createDraft.agentsEnabled,
         allowedAutomaticTargetDepartmentIds: identifiers(createDraft.allowedDepartmentIds),
       });
       if (!result.success) {
@@ -402,6 +420,7 @@ export function WhatsAppChannelManagement({
         displayName: editDraft.displayName,
         departmentId: editDraft.departmentId.trim() || null,
         routingMode: editDraft.routingMode,
+        agentsEnabled: editDraft.agentsEnabled,
         allowedAutomaticTargetDepartmentIds: identifiers(editDraft.allowedDepartmentIds),
       });
       if (!result.success) {
@@ -663,6 +682,10 @@ export function WhatsAppChannelManagement({
                   ['Estado organizacional', ORGANIZATIONAL_LABELS[selected.organizationalStatus]],
                   ['Conexão', CONNECTION_LABELS[selected.connectionStatus]],
                   ['Roteamento', ROUTING_LABELS[selected.routingMode]],
+                  [
+                    'Agentes de IA',
+                    selected.agentsEnabled === false ? 'Desabilitados' : 'Habilitados',
+                  ],
                   [
                     'Departamento',
                     departments.find((department) => department.id === selected.departmentId)

@@ -723,3 +723,12 @@ Origem, destino e paradas compartilham a busca de cidade, endereço e CEP. Ponto
 O modal de pareamento consulta o estado autorizado do canal e o QR atual a cada oito segundos, oculta códigos em falhas/expiração e encerra consultas ao fechar. A conexão só é anunciada após confirmação do provedor e sincronização versionada na API.
 
 O painel administrativo reúne auditoria e uso recente em uma lista com paginação cronológica no servidor. O filtro de resultado limita a registros de requisição, pois eventos de auditoria não possuem código HTTP. Não existe correlação presumida entre requisições e comandos distintos.
+
+## Edição de canais e controle da IA
+
+CreateWhatsAppChannelInput e UpdateWhatsAppChannelInput aceitam agentsEnabled.
+A preferência é retornada em ManagedWhatsAppChannel. POST cria com true por padrão;
+PATCH preserva o valor quando omitido. A edição envia channelId apenas na URL,
+mantendo commandId e expectedVersion no corpo. agentsEnabled=false suspende agentes
+do canal sem bloquear mensagens e atendimento humano. São mantidas as permissões
+whatsapp-channels:create e whatsapp-channels:manage nos respectivos comandos.

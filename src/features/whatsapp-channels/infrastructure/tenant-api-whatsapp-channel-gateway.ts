@@ -21,6 +21,7 @@ type Fetcher = typeof fetch;
 
 const isoDateSchema = z.string().refine((value) => Number.isFinite(Date.parse(value)));
 const channelSchema = z.object({
+  agentsEnabled: z.boolean().optional().default(true),
   id: z.string().uuid(),
   companyId: z.string().uuid(),
   providerId: z.string().min(1),

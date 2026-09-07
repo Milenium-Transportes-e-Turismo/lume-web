@@ -21,6 +21,7 @@ import {
 
 const nullableUuid = z.union([z.string().uuid(), z.null()]);
 const configurationFields = {
+  agentsEnabled: z.boolean().optional(),
   commandId: z.string().uuid(),
   displayName: z.string().trim().min(2).max(80),
   departmentId: nullableUuid,
@@ -200,8 +201,9 @@ export async function updateWhatsAppChannelAction(
     };
   }
   try {
+    const { channelId, ...configuration } = parsed.data;
     const channel = await executeAuthenticatedWhatsAppChannelMutation((gateway) =>
-      gateway.update(parsed.data.channelId, parsed.data),
+      gateway.update(channelId, configuration),
     );
     revalidatePath('/whatsapp-channels');
     return {

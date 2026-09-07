@@ -1,7 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { executeWhatsAppChannelAction, loadWhatsAppChannelsAction } from '../actions';
+import {
+  executeWhatsAppChannelAction,
+  loadWhatsAppChannelsAction,
+  updateWhatsAppChannelAction,
+} from '../actions';
 import type { ManagedWhatsAppChannel } from '../domain';
 import { WhatsAppChannelManagement } from './whatsapp-channel-management';
 
@@ -11,6 +15,10 @@ jest.mock('../actions', () => ({
   loadWhatsAppChannelsAction: jest.fn(),
   updateWhatsAppChannelAction: jest.fn(),
 }));
+
+beforeAll(() => {
+  window.PointerEvent ??= MouseEvent as typeof PointerEvent;
+});
 
 const mockedExecute = jest.mocked(executeWhatsAppChannelAction);
 const mockedLoad = jest.mocked(loadWhatsAppChannelsAction);
@@ -119,4 +127,30 @@ describe('WhatsAppChannelManagement', () => {
     expect(screen.getByText('Tenant API indisponível.')).toBeInTheDocument();
     expect(screen.getByText('Nenhum canal encontrado')).toBeInTheDocument();
   });
+});
+
+it('salva a preferência dos agentes com a versão atual do canal', async () => {
+  const user = userEvent.setup();
+  jest.mocked(updateWhatsAppChannelAction).mockResolvedValue({
+    success: true,
+    message: 'Configuração atualizada.',
+    operation: {
+      channel: { ...channel, agentsEnabled: false, version: 4 },
+      qrCode: null,
+      providerIssue: null,
+      infrastructureCleanupPending: false,
+    },
+  });
+  render(<WhatsAppChannelManagement initialChannels={[channel]} permissions={allPermissions} />);
+  await user.click(screen.getByRole('button', { name: 'Editar configuração' }));
+  const toggle = screen.getByRole('checkbox', { name: 'Agentes de IA habilitados' });
+  expect(toggle).toBeChecked();
+  await user.click(toggle);
+  await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
+  await waitFor(() =>
+    expect(updateWhatsAppChannelAction).toHaveBeenCalledWith(
+      expect.objectContaining({ channelId: channel.id, agentsEnabled: false, expectedVersion: 3 }),
+    ),
+  );
+  expect(await screen.findByText('Desabilitados')).toBeInTheDocument();
 });

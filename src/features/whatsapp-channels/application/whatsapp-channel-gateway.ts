@@ -28,6 +28,7 @@ export class WhatsAppChannelGatewayError extends Error {
 }
 
 export interface CreateWhatsAppChannelInput {
+  readonly agentsEnabled?: boolean;
   readonly commandId: string;
   readonly displayName: string;
   readonly phoneNumber: string;

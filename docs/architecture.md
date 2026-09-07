@@ -312,3 +312,11 @@ Origem, destino e paradas compartilham a busca de cidade, endereço e CEP. Ponto
 O modal de pareamento consulta o estado autorizado do canal e o QR atual a cada oito segundos, oculta códigos em falhas/expiração e encerra consultas ao fechar. A conexão só é anunciada após confirmação do provedor e sincronização versionada na API.
 
 O painel administrativo reúne auditoria e uso recente em uma lista com paginação cronológica no servidor. O filtro de resultado limita a registros de requisição, pois eventos de auditoria não possuem código HTTP. Não existe correlação presumida entre requisições e comandos distintos.
+
+## Configuração dos agentes por canal
+
+O formulário de criação/edição de canais envia agentsEnabled pela Server Action
+e pelo gateway da Tenant API. A Web apresenta a preferência retornada pela API;
+não decide se uma mensagem será automatizada. O gateway aceita ausência do campo
+em respostas anteriores como true. O corpo de atualização exclui channelId,
+utilizado exclusivamente no caminho da requisição.

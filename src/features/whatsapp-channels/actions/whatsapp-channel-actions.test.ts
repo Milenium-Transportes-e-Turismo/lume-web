@@ -9,6 +9,7 @@ import {
 } from '@/features/auth/domain';
 import { getCurrentAuthenticatedSession } from '@/features/auth/server';
 
+import type { WhatsAppChannelGateway } from '../application';
 import type { ManagedWhatsAppChannel } from '../domain';
 import {
   executeAuthenticatedWhatsAppChannelMutation,
@@ -18,6 +19,7 @@ import {
   createWhatsAppChannelAction,
   executeWhatsAppChannelAction,
   loadWhatsAppChannelsAction,
+  updateWhatsAppChannelAction,
 } from './whatsapp-channel-actions';
 
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
@@ -116,5 +118,28 @@ describe('WhatsApp channel server actions', () => {
     await expect(executeWhatsAppChannelAction(input)).resolves.toMatchObject({ success: true });
     expect(mockedMutation).toHaveBeenCalledTimes(1);
     expect(revalidatePath).toHaveBeenCalledWith('/whatsapp-channels');
+  });
+  it('sends channelId only in the URL and preserves the agents toggle', async () => {
+    mockedSession.mockResolvedValue(session(['whatsapp-channels:manage']));
+    const update = jest.fn().mockResolvedValue({ ...channel, agentsEnabled: false });
+    mockedMutation.mockImplementation(async (operation) =>
+      operation({ update } as unknown as WhatsAppChannelGateway),
+    );
+    const result = await updateWhatsAppChannelAction({
+      channelId: channel.id,
+      commandId: '00000000-0000-4000-8000-000000000301',
+      expectedVersion: channel.version,
+      displayName: channel.displayName,
+      departmentId: null,
+      routingMode: 'general-triage',
+      allowedAutomaticTargetDepartmentIds: [],
+      agentsEnabled: false,
+    });
+    expect(result.success).toBe(true);
+    expect(update).toHaveBeenCalledWith(
+      channel.id,
+      expect.objectContaining({ agentsEnabled: false, expectedVersion: channel.version }),
+    );
+    expect(update.mock.calls[0][1]).not.toHaveProperty('channelId');
   });
 });
