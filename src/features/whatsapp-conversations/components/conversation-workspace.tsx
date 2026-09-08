@@ -1851,7 +1851,10 @@ export function ConversationWorkspace({
                               }
                               disabled={isUpdatingConversation || !selectedTransferTarget}
                             >
-                              <SelectTrigger id="transfer-queue" className="h-8 w-full min-w-0">
+                              <SelectTrigger
+                                id="transfer-queue"
+                                className="w-full min-w-0 data-[size=default]:h-8 [&>span:first-child]:truncate [&>span:first-child]:whitespace-nowrap"
+                              >
                                 <span className="min-w-0 truncate">
                                   {selectedTransferTarget?.queues.find(
                                     (queue) => queue.id === transferQueueId,
@@ -1879,7 +1882,10 @@ export function ConversationWorkspace({
                               }
                               disabled={isUpdatingConversation || !selectedTransferTarget}
                             >
-                              <SelectTrigger id="transfer-user" className="h-8 w-full min-w-0">
+                              <SelectTrigger
+                                id="transfer-user"
+                                className="w-full min-w-0 data-[size=default]:h-8 [&>span:first-child]:truncate [&>span:first-child]:whitespace-nowrap"
+                              >
                                 <span className="min-w-0 truncate">
                                   {selectedTransferTarget?.users.find(
                                     (user) => user.id === transferUserId,
