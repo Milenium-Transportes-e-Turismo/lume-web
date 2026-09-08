@@ -18,6 +18,7 @@ export default async function DocumentsPage({
   const session = await requireDocumentSession();
   const query = await searchParams;
   let requests: DocumentRequestListType;
+  let loadError: string | undefined;
   try {
     requests = await executeAuthenticatedDocumentRequest((gateway) =>
       gateway.listRequests({
@@ -30,6 +31,7 @@ export default async function DocumentsPage({
     if (error instanceof DocumentManagementError && error.code === 'unauthorized') {
       redirect('/auth/session-expired');
     }
+    loadError = 'Não foi possível carregar suas solicitações. Tente novamente.';
     requests = { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 } };
   }
 
@@ -43,8 +45,8 @@ export default async function DocumentsPage({
             Acompanhe prazos, pendências, recusas, renovações e o progresso de cada checklist.
           </p>
         </header>
-        <PageFeedbackToast error={query.error} success={query.success} />
-        <DocumentRequestList requests={requests.data} />
+        <PageFeedbackToast error={loadError ?? query.error} success={query.success} />
+        {!loadError && <DocumentRequestList requests={requests.data} />}
       </div>
     </AuthenticatedShell>
   );
