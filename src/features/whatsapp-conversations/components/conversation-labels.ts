@@ -32,8 +32,8 @@ export const CONVERSATION_STATE_LABELS: Record<WhatsAppConversationState, string
 };
 
 export const FLOW_STEP_LABELS: Record<WhatsAppConversationFlowStep, string> = {
-  'main-menu': 'Menu principal',
-  'commercial-menu': 'Menu comercial',
+  'main-menu': 'Atendimento inicial',
+  'commercial-menu': 'Atendimento comercial',
   'quote-data-collection': 'Coleta de dados do orçamento',
   'quote-summary-confirmation': 'Confirmação do resumo',
   'quote-send-pending': 'Envio da proposta pendente',

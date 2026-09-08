@@ -29,7 +29,7 @@ const message: WhatsAppMessage = {
 };
 
 describe('MessageMediaInterpretation', () => {
-  it('loads on demand, renders confidence/provenance and never exposes credentials', async () => {
+  it('abre e fecha sem repetir consulta nem expor informações técnicas', async () => {
     const user = userEvent.setup();
     jest.mocked(getMediaInterpretationAction).mockResolvedValue({
       success: true,
@@ -39,10 +39,10 @@ describe('MessageMediaInterpretation', () => {
         status: 'succeeded',
         transcription: 'Olá',
         detectedLanguage: 'pt-BR',
-        extractedText: null,
+        extractedText: 'Olá',
         summary: 'Saudação',
         documentType: null,
-        structuredData: null,
+        structuredData: { internalDecision: 'HUMAN_REQUIRED' },
         confidence: 0.98,
         durationSeconds: 1,
         provenance: {
@@ -66,8 +66,22 @@ describe('MessageMediaInterpretation', () => {
 
     expect(screen.queryByText('Saudação')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Ver interpretação' }));
-    expect(await screen.findByText('98% confiança')).toBeInTheDocument();
-    expect(screen.getAllByText('Saudação').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Olá')).toBeInTheDocument();
+    expect(screen.getAllByText('Olá')).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        /confiança|Proveniência|Dados estruturados|Contexto gerado|HUMAN_REQUIRED|Saudação/,
+      ),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Fechar interpretação' }));
+    expect(screen.queryByText('Olá')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver interpretação' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await user.click(screen.getByRole('button', { name: 'Ver interpretação' }));
+    expect(screen.getByText('Olá')).toBeInTheDocument();
+    expect(getMediaInterpretationAction).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/credentialIdentifier|secret-ref/iu)).not.toBeInTheDocument();
   });
 });

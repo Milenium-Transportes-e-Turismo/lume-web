@@ -327,3 +327,22 @@ ConversationMessageSheet usa a autoria e o deliveryStatus retornados pela API.
 AI_AGENT é apresentado como Milena IA; nomes de atendentes humanos e autoria
 externa permanecem distintos. Mensagens pendentes não são apresentadas como
 enviadas e falhas anteriores não se sobrepõem ao estado atual de entrega.
+
+## Atendimento contextual e interpretação compacta
+
+O Painel WhatsApp apresenta o atendimento sem menus numéricos. A Tenant API e os
+agentes interpretam mensagens novas com o histórico e o orçamento já registrado.
+A transferência exige departamento e permite fila e responsável opcionais. Os
+seletores mantêm altura uniforme e textos longos truncados.
+
+A interpretação de mídia começa recolhida, abre sob demanda e oferece Fechar.
+O texto é exibido uma única vez, priorizando transcrição e texto extraído. Resumo
+é usado apenas quando não existe texto. Confiança, JSON, proveniência e contexto
+técnico não aparecem na caixa de mensagens; a correção humana continua disponível
+para quem possui permissão. Reabrir reutiliza a consulta já concluída; análises
+pendentes podem ser atualizadas explicitamente.
+
+A transferência usa o snapshot autorizado anterior ao comando e a sessão retornada
+pela API, sem exigir nova leitura do destino. Assim, a perda de acesso ao novo
+departamento não transforma um comando confirmado em erro. A lista é atualizada
+após a confirmação para refletir o escopo atual do operador.

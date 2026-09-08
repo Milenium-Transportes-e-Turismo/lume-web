@@ -785,7 +785,11 @@ export function ConversationWorkspace({
     });
   }
 
-  function applyActionResult(result: WhatsAppConversationActionResult, successMessage: string) {
+  function applyActionResult(
+    result: WhatsAppConversationActionResult,
+    successMessage: string,
+    reloadDetail = true,
+  ) {
     if (result.conversation) {
       replaceConversation(result.conversation, result.success);
       setTargetDepartment(getDefaultTargetDepartment(result.conversation.department));
@@ -793,7 +797,7 @@ export function ConversationWorkspace({
     setFeedbackMessage(result.success ? successMessage : result.message);
     setFeedbackTone(result.success ? 'success' : 'error');
 
-    if (result.conversation) {
+    if (result.conversation && reloadDetail) {
       void loadConversationDetail(result.conversation.id);
     }
   }
@@ -910,10 +914,11 @@ export function ConversationWorkspace({
         userId: transferUserId || undefined,
         reason: transferReason.trim() || undefined,
       });
-      applyActionResult(result, 'Atendimento encaminhado com sucesso.');
+      applyActionResult(result, 'Atendimento encaminhado com sucesso.', false);
       if (result.success) {
         setIsForwardDialogOpen(false);
         setTransferReason('');
+        await refreshList(true);
       }
     });
   }
@@ -1792,8 +1797,8 @@ export function ConversationWorkspace({
                     <DialogHeader>
                       <DialogTitle>Transferir atendimento</DialogTitle>
                       <DialogDescription>
-                        Escolha um destino publicado pela Tenant API. Fila e responsável são
-                        opcionais na transferência.
+                        Escolha o departamento de destino. Se desejar, selecione uma fila ou um
+                        responsável.
                       </DialogDescription>
                     </DialogHeader>
                     {initialAssignmentTargets.length ? (
@@ -1846,8 +1851,8 @@ export function ConversationWorkspace({
                               }
                               disabled={isUpdatingConversation || !selectedTransferTarget}
                             >
-                              <SelectTrigger id="transfer-queue" className="w-full">
-                                <span>
+                              <SelectTrigger id="transfer-queue" className="h-8 w-full min-w-0">
+                                <span className="min-w-0 truncate">
                                   {selectedTransferTarget?.queues.find(
                                     (queue) => queue.id === transferQueueId,
                                   )?.name ?? 'Sem fila específica'}
@@ -1874,8 +1879,8 @@ export function ConversationWorkspace({
                               }
                               disabled={isUpdatingConversation || !selectedTransferTarget}
                             >
-                              <SelectTrigger id="transfer-user" className="w-full">
-                                <span>
+                              <SelectTrigger id="transfer-user" className="h-8 w-full min-w-0">
+                                <span className="min-w-0 truncate">
                                   {selectedTransferTarget?.users.find(
                                     (user) => user.id === transferUserId,
                                   )?.name ?? 'Sem responsável específico'}

@@ -1295,7 +1295,17 @@ describe('ConversationWorkspace', () => {
       version: 4,
     });
     mockFetchDetail(conversation);
-    mockedTransfer.mockResolvedValue({ success: true, conversation: forwarded });
+    const readsAfterTransfer: string[] = [];
+    mockedTransfer.mockImplementationOnce(async () => {
+      jest.mocked(global.fetch).mockImplementation(async (input) => {
+        const url = String(input);
+        readsAfterTransfer.push(url);
+        return url.startsWith('/api/whatsapp-conversations?')
+          ? response({ conversations: [] })
+          : response({ message: 'Acesso negado ao departamento de destino.' }, 403);
+      });
+      return { success: true, conversation: forwarded };
+    });
     render(
       <ConversationWorkspace
         initialConversations={[conversation]}
@@ -1323,6 +1333,16 @@ describe('ConversationWorkspace', () => {
         }),
       );
     });
+    await waitFor(() => {
+      expect(readsAfterTransfer.length).toBeGreaterThan(0);
+      expect(
+        readsAfterTransfer.every((url) => url.startsWith('/api/whatsapp-conversations?')),
+      ).toBe(true);
+      expect(
+        screen.queryByRole('region', { name: /Histórico da conversa/ }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Acesso negado ao departamento de destino.')).not.toBeInTheDocument();
   });
 
   it('sends a human message with optimistic version and shows its pending state', async () => {

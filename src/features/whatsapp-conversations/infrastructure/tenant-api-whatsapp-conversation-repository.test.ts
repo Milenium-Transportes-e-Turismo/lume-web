@@ -813,6 +813,38 @@ describe('LumeApiWhatsAppConversationRepository', () => {
     expect(requests.every(([, body]) => /^[0-9a-f-]{36}$/.test(body.commandId))).toBe(true);
   });
 
+  it('confirms a transfer even when the source account loses access to the target department', async () => {
+    let transferred = false;
+    const fetcher = jest.fn(async (_url: Parameters<typeof fetch>[0], input?: RequestInit) => {
+      if (input?.method === 'POST') {
+        transferred = true;
+        return jsonResponse(apiServiceSession({ version: 15, queueId: null, queue: null }));
+      }
+      if (transferred) return new Response(null, { status: 403 });
+      return jsonResponse(apiConversation({ version: 14 }));
+    });
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+
+    const result = await repository.transferServiceSession(conversationId, {
+      serviceSessionId: apiServiceSession().id,
+      commandId: '00000000-0000-4000-8000-000000000904',
+      expectedVersion: 14,
+      departmentId: apiServiceSession().currentDepartmentId,
+    });
+
+    expect(result.currentServiceSession).toMatchObject({
+      version: 15,
+      controlMode: 'HUMAN',
+      status: 'WAITING_HUMAN',
+      queueId: null,
+    });
+    expect(fetcher.mock.calls.map(([, input]) => input?.method)).toEqual(['GET', 'POST']);
+  });
+
   it('starts a canonical human conversation by phone', async () => {
     const fetcher = jest.fn().mockResolvedValue(
       jsonResponse(

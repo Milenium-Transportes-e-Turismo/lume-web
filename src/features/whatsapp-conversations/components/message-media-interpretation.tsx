@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, type FormEvent } from 'react';
-import { Bot, CheckCircle2, FileSearch, LoaderCircle, PencilLine, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, FileSearch, LoaderCircle, PencilLine, X } from 'lucide-react';
 
 import {
   analyzeMediaInterpretationAction,
@@ -13,8 +13,6 @@ import type {
   WhatsAppMediaInterpretation,
   WhatsAppMessage,
 } from '../domain';
-import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
-import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import {
   Dialog,
@@ -33,34 +31,11 @@ interface MessageMediaInterpretationProps {
   readonly canManage: boolean;
 }
 
-const STATUS_LABELS: Record<WhatsAppMediaInterpretation['status'], string> = {
-  'not-requested': 'Não analisada',
-  pending: 'Em análise',
-  succeeded: 'Analisada',
-  failed: 'Falha na análise',
-  unsupported: 'Formato não suportado',
-};
 const DEFERRED_LABELS: Record<DeferredWhatsAppMediaInterpretation['reason'], string> = {
-  'human-control-disabled': 'A política do tenant desativa análise durante controle humano.',
-  'media-agent-unavailable': 'O agente especialista em mídia não está configurado.',
-  'binary-not-stored': 'A cópia binária durável ainda não está disponível.',
+  'human-control-disabled': 'A análise automática está pausada durante o atendimento humano.',
+  'media-agent-unavailable': 'A análise de mídia está indisponível no momento.',
+  'binary-not-stored': 'A mídia ainda está sendo preparada. Tente novamente em instantes.',
 };
-
-function sanitize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitize);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => !/(?:credential|api.?key|secret|token)/iu.test(key))
-        .map(([key, entry]) => [key, sanitize(entry)]),
-    );
-  }
-  return value;
-}
-
-function evidence(value: Readonly<Record<string, unknown>> | null): string {
-  return value ? JSON.stringify(sanitize(value), null, 2) : 'Sem proveniência adicional.';
-}
 
 export function MessageMediaInterpretation({
   conversationId,
@@ -71,13 +46,16 @@ export function MessageMediaInterpretation({
     WhatsAppMediaInterpretation | DeferredWhatsAppMediaInterpretation | null
   >(null);
   const [loaded, setLoaded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState('');
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correction, setCorrection] = useState('');
   const [feedback, setFeedback] = useState('');
   const [isPending, startTransition] = useTransition();
 
-  function load() {
+  function load(refresh = false) {
+    setExpanded(true);
+    if (loaded && !error && !refresh) return;
     setError('');
     startTransition(async () => {
       const result = await getMediaInterpretationAction({
@@ -86,7 +64,7 @@ export function MessageMediaInterpretation({
       });
       setLoaded(true);
       if (result.success) setInterpretation(result.interpretation);
-      else setError(`${result.message} (${result.code})`);
+      else setError(result.message);
     });
   }
 
@@ -98,7 +76,7 @@ export function MessageMediaInterpretation({
         messageId: message.id,
       });
       if (result.success) setInterpretation(result.interpretation);
-      else setError(`${result.message} (${result.code})`);
+      else setError(result.message);
     });
   }
 
@@ -118,156 +96,106 @@ export function MessageMediaInterpretation({
         setCorrection('');
         setFeedback('');
       } else if (!result.success) {
-        setError(`${result.message} (${result.code})`);
+        setError(result.message);
       }
     });
   }
 
-  if (!loaded && !isPending) {
+  if (!expanded) {
     return (
-      <Button type="button" size="xs" variant="ghost" onClick={load}>
+      <Button
+        type="button"
+        size="xs"
+        variant="ghost"
+        onClick={() => load()}
+        aria-expanded={false}
+        disabled={isPending}
+        aria-controls={'interpretation-' + message.id}
+      >
         <FileSearch aria-hidden="true" /> Ver interpretação
       </Button>
     );
   }
-
-  if (isPending && !interpretation) {
-    return (
-      <p className="flex items-center gap-1 text-xs text-muted-foreground" aria-live="polite">
-        <LoaderCircle className="size-3 animate-spin" /> Consultando interpretação…
-      </p>
-    );
-  }
-
-  if (error && !interpretation) {
-    return (
-      <Alert variant="destructive" className="p-2 text-xs">
-        <ShieldAlert className="size-3.5" />
-        <AlertTitle>Interpretação indisponível</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-        <Button type="button" size="xs" variant="outline" className="mt-2" onClick={load}>
-          Tentar novamente
-        </Button>
-      </Alert>
-    );
-  }
-
-  if (interpretation?.status === 'deferred') {
-    return (
-      <div className="rounded-lg border bg-muted/40 p-2 text-xs">
-        <p className="font-medium">Análise adiada</p>
-        <p className="text-muted-foreground">{DEFERRED_LABELS[interpretation.reason]}</p>
-      </div>
-    );
-  }
-
-  if (!interpretation) return null;
-  const contextLabel =
-    interpretation.effectiveContext.source === 'human'
-      ? 'Contexto corrigido por pessoa'
-      : interpretation.effectiveContext.source === 'machine'
-        ? 'Contexto gerado pelo agente'
-        : 'Sem contexto efetivo';
-
+  const analyzed = interpretation && interpretation.status !== 'deferred' ? interpretation : null;
+  const content =
+    analyzed?.transcription?.trim() || analyzed?.extractedText?.trim() || analyzed?.summary?.trim();
   return (
     <section
+      id={'interpretation-' + message.id}
       className="grid gap-2 rounded-lg border bg-background/70 p-2 text-xs"
       aria-label="Interpretação da mídia"
     >
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1 font-semibold">
-          <Bot className="size-3.5" aria-hidden="true" /> Interpretação
+      <header className="flex items-center justify-between gap-2">
+        <span className="font-semibold">
+          {message.kind === 'audio' ? 'Transcrição' : 'Interpretação'}
         </span>
-        <div className="flex items-center gap-1">
-          <Badge
-            variant={
-              interpretation.status === 'succeeded'
-                ? 'default'
-                : interpretation.status === 'failed'
-                  ? 'destructive'
-                  : 'secondary'
-            }
-          >
-            {STATUS_LABELS[interpretation.status]}
-          </Badge>
-          {interpretation.confidence !== null ? (
-            <Badge variant="outline">
-              {Math.round(interpretation.confidence * 100)}% confiança
-            </Badge>
-          ) : null}
-        </div>
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          aria-label="Fechar interpretação"
+          aria-expanded={true}
+          aria-controls={'interpretation-' + message.id}
+          onClick={() => setExpanded(false)}
+        >
+          <X aria-hidden="true" /> Fechar
+        </Button>
       </header>
-      {interpretation.summary ? (
-        <p>
-          <strong>Resumo:</strong> {interpretation.summary}
+      {isPending && !interpretation ? (
+        <p className="flex items-center gap-1 text-muted-foreground" aria-live="polite">
+          <LoaderCircle className="size-3 animate-spin" aria-hidden="true" /> Consultando
+          interpretação…
         </p>
       ) : null}
-      {interpretation.transcription ? (
-        <div>
-          <strong>Transcrição</strong>
-          <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-muted/50 p-2">
-            {interpretation.transcription}
-          </p>
-        </div>
+      {interpretation?.status === 'deferred' ? (
+        <p className="text-muted-foreground">{DEFERRED_LABELS[interpretation.reason]}</p>
       ) : null}
-      {interpretation.extractedText ? (
-        <div>
-          <strong>Texto extraído</strong>
-          <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-muted/50 p-2">
-            {interpretation.extractedText}
-          </p>
-        </div>
-      ) : null}
-      {interpretation.structuredData ? (
-        <details>
-          <summary className="cursor-pointer font-medium">Dados estruturados</summary>
-          <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">
-            {JSON.stringify(sanitize(interpretation.structuredData), null, 2)}
-          </pre>
-        </details>
-      ) : null}
-      <div className="rounded bg-muted/40 p-2">
-        <p className="font-medium">{contextLabel}</p>
-        {interpretation.effectiveContext.value ? (
-          <p className="mt-1 whitespace-pre-wrap">{interpretation.effectiveContext.value}</p>
-        ) : null}
-      </div>
-      {interpretation.errorCode ? (
-        <p className="text-destructive">
-          <strong>Erro:</strong> {interpretation.errorCode}
+      {content ? (
+        <p className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/50 p-2">
+          {content}
+        </p>
+      ) : analyzed ? (
+        <p className="text-muted-foreground">
+          {analyzed.status === 'pending'
+            ? 'A mídia está sendo analisada.'
+            : analyzed.status === 'failed'
+              ? 'Não foi possível analisar esta mídia.'
+              : analyzed.status === 'unsupported'
+                ? 'Este formato ainda não possui interpretação.'
+                : 'Ainda não há texto disponível para esta mídia.'}
         </p>
       ) : null}
-      {interpretation.correction ? (
+      {analyzed?.correction ? (
         <div className="rounded border border-primary/30 bg-primary/5 p-2">
           <p className="flex items-center gap-1 font-medium">
-            <CheckCircle2 className="size-3.5" /> Correção humana efetiva
+            <CheckCircle2 className="size-3.5" aria-hidden="true" /> Correção registrada
           </p>
-          <p className="mt-1 whitespace-pre-wrap">{interpretation.correction.correction}</p>
-          {interpretation.correction.feedback ? (
-            <p className="mt-1 text-muted-foreground">
-              Feedback: {interpretation.correction.feedback}
-            </p>
-          ) : null}
+          <p className="mt-1 whitespace-pre-wrap">{analyzed.correction.correction}</p>
         </div>
       ) : null}
-      <details>
-        <summary className="cursor-pointer text-muted-foreground">Proveniência técnica</summary>
-        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">
-          {evidence(interpretation.provenance)}
-        </pre>
-      </details>
       {error ? (
         <p className="text-destructive" role="alert">
           {error}
         </p>
       ) : null}
       <div className="flex flex-wrap justify-end gap-1">
-        {canManage && interpretation.status === 'not-requested' ? (
-          <Button type="button" size="xs" onClick={analyze} disabled={isPending}>
-            <FileSearch /> Analisar agora
+        {error || interpretation?.status === 'deferred' || analyzed?.status === 'pending' ? (
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => load(true)}
+          >
+            Atualizar interpretação
           </Button>
         ) : null}
-        {canManage && interpretation.status === 'succeeded' && !interpretation.correction ? (
+        {canManage && analyzed?.status === 'not-requested' ? (
+          <Button type="button" size="xs" onClick={analyze} disabled={isPending}>
+            <FileSearch aria-hidden="true" /> Analisar agora
+          </Button>
+        ) : null}
+        {canManage && analyzed?.status === 'succeeded' && !analyzed.correction ? (
           <Button
             type="button"
             size="xs"
@@ -275,7 +203,7 @@ export function MessageMediaInterpretation({
             onClick={() => setCorrectionOpen(true)}
             disabled={isPending}
           >
-            <PencilLine /> Corrigir contexto
+            <PencilLine aria-hidden="true" /> Corrigir interpretação
           </Button>
         ) : null}
       </div>
@@ -286,8 +214,8 @@ export function MessageMediaInterpretation({
             <DialogHeader>
               <DialogTitle>Corrigir interpretação</DialogTitle>
               <DialogDescription>
-                A correção é imutável, auditável e passa a prevalecer no contexto futuro. Ela não
-                dispara nova análise.
+                O atendimento usará esta correção nas próximas respostas. Revise o texto antes de
+                salvar, pois ele não poderá ser editado depois.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-1.5">

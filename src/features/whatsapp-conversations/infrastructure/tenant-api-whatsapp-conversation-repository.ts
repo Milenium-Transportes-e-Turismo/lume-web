@@ -1281,6 +1281,16 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     extra: Readonly<Record<string, unknown>> = {},
     commandId: string = randomUUID(),
   ): Promise<WhatsAppConversation> {
+    // A successful transfer may remove the source user's access immediately.
+    const sourceConversation =
+      action === 'transfer'
+        ? mapConversation(
+            parseResponse(
+              conversationSchema,
+              await this.request('/whatsapp/conversations/' + encodeURIComponent(conversationId)),
+            ),
+          )
+        : undefined;
     const responseValue = await this.request(
       `/service/sessions/${encodeURIComponent(serviceSessionId)}/actions/${action}`,
       {
@@ -1294,6 +1304,7 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
         conversationId,
         directServiceSession.data,
         directServiceSession.data.version,
+        sourceConversation,
       );
     }
     const response = parseResponse(versionedActionResultSchema, responseValue);
@@ -1306,6 +1317,7 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
       conversationId,
       serviceSessionSchema.parse(response.snapshot),
       response.resultingVersion,
+      sourceConversation,
     );
   }
 
@@ -1313,8 +1325,9 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
     conversationId: string,
     serviceSession: z.infer<typeof serviceSessionSchema>,
     resultingVersion: number,
+    sourceConversation?: WhatsAppConversation,
   ): Promise<WhatsAppConversation> {
-    const conversation = await this.getConversationById(conversationId);
+    const conversation = sourceConversation ?? (await this.getConversationById(conversationId));
     if (!conversation) {
       throw new WhatsAppConversationRepositoryError(
         'not-found',
