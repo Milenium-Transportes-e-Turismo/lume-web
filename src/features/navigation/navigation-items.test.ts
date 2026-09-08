@@ -166,8 +166,18 @@ describe('getAuthorizedNavigationItems', () => {
     );
 
     expect(items.map((item) => item.label)).toContain('Orçamentos');
-    expect(items.map((item) => item.label)).toContain('Contatos');
+    expect(items.map((item) => item.label)).not.toContain('Contatos');
+    expect(
+      getAuthorizedNavigationItems(createEmployee(['clients:view'])).map((item) => item.label),
+    ).toContain('Contatos');
     expect(items.find((item) => item.label === 'Orçamentos')?.href).toBe('/quote-proposals');
+  });
+
+  it('keeps canonical contact export available outside Commercial when clients:view is granted', () => {
+    const items = getAuthorizedNavigationItems(
+      createEmployee(['clients:view'], true, ['financial']),
+    );
+    expect(items.find((item) => item.href === '/contacts')).toMatchObject({ group: 'records' });
   });
 
   it('grants the service workspace across internal departments but keeps other commercial routes scoped', () => {

@@ -8,19 +8,21 @@ import { WhatsAppContactsPage } from '@/features/whatsapp-contacts/pages';
 
 export const metadata: Metadata = {
   title: 'Contatos | Lume',
-  description: 'Agenda de contatos vinculada ao Painel WhatsApp.',
+  description: 'Exportação de cadastros aprovados para Google Contacts.',
 };
 
 export default async function Page() {
   const session = await getCurrentAuthenticatedSession();
   if (session === null) redirect('/login');
-  const canManage = hasPermission(session.user, 'whatsapp-conversations:manage');
-  if (!canManage && !hasPermission(session.user, 'whatsapp-conversations:view')) {
+  const canExport =
+    hasPermission(session.user, 'documents:view') ||
+    hasPermission(session.user, 'documents:manage');
+  if (!hasPermission(session.user, 'clients:view')) {
     redirect('/dashboard');
   }
   return (
     <AuthenticatedShell user={session.user}>
-      <WhatsAppContactsPage canManage={canManage} />
+      <WhatsAppContactsPage canExport={canExport} />
     </AuthenticatedShell>
   );
 }

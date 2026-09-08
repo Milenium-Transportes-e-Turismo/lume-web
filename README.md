@@ -317,3 +317,14 @@ A transferência usa o snapshot autorizado anterior ao comando e a sessão retor
 pela API, sem exigir nova leitura do destino. Assim, a perda de acesso ao novo
 departamento não transforma um comando confirmado em erro. A lista é atualizada
 após a confirmação para refletir o escopo atual do operador.
+
+## Contatos para Google Contacts
+
+A página /contacts consulta os cadastros canônicos ativos e não temporários e
+oferece somente exportação CSV compatível com Google Contacts. Importação e
+manutenção da agenda deixam esta página; correções são feitas em Cadastro.
+A API publica GET/POST /api/v1/registrations/contact-export, com prévia e lotes
+de até 3.000 cadastros. Consulta exige clients:view; exportação exige também
+documents:view ou documents:manage. Geração, limites e persistência temporária
+reutilizam DataExchange. Não requer migration ou novas variáveis; atualizar API
+antes do Web. A importação no Google é feita manualmente com o CSV baixado.

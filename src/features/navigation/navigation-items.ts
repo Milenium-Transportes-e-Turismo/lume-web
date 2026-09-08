@@ -103,10 +103,9 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
   {
     label: 'Contatos',
     href: '/contacts',
-    permission: 'whatsapp-conversations:view',
-    alternativePermissions: ['whatsapp-conversations:manage'],
+    permission: 'clients:view',
     icon: ContactRound,
-    group: 'commercial',
+    group: 'records',
   },
   {
     label: 'Orçamentos',
