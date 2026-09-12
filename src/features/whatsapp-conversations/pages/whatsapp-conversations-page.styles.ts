@@ -1,7 +1,7 @@
 import { cva } from 'class-variance-authority';
 
 export const whatsAppConversationsPageStyles = {
-  content: cva('h-[calc(100dvh-3.5rem)] min-h-[34rem] w-full min-w-0 overflow-hidden p-0'),
+  content: cva('h-[calc(100dvh-3rem)] md:h-dvh min-h-[34rem] w-full min-w-0 overflow-hidden p-0'),
 
   eyebrow: cva('text-sm font-semibold text-primary-emphasis'),
 

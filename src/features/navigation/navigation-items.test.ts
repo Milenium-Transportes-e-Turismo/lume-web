@@ -29,7 +29,7 @@ describe('getAuthorizedNavigationItems', () => {
     const items = getAuthorizedNavigationItems(createEmployee(['dashboard:view']));
 
     expect(items.map((item) => item.label)).toEqual(['Dashboard']);
-    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(17);
+    expect(INTERNAL_NAVIGATION_ITEMS).toHaveLength(22);
   });
 
   it('shows License only with its explicit permission inside Management', () => {
@@ -223,4 +223,17 @@ describe('getAuthorizedNavigationItems', () => {
 
     expect(getAuthorizedNavigationItems(user).map((item) => item.href)).toEqual(['/documents']);
   });
+});
+
+it('places supplier companies in General and fleet catalogs in Records', () => {
+  const items = getAuthorizedNavigationItems(createEmployee(['clients:view', 'trips:view']));
+  expect(items.find((item) => item.href === '/companies')).toMatchObject({ group: 'general' });
+  expect(items.find((item) => item.href === '/fleet')).toMatchObject({ group: 'records' });
+  expect(items.find((item) => item.href === '/catalogs')).toMatchObject({ group: 'records' });
+  expect(
+    getAuthorizedNavigationItems(createEmployee(['clients:view'])).map((item) => item.href),
+  ).not.toContain('/transport');
+  expect(
+    getAuthorizedNavigationItems(createEmployee(['contracts:view'])).map((item) => item.href),
+  ).toContain('/transport');
 });

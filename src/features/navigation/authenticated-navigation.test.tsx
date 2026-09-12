@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import type { EmployeeUser } from '@/features/auth/domain';
 import { getPendingQuoteProposalCountAction } from '@/features/quote-proposals/actions';
@@ -9,11 +9,13 @@ import { AuthenticatedNavigation } from './authenticated-navigation';
 
 jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
+  useSearchParams: jest.fn(),
 }));
 jest.mock('@/features/quote-proposals/actions', () => ({
   getPendingQuoteProposalCountAction: jest.fn(),
 }));
 
+const mockedUseSearchParams = jest.mocked(useSearchParams);
 const mockedUsePathname = jest.mocked(usePathname);
 const mockedPendingCount = jest.mocked(getPendingQuoteProposalCountAction);
 
@@ -46,6 +48,9 @@ function createEmployee(
 describe('AuthenticatedNavigation', () => {
   beforeEach(() => {
     mockedUsePathname.mockReturnValue('/dashboard');
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams() as ReturnType<typeof useSearchParams>,
+    );
     mockedPendingCount.mockReset();
     mockedPendingCount.mockResolvedValue({
       success: true,
@@ -140,7 +145,7 @@ describe('AuthenticatedNavigation', () => {
       createEmployee(['dashboard:view', 'ai-agents:use', 'whatsapp-conversations:manage']),
     );
 
-    expect(screen.getByText('Geral')).toBeInTheDocument();
+    expect(screen.getByText('Dashboards')).toBeInTheDocument();
     expect(screen.getByText('Comercial')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Painel WhatsApp' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Orçamentos' })).toBeInTheDocument();
@@ -153,13 +158,18 @@ describe('AuthenticatedNavigation', () => {
 
     renderNavigation(createEmployee(['clients:view'], true, ['operations']));
 
-    expect(screen.getByText('Cadastros')).toBeInTheDocument();
-    expect(screen.queryByText('Operacional')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cadastro' })).toHaveAttribute(
+    expect(screen.getByText('Cadastro')).toBeInTheDocument();
+    expect(screen.getByText('Empresa')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Transportes' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'CNPJs do tenant' })).toHaveAttribute(
+      'href',
+      '/companies',
+    );
+    expect(screen.getByRole('link', { name: 'Consultar' })).toHaveAttribute(
       'href',
       '/registrations',
     );
-    expect(screen.getByRole('link', { name: 'Cadastro' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Consultar' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('renders route planning under the Operations group', () => {
@@ -180,12 +190,46 @@ describe('AuthenticatedNavigation', () => {
       createEmployee(['users:view', 'documents:manage'], true, ['management'], true),
     );
 
-    expect(screen.getByText('Pessoas')).toBeInTheDocument();
+    expect(screen.getByText('Plataforma')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Usuários' })).toHaveAttribute('href', '/users');
     expect(screen.getByRole('link', { name: 'Gestão documental' })).toHaveAttribute(
       'href',
       '/document-management',
     );
+  });
+
+  it('marks the filtered employee view without also marking the generic registration list', () => {
+    mockedUsePathname.mockReturnValue('/registrations');
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams('roleCodes=employee') as ReturnType<typeof useSearchParams>,
+    );
+    renderNavigation(createEmployee(['clients:view'], true, ['operations']));
+    expect(screen.getByRole('link', { name: 'Funcionários' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Consultar' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks only the creation destination while creating a registration', () => {
+    mockedUsePathname.mockReturnValue('/registrations/new');
+    renderNavigation(createEmployee(['clients:view', 'clients:create'], true, ['operations']));
+    expect(screen.getByRole('link', { name: 'Criar' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Consultar' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks the requested records tab in the Financial navigation', () => {
+    mockedUsePathname.mockReturnValue('/transport');
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams('tab=records') as ReturnType<typeof useSearchParams>,
+    );
+    renderNavigation(createEmployee(['trips:view'], true, ['operations']));
+    expect(screen.getByText('Financeiro')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Registros importados' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Pendências' })).not.toHaveAttribute('aria-current');
   });
 
   it('does not render navigation for an inactive user', () => {

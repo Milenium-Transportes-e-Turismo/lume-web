@@ -1,24 +1,12 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import type { ReactNode, CSSProperties } from 'react';
 
-import { tenantBranding } from '@/config/tenant-branding';
 import type { User } from '@/features/auth/domain';
 import { AppSidebar } from '@/shared/app-sidebar';
 import { CurrentUserProfilePictureProvider } from '@/shared/current-user-avatar';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/shared/ui/breadcrumb';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/shared/ui/sidebar';
 
-import { getAuthorizedNavigationItems } from './navigation-items';
-import { CommercialNotificationCenter } from './commercial-notification-center';
-import { ThemeToggle } from './theme-toggle';
 import { AccentColorPreferenceSync } from './accent-color-preference';
 
 export interface AuthenticatedShellProps {
@@ -27,37 +15,17 @@ export interface AuthenticatedShellProps {
 }
 
 export function AuthenticatedShell({ user, children }: AuthenticatedShellProps) {
-  const pathname = usePathname();
-  const currentItem = getAuthorizedNavigationItems(user).find(
-    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-  );
-
   return (
     <CurrentUserProfilePictureProvider key={user.id} userId={user.id}>
       <AccentColorPreferenceSync userId={user.id} />
-      <SidebarProvider>
+      <SidebarProvider
+        style={{ '--sidebar-width': '21rem', '--sidebar-width-icon': '3.5rem' } as CSSProperties}
+      >
         <AppSidebar user={user} />
         <SidebarInset className="min-w-0">
-          <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex h-12 shrink-0 items-center px-4 md:hidden">
             <SidebarTrigger aria-label="Alternar menu lateral" />
-            <Breadcrumb className="min-w-0">
-              <BreadcrumbList className="flex-nowrap">
-                <BreadcrumbItem className="hidden text-muted-foreground sm:block">
-                  {tenantBranding.productName}
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden sm:block" />
-                <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="truncate font-semibold">
-                    {currentItem?.label ?? 'Área interna'}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="ml-auto flex items-center gap-1">
-              <CommercialNotificationCenter user={user} />
-              <ThemeToggle />
-            </div>
-          </header>
+          </div>
           <div className="min-w-0 flex-1">{children}</div>
         </SidebarInset>
       </SidebarProvider>

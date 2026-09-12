@@ -6,6 +6,7 @@ import { AUTHENTICATED_SESSION_VERSION, type AuthenticatedSession } from '@/feat
 import { AiAgentsPage } from './ai-agents-page';
 
 jest.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: jest.fn(),
 }));
 

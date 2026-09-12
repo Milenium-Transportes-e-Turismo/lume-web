@@ -98,3 +98,13 @@ não possuem substituto shadcn que melhore sua semântica.
 - a marca principal é sempre Lume; nome do cliente pode ser exibido como contexto,
   sem controlar a paleta do produto;
 - alterações devem ser verificadas em 320–390 px, 200% de zoom, claro e escuro.
+
+## Barra de navegação das páginas
+
+O `AuthenticatedShell` não exibe a barra com o breadcrumb “Lume > página”.
+Títulos, ações e cabeçalhos próprios do conteúdo permanecem nas páginas.
+A sidebar mantém marca, navegação e ferramentas; no celular, um botão acessível
+permite abrir o menu. Roteirização e WhatsApp usam toda a altura disponível,
+descontando apenas os 48 px desse controle no celular.
+
+O indicador de orçamentos pendentes fica dentro do link da sidebar, na mesma linha de ícone e título, alinhado à direita pelo fluxo flex. Ele não depende de posicionamento absoluto nem se sobrepõe ao texto em larguras menores.

@@ -9,7 +9,7 @@ export default async function RoutingPage() {
     <AuthenticatedShell user={session.user}>
       <main
         aria-label="Roteirização"
-        className="h-[calc(100dvh-3.5rem)] min-h-0 w-full overflow-hidden"
+        className="h-[calc(100dvh-3rem)] md:h-dvh min-h-0 w-full overflow-hidden"
       >
         <RoutePlannerForm canCalculate={hasPermission(session.user, 'route-planner:calculate')} />
       </main>

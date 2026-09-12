@@ -133,6 +133,8 @@ export interface ConversationServiceContextPanelProps {
   readonly onReturnToQueue: () => void;
   readonly onChangePriority: (priority: WhatsAppServiceSessionPriority, reason: string) => void;
   readonly onReturnToAi: () => void;
+  readonly canDismissAssistantSuggestion?: boolean;
+  readonly onAssistantSuggestion?: (id: string, decision: 'accept' | 'dismiss') => void;
   readonly onClose: () => void;
   readonly onArchiveToggle: () => void;
   readonly onCommercialStatus: () => void;
@@ -156,6 +158,8 @@ export function ConversationServiceContextPanel({
   onReturnToQueue,
   onChangePriority,
   onReturnToAi,
+  onAssistantSuggestion,
+  canDismissAssistantSuggestion = false,
   onClose,
   onArchiveToggle,
   onCommercialStatus,
@@ -210,6 +214,45 @@ export function ConversationServiceContextPanel({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {session.controlMode === 'HUMAN' && (conversation.assistantSuggestions?.length ?? 0) > 0 ? (
+          <section
+            aria-label="Sugestões internas da Milena"
+            className="space-y-3 border-b border-border bg-primary/5 p-3"
+          >
+            <h4 className="flex items-center gap-2 text-sm font-semibold">
+              <Sparkles className="size-4" aria-hidden="true" /> Assistente do atendente
+            </h4>
+            <p className="text-xs text-muted-foreground">Visível somente no painel.</p>
+            {conversation.assistantSuggestions?.map((suggestion) => (
+              <div
+                key={suggestion.id}
+                className="space-y-2 rounded-lg border border-border bg-card p-3"
+              >
+                <p className="text-sm leading-5">{suggestion.question}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={isBusy || !canTransfer || !onAssistantSuggestion}
+                    onClick={() => onAssistantSuggestion?.(suggestion.id, 'accept')}
+                  >
+                    {suggestion.kind === 'new-quote'
+                      ? 'Sim, iniciar coleta'
+                      : 'Direcionar ao departamento'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isBusy || !canDismissAssistantSuggestion || !onAssistantSuggestion}
+                    onClick={() => onAssistantSuggestion?.(suggestion.id, 'dismiss')}
+                  >
+                    {suggestion.kind === 'new-quote' ? 'Não, continuar comigo' : 'Dispensar'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </section>
+        ) : null}
+
         <section className="grid grid-cols-2 gap-px bg-border" aria-label="Estado do atendimento">
           <div className="bg-card px-3 py-2">
             <small className="block text-[9px] font-bold uppercase tracking-wide text-muted-foreground">

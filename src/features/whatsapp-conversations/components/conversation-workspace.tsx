@@ -56,6 +56,7 @@ import { Textarea } from '@/shared/ui/textarea';
 import { Input } from '@/shared/ui/input';
 import { toast } from '@/shared/ui/toast';
 import {
+  resolveWhatsAppAssistantSuggestionAction,
   archiveWhatsAppConversationAction,
   changeWhatsAppConversationPriorityAction,
   changeWhatsAppConversationDepartmentAction,
@@ -249,6 +250,7 @@ export function preserveLoadedConversationHistory(
       messages: existing?.messages ?? conversation.messages,
       messageHistory: existing?.messageHistory ?? conversation.messageHistory,
       transitions: existing?.transitions ?? conversation.transitions,
+      assistantSuggestions: existing?.assistantSuggestions ?? conversation.assistantSuggestions,
     };
   });
 }
@@ -276,6 +278,7 @@ const TRANSITION_LABELS: Readonly<Record<string, string>> = {
   'start-department-contact': 'Contato com departamento iniciado',
   'start-quote': 'Coleta de orçamento iniciada',
   'new-quote-request': 'Novo orçamento solicitado',
+  'start-assisted-quote': 'Coleta de novo orçamento autorizada pelo atendente',
   'present-quote-summary': 'Resumo do orçamento apresentado',
   'correct-quote': 'Orçamento corrigido',
   'confirm-quote': 'Resumo do orçamento confirmado',
@@ -596,6 +599,8 @@ export function ConversationWorkspace({
           (!previousSelected ||
             incomingSelected.version !== previousSelected.version ||
             incomingSelected.updatedAt !== previousSelected.updatedAt ||
+            getCurrentWhatsAppServiceSession(incomingSelected).version !==
+              getCurrentWhatsAppServiceSession(previousSelected).version ||
             hasPendingOutboundMessage(previousSelected))
         ) {
           await loadConversationDetail(selectedId);
@@ -838,6 +843,25 @@ export function ConversationWorkspace({
         expectedVersion: conversation.version,
       });
       applyActionResult(result, 'Conversa marcada como lida.');
+    });
+  }
+
+  function handleAssistantSuggestion(suggestionId: string, decision: 'accept' | 'dismiss') {
+    if (!selectedConversation) return;
+    const selected = selectedConversation;
+    startConversationTransition(async () => {
+      const result = await resolveWhatsAppAssistantSuggestionAction({
+        conversationId: selected.id,
+        suggestionId,
+        decision,
+        commandId: globalThis.crypto.randomUUID(),
+        expectedVersion: selected.version,
+        expectedSessionVersion: getCurrentWhatsAppServiceSession(selected).version,
+      });
+      applyActionResult(
+        result,
+        decision === 'accept' ? 'Sugestão aprovada.' : 'Atendimento mantido com a equipe.',
+      );
     });
   }
 
@@ -2323,6 +2347,8 @@ export function ConversationWorkspace({
               onTransfer={openTransferDialog}
               onReturnToQueue={openReturnQueueDialog}
               onChangePriority={handlePriorityChange}
+              canDismissAssistantSuggestion={permissions.respond}
+              onAssistantSuggestion={handleAssistantSuggestion}
               onReturnToAi={() =>
                 handleVersionedAction(
                   returnWhatsAppConversationToBotAction,

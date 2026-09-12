@@ -187,4 +187,85 @@ describe('ConversationServiceContextPanel', () => {
       expect(screen.getByRole('button', { name })).toBeDisabled();
     }
   });
+  it('offers private yes/no controls to the attendant without replying to the customer', async () => {
+    const user = userEvent.setup();
+    const base = createWhatsAppConversationFixture();
+    const onAssistantSuggestion = jest.fn();
+    const conversation = createWhatsAppConversationFixture({
+      currentServiceSession: {
+        ...getCurrentWhatsAppServiceSession(base),
+        controlMode: 'HUMAN',
+        status: 'OPEN',
+        projection: 'NATIVE',
+      },
+      assistantSuggestions: [
+        {
+          id: 'suggestion-1',
+          serviceSessionId: 'session-1',
+          kind: 'new-quote',
+          question: 'Deseja que a Milena assuma a coleta?',
+          targetDepartment: 'commercial',
+          createdAt: '2026-09-11T04:00:00.000Z',
+        },
+      ],
+    });
+    render(
+      <ConversationServiceContextPanel
+        conversation={conversation}
+        isBusy={false}
+        {...handlers()}
+        canDismissAssistantSuggestion
+        onAssistantSuggestion={onAssistantSuggestion}
+      />,
+    );
+    expect(screen.getByText('Visível somente no painel.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sim, iniciar coleta' }));
+    expect(onAssistantSuggestion).toHaveBeenLastCalledWith('suggestion-1', 'accept');
+    await user.click(screen.getByRole('button', { name: 'Não, continuar comigo' }));
+    expect(onAssistantSuggestion).toHaveBeenLastCalledWith('suggestion-1', 'dismiss');
+  });
+
+  it('blocks suggestions while busy and hides them after control returns to AI', () => {
+    const base = createWhatsAppConversationFixture();
+    const conversation = createWhatsAppConversationFixture({
+      currentServiceSession: {
+        ...getCurrentWhatsAppServiceSession(base),
+        controlMode: 'HUMAN',
+        status: 'OPEN',
+        projection: 'NATIVE',
+      },
+      assistantSuggestions: [
+        {
+          id: 'suggestion-2',
+          serviceSessionId: 'session-1',
+          kind: 'department',
+          question: 'Direcionar ao Financeiro?',
+          targetDepartment: 'financial',
+          createdAt: '2026-09-11T04:00:00.000Z',
+        },
+      ],
+    });
+    const { rerender } = render(
+      <ConversationServiceContextPanel
+        conversation={conversation}
+        isBusy
+        {...handlers()}
+        canDismissAssistantSuggestion
+        onAssistantSuggestion={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Direcionar ao departamento' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Dispensar' })).toBeDisabled();
+    rerender(
+      <ConversationServiceContextPanel
+        conversation={{
+          ...conversation,
+          currentServiceSession: { ...conversation.currentServiceSession!, controlMode: 'AI' },
+        }}
+        isBusy={false}
+        {...handlers()}
+      />,
+    );
+    expect(screen.queryByText('Direcionar ao Financeiro?')).not.toBeInTheDocument();
+  });
 });

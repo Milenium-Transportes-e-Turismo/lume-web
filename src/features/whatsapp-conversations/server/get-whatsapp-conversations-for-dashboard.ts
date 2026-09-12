@@ -329,3 +329,13 @@ export function downloadWhatsAppMessageContentForDashboard(
     repository.downloadMessageContent(conversationId, messageId),
   );
 }
+
+export function resolveWhatsAppAssistantSuggestionForDashboard(
+  input: import('../application/contracts/whatsapp-conversation-repository').ResolveWhatsAppAssistantSuggestionCommand,
+) {
+  return executeAuthenticatedWhatsAppMutation((repository) => {
+    if (!repository.resolveAssistantSuggestion)
+      throw new Error('Sugestões internas indisponíveis neste ambiente.');
+    return repository.resolveAssistantSuggestion(input);
+  });
+}

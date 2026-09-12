@@ -95,12 +95,11 @@ As rotas autenticadas compartilham `AuthenticatedShell`, montado com os
 componentes oficiais do bloco `sidebar-07` do shadcn/ui (`SidebarProvider`,
 `Sidebar`, `SidebarInset`, dropdowns e rail). A sidebar usa o catálogo central
 de navegação e continua filtrada pelas permissões devolvidas pelo backend. Ela
-pode ser recolhida no desktop e funciona como drawer no mobile. O header ocupa
-uma única linha, sem margem superior no inset, com breadcrumb da rota e
-alternância entre os modos claro e escuro. O acionador da sidebar e o
-breadcrumb são adjacentes, sem um separador vertical ornamental. Cabeçalhos de
-página usam espaçamento compacto para preservar a área útil antes das filas,
-gráficos e catálogos.
+pode ser recolhida no desktop e funciona como drawer no mobile. A faixa de
+ferramentas da navegação reúne recolhimento, tema, notificações e cor de destaque.
+O cabeçalho global com breadcrumb “Lume > página” foi removido do conteúdo.
+Títulos de página e botões de ação permanecem, com espaçamento compacto antes
+das filas, gráficos e catálogos.
 
 A foto do usuário é sincronizada no shell pelo
 `CurrentUserProfilePictureProvider`. Ao montar o shell, a Route Handler
@@ -357,3 +356,26 @@ de até 3.000 cadastros. Consulta exige clients:view; exportação exige também
 documents:view ou documents:manage. Geração, limites e persistência temporária
 reutilizam DataExchange. Não requer migration ou novas variáveis; atualizar API
 antes do Web. A importação no Google é feita manualmente com o CSV baixado.
+
+## Transportes
+
+/transport reutiliza AuthenticatedShell e o catálogo central. A Route Handler /api/transport/[...path] tem allowlist de métodos/caminhos e filtros, páginas limitadas a 25, sessão criptografada e renovação de token. TransportGateway é server-only, usa exclusivamente LUME_TENANT_API_URL e valida respostas com Zod. IDs externos e quilometragens são strings; nulos não são convertidos em zero. A Web não calcula regras de odômetro, decide resolução ou altera dados na Avic.
+
+Comandos levam commandId estável para repetição do mesmo corpo e expectedVersion onde exigido. Em conflitos, o detalhe autoritativo é consultado; justificativas são preservadas para revisão. O histórico e as filas são carregados sob demanda, sem materializar todas as páginas.
+
+### Cadastros compartilhados e Transportes
+
+CNPJs do tenant, Frota e Tipos e categorias possuem rotas próprias na sidebar.
+As abas de vínculos e contratos são compostas no perfil canônico do Cadastro,
+reutilizando CatalogPanel com registrationId fixo. Os gateways e comandos
+versionados continuam únicos; a API filtra as listas e candidatos por cadastro.
+
+## Sidebar e catálogos — 10/09/2026
+
+A sidebar usa duas colunas: ferramentas (tema, notificações e cor) e navegação hierárquica. O menu do usuário fica no topo, com perfil, documentos, suporte e saída. As permissões continuam vindo do catálogo autorizado; exemplos sem funcionalidade não geram links.
+
+Empresa reúne dados, pessoas com filtros de Papel, frota, tipos/categorias, agentes e canais. Plataforma mantém usuários/administração/licença. Registros fica em Financeiro → Controle e conserva /transport, com atalhos por aba. Integração Avic fica em /integrations/avic. Dashboards mostra o painel já existente, sem inventar métricas ou telas departamentais.
+
+A Frota mantém seus seletores e carrega todas as páginas de opções sem controles de busca/paginação em cada campo. Origem e ID externo ficam fora do formulário; referências anteriores são preservadas e não se presume que número de frota seja VeiculoId.
+
+Códigos de tipos/categorias são gerados pela API. O usuário informa tipo e nome; o código numérico é somente leitura. A atualização da API e a migração numeric_catalog_codes devem preceder a Web.

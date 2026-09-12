@@ -99,7 +99,20 @@ export interface WhatsAppMediaContent {
   readonly mimeType: string;
 }
 
+export interface ResolveWhatsAppAssistantSuggestionCommand {
+  readonly conversationId: string;
+  readonly suggestionId: string;
+  readonly commandId: string;
+  readonly expectedVersion: number;
+  readonly expectedSessionVersion: number;
+  readonly decision: 'accept' | 'dismiss';
+}
+
 export interface WhatsAppConversationRepository {
+  resolveAssistantSuggestion?(
+    input: ResolveWhatsAppAssistantSuggestionCommand,
+  ): Promise<WhatsAppConversation>;
+
   getServiceAssignmentTargets(): Promise<readonly WhatsAppServiceAssignmentTarget[]>;
   startConversation(phone: string): Promise<WhatsAppConversation>;
   getConversations(

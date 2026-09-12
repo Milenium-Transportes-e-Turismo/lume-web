@@ -12,6 +12,8 @@ import {
   RadioTower,
   ContactRound,
   Building2,
+  Bus,
+  Tags,
   ScanSearch,
   Users,
   BookOpenCheck,
@@ -29,7 +31,13 @@ import {
 } from '@/features/auth/domain';
 
 export type NavigationGroup =
-  'general' | 'records' | 'commercial' | 'operations' | 'people-operations' | 'administration';
+  | 'general'
+  | 'records'
+  | 'commercial'
+  | 'operations'
+  | 'people-operations'
+  | 'administration'
+  | 'financial';
 
 export interface InternalNavigationItem {
   readonly label: string;
@@ -42,6 +50,46 @@ export interface InternalNavigationItem {
 }
 
 export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
+  {
+    label: 'CNPJs do tenant',
+    href: '/companies',
+    permission: 'clients:view',
+    alternativePermissions: ['clients:manage'],
+    icon: Building2,
+    group: 'general',
+  },
+  {
+    label: 'Frota',
+    href: '/fleet',
+    permission: 'trips:view',
+    alternativePermissions: ['trips:manage'],
+    icon: Bus,
+    group: 'records',
+  },
+  {
+    label: 'Tipos e categorias',
+    href: '/catalogs',
+    permission: 'trips:view',
+    alternativePermissions: ['trips:manage'],
+    icon: Tags,
+    group: 'records',
+  },
+  {
+    label: 'Registros',
+    href: '/transport',
+    permission: 'trips:view',
+    alternativePermissions: ['trips:manage', 'contracts:view', 'contracts:manage'],
+    icon: Route,
+    group: 'financial',
+  },
+  {
+    label: 'Avic System',
+    href: '/integrations/avic',
+    permission: 'trips:view',
+    alternativePermissions: ['trips:manage'],
+    icon: RadioTower,
+    group: 'general',
+  },
   {
     label: 'Cadastro',
     href: '/registrations',
@@ -178,7 +226,7 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
 
 function hasOrganizationalScope(user: User, item: InternalNavigationItem): boolean {
   if (user.isAdministrator === true) return true;
-  if (item.href === '/users') return true;
+  if (item.href === '/users' || item.href === '/transport') return true;
   if (item.href === '/whatsapp-conversations') return user.type === 'employee';
   if (item.group === 'commercial') return hasCommercialScope(user);
   if (item.group === 'operations') {

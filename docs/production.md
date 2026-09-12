@@ -121,22 +121,18 @@ balanceador. Nenhuma sonda expõe segredos ou JWTs.
 7. Execute abertura de conversa, takeover, envio controlado pelo atendente em
    **Abrir chat** e um canário de orçamento criado pelo workspace com PDF não
    sensível. Confirme também a grafia do nome do PDF com caracteres acentuados.
-8. Em uma conversa `human-active` atribuída ao usuário, valide **Encerrar
-   atendimento** e confirme que o frontend envia o comando versionado
-   `return-to-bot`. A conversa deve permanecer no histórico e voltar ao estado
-   autoritativo do bot; conflito ou recusa da Tenant API não pode ser apresentado
-   como sucesso. Com outro atendente autenticado, confirme que a interface e a
-   Server Action recusam a mesma ação e que uma chamada direta à Tenant API
-   recebe `403` sem alterar a versão. A exceção de Gerência/Diretoria só poderá
-   entrar neste canário depois que a API publicar permissão, motivo e auditoria
-   explícitos. Confirme também que a interface não oferece `close` como sinônimo
-   dessa ação e que um uso autorizado desse comando técnico nunca elimina o
-   histórico: o próximo contato deve reabrir a mesma conversa canônica.
+8. Valide separadamente **Encerrar conversa**, **Retornar à IA** e **Transferir**
+   pelos comandos nativos versionados da sessão. Confirme que o painel respeita
+   `availableActions` e que ator sem capacidade/escopo não altera o estado.
+   Conflitos devem exigir recarga; não simular sucesso. A confirmação de resumo
+   deve criar o orçamento e colocar a sessão na fila humana do Comercial.
+   Novo pedido durante controle humano deve gerar sugestão privada, sem enviar
+   resposta automática. Confira preservação do histórico e dos orçamentos anteriores.
 9. Verifique o sino em usuários de departamentos diferentes e confirme que cada
    um recebe somente notificações do próprio escopo. No Comercial, valide o
    aviso de novo orçamento pendente.
-10. Confirme os grupos **Geral**, **Cadastros**, **Comercial**, **Pessoas** e
-    **Administração** na sidebar,
+10. Confirme Empresa, Plataforma, Dashboards, Financeiro, Operacional e Comercial
+    na sidebar, conforme as permissões,
     o envio de suporte pelo provedor e, ao simular uma falha autorizada, o
     `mailto:` com identificação do solicitante; confirme também a negativa de
     `/users` sem uma permissão `users:*` compatível e de `/license` fora de
@@ -220,3 +216,35 @@ de até 3.000 cadastros. Consulta exige clients:view; exportação exige também
 documents:view ou documents:manage. Geração, limites e persistência temporária
 reutilizam DataExchange. Não requer migration ou novas variáveis; atualizar API
 antes do Web. A importação no Google é feita manualmente com o CSV baixado.
+
+## Ativação de Transportes
+
+Transportes não adiciona variáveis públicas nem credenciais ao Web. O serviço continua consumindo apenas LUME_TENANT_API_URL; URL, autenticação Avic e worker pertencem à Tenant API. Configure migrações e serviço em ambiente autorizado antes de publicar uma versão do Web que exiba a área. A tela informa requisitos ausentes, respostas incompatíveis e indisponibilidade, sem simular importação ou correção. A implementação está nos diretórios existentes de desenvolvimento na VPS, na branch develop, e não implica deploy, migração ou validação de produção.
+
+Para login automático Avic, configure AVIC_API_USER_ID e AVIC_API_ACCESS_KEY somente
+na Tenant API. Nenhuma variável adicional é necessária no Web. A obtenção de token e
+renovação por novo login ocorrem no servidor, sem ação manual no navegador.
+
+## Sidebar e catálogos — 10/09/2026
+
+A sidebar usa duas colunas: ferramentas (tema, notificações e cor) e navegação hierárquica. O menu do usuário fica no topo, com perfil, documentos, suporte e saída. As permissões continuam vindo do catálogo autorizado; exemplos sem funcionalidade não geram links.
+
+Empresa reúne dados, pessoas com filtros de Papel, frota, tipos/categorias, agentes e canais. Plataforma mantém usuários/administração/licença. Registros fica em Financeiro → Controle e conserva /transport, com atalhos por aba. Integração Avic fica em /integrations/avic. Dashboards mostra o painel já existente, sem inventar métricas ou telas departamentais.
+
+A Frota mantém seus seletores e carrega todas as páginas de opções sem controles de busca/paginação em cada campo. Origem e ID externo ficam fora do formulário; referências anteriores são preservadas e não se presume que número de frota seja VeiculoId.
+
+Códigos de tipos/categorias são gerados pela API. O usuário informa tipo e nome; o código numérico é somente leitura. A atualização da API e a migração numeric_catalog_codes devem preceder a Web.
+
+## Compatibilidade com a API e publicação no Git
+
+As telas de Transportes dependem das migrações de catálogos, CNPJs próprios e
+códigos numéricos na API. A assistência do WhatsApp depende dos comandos de sessão
+e da janela persistida de espera do cliente. Publique a API compatível antes da
+Web e consulte o guia de implantação do repositório da API para a sequência de
+migrações. Publicar a branch `develop` no GitHub não constitui deploy de serviço.
+
+O desenvolvimento de staging usa os diretórios oficiais
+`/home/taiane/lume/lume-staging/lume-tenant-web` e
+`/home/taiane/lume/lume-staging/lume-tenant-api`. Compare a revisão construída com
+a imagem executada e confirme readiness e comportamento autenticado. Arquivos
+`.env`, credenciais, mídias e diagnósticos privados ficam fora do Git.

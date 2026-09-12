@@ -1,12 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronsUpDown, CircleUserRound, LifeBuoy, UserRound } from 'lucide-react';
+import { ChevronsUpDown, CircleUserRound, LifeBuoy, UserRound, Files } from 'lucide-react';
 
 import { LogoutButton } from '@/features/auth/components';
 import { hasPermission, type User } from '@/features/auth/domain';
-import { ThemeToggle } from '@/features/navigation/theme-toggle';
-import { AccentColorPicker } from '@/features/navigation/accent-color-preference';
 import { CurrentUserAvatar } from '@/shared/current-user-avatar';
 import {
   DropdownMenu,
@@ -70,6 +68,12 @@ export function NavUser({ user }: { readonly user: User }) {
                   Meu perfil
                 </DropdownMenuItem>
               ) : null}
+              {hasPermission(user, 'documents:view') ? (
+                <DropdownMenuItem render={<Link href="/documents" />}>
+                  <Files aria-hidden="true" />
+                  Meus documentos
+                </DropdownMenuItem>
+              ) : null}
               {hasPermission(user, 'support:view') || hasPermission(user, 'support:create') ? (
                 <DropdownMenuItem render={<Link href="/support" />}>
                   <LifeBuoy aria-hidden="true" />
@@ -77,14 +81,6 @@ export function NavUser({ user }: { readonly user: User }) {
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <div className="flex items-center justify-between gap-3 px-2 py-1.5 text-sm">
-              <span>Tema</span>
-              <span className="flex items-center gap-2">
-                <AccentColorPicker userId={user.id} />
-                <ThemeToggle />
-              </span>
-            </div>
             <DropdownMenuSeparator />
             <div className="p-1 [&_form]:w-full [&_button]:w-full [&_button]:justify-start">
               <LogoutButton />

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 
 import { WhatsAppConversationRepositoryError } from '../application';
 import type {
@@ -10,6 +11,7 @@ import type {
   WhatsAppServiceSessionPriority,
 } from '../domain';
 import {
+  resolveWhatsAppAssistantSuggestionForDashboard,
   archiveWhatsAppConversationForDashboard,
   changeWhatsAppConversationDepartmentForDashboard,
   changeWhatsAppConversationPriorityForDashboard,
@@ -632,4 +634,30 @@ export async function sendHumanWhatsAppMessageAction(
         'Não foi possível confirmar o registro da mensagem. O rascunho e os identificadores de reenvio foram preservados.',
     };
   }
+}
+
+export async function resolveWhatsAppAssistantSuggestionAction(
+  input: unknown,
+): Promise<WhatsAppConversationActionResult> {
+  const parsed = z
+    .object({
+      conversationId: z.string().uuid(),
+      suggestionId: z.string().uuid(),
+      commandId: z.string().uuid(),
+      expectedVersion: z.number().int().positive(),
+      expectedSessionVersion: z.number().int().positive(),
+      decision: z.enum(['accept', 'dismiss']),
+    })
+    .safeParse(input);
+  if (!parsed.success) return invalidVersionedAction();
+  if (!(await isAuthorized(parsed.data.decision === 'accept' ? 'transfer' : 'respond'))) {
+    return {
+      success: false,
+      code: 'forbidden',
+      message: 'Você não tem permissão para decidir esta sugestão.',
+    };
+  }
+  return executeAuthorizedAction(parsed.data, () =>
+    resolveWhatsAppAssistantSuggestionForDashboard(parsed.data),
+  );
 }

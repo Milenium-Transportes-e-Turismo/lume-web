@@ -367,7 +367,18 @@ export interface WhatsAppQuoteRequest {
   readonly updatedAt: string;
 }
 
+export interface WhatsAppAssistantSuggestion {
+  readonly id: string;
+  readonly serviceSessionId: string;
+  readonly kind: 'new-quote' | 'department';
+  readonly question: string;
+  readonly targetDepartment: WhatsAppConversationDepartment;
+  readonly createdAt: string;
+}
+
 export interface WhatsAppConversation {
+  readonly assistantSuggestions?: readonly WhatsAppAssistantSuggestion[];
+
   readonly id: string;
   readonly companyId: string;
   readonly channel: WhatsAppChannel;

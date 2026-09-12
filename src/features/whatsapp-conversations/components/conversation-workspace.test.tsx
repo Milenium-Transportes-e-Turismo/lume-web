@@ -1734,6 +1734,56 @@ describe('ConversationWorkspace', () => {
     });
   });
 
+  it('loads silent suggestions when only the native session changes and keeps them across list refreshes', async () => {
+    const summary = createWhatsAppConversationFixture({
+      unreadCount: 0,
+      messages: [],
+      version: 8,
+      conversationState: 'human-active',
+      flowStep: 'human-service',
+    });
+    const initial = {
+      ...summary,
+      currentServiceSession: {
+        ...getCurrentWhatsAppServiceSession(summary),
+        version: 3,
+        projection: 'NATIVE' as const,
+      },
+    };
+    const incoming = {
+      ...initial,
+      currentServiceSession: { ...initial.currentServiceSession, version: 4 },
+      assistantSuggestions: [],
+    };
+    const detail: WhatsAppConversation = {
+      ...incoming,
+      assistantSuggestions: [
+        {
+          id: '00000000-0000-4000-8000-000000000991',
+          serviceSessionId: initial.currentServiceSession.id,
+          kind: 'new-quote',
+          question: 'Deseja que a Milena assuma a coleta?',
+          targetDepartment: 'commercial',
+          createdAt: '2026-09-11T02:00:00.000Z',
+        },
+      ],
+    };
+    jest
+      .mocked(global.fetch)
+      .mockResolvedValueOnce(response({ conversation: initial }))
+      .mockResolvedValueOnce(response({ conversations: [incoming] }))
+      .mockResolvedValueOnce(response({ conversation: detail }))
+      .mockResolvedValueOnce(response({ conversations: [incoming] }));
+    const user = userEvent.setup();
+    render(<ConversationWorkspace initialConversations={[initial]} />);
+    await openMessages(user);
+    await user.click(screen.getByRole('button', { name: 'Atualizar conversas' }));
+    expect(await screen.findByText('Deseja que a Milena assuma a coleta?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Atualizar conversas' }));
+    expect(screen.getByText('Deseja que a Milena assuma a coleta?')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+  });
+
   it('refreshes a pending delivery even when the conversation version did not change', async () => {
     const pendingMessage = {
       id: '00000000-0000-4000-8000-000000000711',

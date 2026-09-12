@@ -17,11 +17,11 @@ timeout curto do gateway.
 Contas legadas com `documentAccessMode=document-portal` são direcionadas a
 `/documents` após o login e veem somente a navegação documental. A API também
 limita suas permissões; a proteção não depende do menu. O Tenant Web não cria
-novas contas desse modo enquanto a Tenant API não publicar o fluxo de
-pré-admissão por link seguro.
+novas contas desse modo. A API já oferece gestão de links de pré-admissão,
+mas o fluxo de recebimento público de documentos ainda não está completo.
 
-O menu **Pessoas** exibe **Usuários** e **Gestão documental** conforme as
-permissões. Administradores mantêm edição integral de departamentos,
+**Gestão documental** aparece no acesso principal e **Usuários** no grupo
+**Plataforma**, conforme as permissões. **Pessoas** oferece atalhos de Cadastro. Administradores mantêm edição integral de departamentos,
 permissões e estado das contas. RH e Departamento Pessoal veem a listagem e
 podem editar os dados pessoais e o perfil documental do usuário,
 podem consultar o catálogo para filtrar a lista, mas não alteram departamentos,

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { hasPermission } from '@/features/auth/domain';
+import { CatalogPanel } from '@/features/transport/components/catalog-panel';
 import { AuthenticatedShell } from '@/features/navigation';
 import {
   createRegistrationRelationshipAction,
@@ -80,6 +81,19 @@ export default async function RegistrationDetailPage({
   const canUpdate =
     hasPermission(session.user, 'clients:update') || hasPermission(session.user, 'clients:manage');
   const canHistory = hasPermission(session.user, 'clients:history');
+  const canViewAffiliations =
+    hasPermission(session.user, 'clients:view') || hasPermission(session.user, 'clients:manage');
+  const canViewContracts =
+    hasPermission(session.user, 'contracts:view') ||
+    hasPermission(session.user, 'contracts:manage');
+  const profileTabs = [
+    'identity',
+    'contacts',
+    'relationships',
+    ...(canHistory ? ['history'] : []),
+    ...(canViewAffiliations ? ['affiliations'] : []),
+    ...(canViewContracts ? ['contracts'] : []),
+  ];
   const [registration, history, options] = await Promise.all([
     executeAuthenticatedRegistrationRequest((gateway) => gateway.get(registrationId)),
     canHistory
@@ -195,20 +209,53 @@ export default async function RegistrationDetailPage({
             </CardContent>
           </Card>
         )}
-        <Tabs
-          defaultValue={
-            ['identity', 'contacts', 'relationships', 'history'].includes(search.tab ?? '')
-              ? search.tab
-              : 'identity'
-          }
-        >
+        <Tabs defaultValue={profileTabs.includes(search.tab ?? '') ? search.tab : 'identity'}>
           <TabsList className="h-auto flex-wrap">
             <TabsTrigger value="identity">Identidade</TabsTrigger>
             <TabsTrigger value="contacts">Contatos</TabsTrigger>
             <TabsTrigger value="relationships">Relacionamentos</TabsTrigger>
+            {canViewAffiliations ? (
+              <TabsTrigger value="affiliations">Vínculos com empresas</TabsTrigger>
+            ) : null}
+            {canViewContracts ? <TabsTrigger value="contracts">Contratos</TabsTrigger> : null}
             {canHistory ? <TabsTrigger value="history">Histórico</TabsTrigger> : null}
           </TabsList>
 
+          {canViewAffiliations && (
+            <TabsContent value="affiliations" className="space-y-3">
+              <h2 className="text-xl font-semibold">Vínculos de {registration.displayName}</h2>
+              <CatalogPanel
+                key={'affiliations-' + registration.id}
+                resource="affiliations"
+                registrationId={registration.id}
+                canCreate={
+                  hasPermission(session.user, 'clients:create') ||
+                  hasPermission(session.user, 'clients:manage')
+                }
+                canUpdate={canUpdate}
+                canDeactivate={false}
+              />
+            </TabsContent>
+          )}
+          {canViewContracts && (
+            <TabsContent value="contracts" className="space-y-3">
+              <h2 className="text-xl font-semibold">Contratos de {registration.displayName}</h2>
+              <CatalogPanel
+                key={'contracts-' + registration.id}
+                resource="contracts"
+                registrationId={registration.id}
+                canCreate={
+                  hasPermission(session.user, 'contracts:create') ||
+                  hasPermission(session.user, 'contracts:manage')
+                }
+                canUpdate={
+                  hasPermission(session.user, 'contracts:update') ||
+                  hasPermission(session.user, 'contracts:manage')
+                }
+                canDeactivate={false}
+              />
+            </TabsContent>
+          )}
           <TabsContent value="identity" className="space-y-3">
             <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
               <Card size="sm">

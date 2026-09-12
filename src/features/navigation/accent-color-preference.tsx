@@ -130,11 +130,9 @@ export function AccentColorPicker({ userId }: { readonly userId: string }) {
       />
       <Popover.Portal>
         <Popover.Positioner side="right" align="end" sideOffset={10} className="z-50">
-          <Popover.Popup className="w-80 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95">
+          <Popover.Popup className="w-80 max-w-[calc(100vw-2rem)] rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95">
             <Popover.Title className="font-semibold">Cor de destaque</Popover.Title>
-            <Popover.Description className="mt-1 text-xs text-muted-foreground">
-              Cores do Tailwind Colors, sempre na tonalidade 500.
-            </Popover.Description>
+
             <div
               className="mt-3 grid grid-cols-7 gap-2"
               role="radiogroup"

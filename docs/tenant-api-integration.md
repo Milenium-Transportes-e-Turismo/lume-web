@@ -139,11 +139,12 @@ abaixo refletem os limites atuais:
   `users:update` e `users:manage`; a Tenant API ainda aplica restrições por papel
   e por usuário-alvo;
 - `/license` exige vínculo Gerência e `license:view`;
-- `/whatsapp-conversations` e `/quote-proposals` exigem vínculo Comercial e
-  `whatsapp-conversations:manage`.
+- `/whatsapp-conversations` respeita as capacidades de atendimento e o escopo
+  publicados pela API; não exige Comercial para todos os atendimentos;
+- `/quote-proposals` mantém seu escopo e suas permissões comerciais.
 
-A sidebar organiza os itens em **Geral**, **Cadastros**, **Comercial**,
-**Pessoas** e **Administração**.
+A sidebar organiza Empresa, Plataforma, Dashboards, Financeiro, Operacional e
+Comercial. O catálogo central e as capacidades da API determinam os itens visíveis.
 
 O estado da licença segue o contrato atual da API:
 
@@ -160,7 +161,7 @@ Zod as respostas da Tenant API. O `companyId` retornado é mantido no domínio
 para auditoria, mas nunca é aceito do navegador nem enviado em filtros: o
 backend deriva o tenant exclusivamente do JWT.
 
-As quatro dimensões canônicas consumidas são:
+A projeção de compatibilidade da conversa ainda contém quatro dimensões:
 
 - `department`: o Painel WhatsApp oferece apenas as nove filas operacionais
   `commercial`, `purchasing`, `controlling`, `personnel-department`,
@@ -179,8 +180,9 @@ O contrato aceita também `currentServiceSession` sem remover os campos legados.
 Nessa projeção, lifecycle (`status`), controle (`controlMode`) e assignment
 (`responsibleUserId`/`queueId`) permanecem dimensões independentes. O painel
 preserva ainda `priority`, `priorityReason`, `prioritySource`,
-`sourceChannelId`, a versão própria da sessão e `availableActions`. Enquanto a
-Tenant API não publicar a sessão nativa, o adapter cria uma projeção marcada
+`sourceChannelId`, a versão própria da sessão e `availableActions`. A API atual
+publica essa sessão. Apenas quando ela falta em uma resposta de compatibilidade,
+o adapter cria uma projeção marcada
 como `LEGACY_CONVERSATION`; ela não inventa fila ou prioridade e só habilita os
 comandos que a façade atual realmente suporta.
 
@@ -769,3 +771,36 @@ de até 3.000 cadastros. Consulta exige clients:view; exportação exige também
 documents:view ou documents:manage. Geração, limites e persistência temporária
 reutilizam DataExchange. Não requer migration ou novas variáveis; atualizar API
 antes do Web. A importação no Google é feita manualmente com o CSV baixado.
+
+## Transportes e Avic
+
+O gateway de Transportes integra /transport/companies, /fleet, /catalogs, /affiliations, /contracts e /routes, com CRUD versionado e paginação por page/pageSize. Os seletores de clientes e funcionários reutilizam /registrations PF/PJ. Condições de contrato, vínculos de rota e titularidade da frota são encerrados e adicionados por vigência; a API preserva histórico e aplica isolamento do tenant.
+
+Importações, registros, pendências e análises usam /transport/imports, /records, /issues, /analysis com cursor/limit. A justificativa usa /issues/:id/justifications; não existe edição de KM nem resolução manual no Web. /transport/integration lê requisitos atuais; após PATCH, nova leitura confirma prontidão. /transport/summary retorna contratado/registrado/diferença e disponibilidade por período; /summary/period-state registra abertura/fechamento explícitos sem regra financeira. Consulte [transport.md](transport.md) para permissões e ativação.
+
+### Listas por perfil do cadastro
+
+GET /transport/affiliations, /transport/contracts e /transport/contracts/candidates
+aceitam registrationId opcional (UUID). O filtro é aplicado pela Tenant API antes
+da contagem e paginação, mantendo o tenant autenticado. A Web usa o filtro nas
+abas do perfil e não carrega a lista geral para filtrá-la no navegador.
+
+## Sidebar e catálogos — 10/09/2026
+
+A sidebar usa duas colunas: ferramentas (tema, notificações e cor) e navegação hierárquica. O menu do usuário fica no topo, com perfil, documentos, suporte e saída. As permissões continuam vindo do catálogo autorizado; exemplos sem funcionalidade não geram links.
+
+Empresa reúne dados, pessoas com filtros de Papel, frota, tipos/categorias, agentes e canais. Plataforma mantém usuários/administração/licença. Registros fica em Financeiro → Controle e conserva /transport, com atalhos por aba. Integração Avic fica em /integrations/avic. Dashboards mostra o painel já existente, sem inventar métricas ou telas departamentais.
+
+A Frota mantém seus seletores e carrega todas as páginas de opções sem controles de busca/paginação em cada campo. Origem e ID externo ficam fora do formulário; referências anteriores são preservadas e não se presume que número de frota seja VeiculoId.
+
+Códigos de tipos/categorias são gerados pela API. O usuário informa tipo e nome; o código numérico é somente leitura. A atualização da API e a migração numeric_catalog_codes devem preceder a Web.
+
+## Sugestões internas do atendimento
+
+O detalhe de conversa inclui assistantSuggestions. O painel exibe a pergunta
+ao atendente, separada das mensagens WhatsApp. A decisão chama
+POST /whatsapp/conversations/:id/assistant-suggestions/:suggestionId/resolve
+com commandId, expectedVersion da conversa, expectedSessionVersion e decision
+(accept/dismiss). A aprovação da coleta cria outro orçamento e devolve à IA;
+a recusa mantém o atendimento humano. Sugestões de outro departamento oferecem
+encaminhamento autorizado. Em conflito, o painel recarrega o estado.

@@ -1,3 +1,4 @@
+import type { ResolveWhatsAppAssistantSuggestionCommand } from '../application/contracts/whatsapp-conversation-repository';
 import 'server-only';
 
 import { randomUUID } from 'node:crypto';
@@ -250,6 +251,19 @@ const conversationSchema = z.object({
       name: z.string().min(1),
     })
     .nullable(),
+  assistantSuggestions: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        serviceSessionId: z.string().uuid(),
+        kind: z.enum(['new-quote', 'department']),
+        question: z.string().min(1).max(1000),
+        targetDepartment: z.enum(WHATSAPP_CONVERSATION_DEPARTMENTS),
+        createdAt: z.string().datetime(),
+      }),
+    )
+    .optional()
+    .default([]),
   currentServiceSession: serviceSessionSchema.optional(),
   serviceSession: serviceSessionSchema.optional(),
   evidence: conversationEvidenceSchema.optional(),
@@ -646,6 +660,7 @@ function mapConversation(
         }
       : {}),
     evidence: getConversationEvidence(conversation),
+    assistantSuggestions: conversation.assistantSuggestions,
     unreadCount: conversation.unreadCount,
     version: conversation.version,
     lastInboundAt: conversation.lastInboundAt,
@@ -1011,6 +1026,17 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
       {},
       commandId,
     );
+  }
+
+  async resolveAssistantSuggestion(
+    input: ResolveWhatsAppAssistantSuggestionCommand,
+  ): Promise<WhatsAppConversation> {
+    const { conversationId, suggestionId, ...command } = input;
+    const response = await this.request(
+      `/whatsapp/conversations/${encodeURIComponent(conversationId)}/assistant-suggestions/${encodeURIComponent(suggestionId)}/resolve`,
+      { method: 'POST', body: command },
+    );
+    return mapConversation(parseResponse(conversationSchema, response));
   }
 
   async returnConversationToBot(

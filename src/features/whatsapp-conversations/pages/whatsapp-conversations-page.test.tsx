@@ -7,6 +7,7 @@ import { createWhatsAppConversationFixture } from '../testing/whatsapp-conversat
 import { WhatsAppConversationsPage } from './whatsapp-conversations-page';
 
 jest.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: jest.fn(),
 }));
 jest.mock('@/features/auth/components', () => ({

@@ -13,6 +13,7 @@ jest.mock('@/shared/ui/toast', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: jest.fn(),
   useRouter: jest.fn(),
 }));

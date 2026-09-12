@@ -17,18 +17,18 @@ faz `/api/readiness` responder `503`, sem imprimir o valor ou o segredo.
 
 ## Variáveis aceitas
 
-| Variável                                     | Visibilidade    | Regra                                                          |
-| -------------------------------------------- | --------------- | -------------------------------------------------------------- |
-| `LUME_TENANT_API_URL`                        | privada         | obrigatória em runtime; URL HTTP local e HTTPS em produção     |
-| `LUME_TENANT_API_TIMEOUT_MS`                 | privada         | opcional; inteiro entre 100 e 30000; padrão 5000               |
-| `LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS` | privada         | opcional; inteiro a partir de 30000; padrão 300000             |
-| `LUME_TENANT_API_WHATSAPP_IMPORT_TIMEOUT_MS` | privada         | opcional; inteiro a partir de 30000; padrão 600000             |
-| `SESSION_SECRET`                             | secreta         | obrigatória em runtime; pelo menos 32 bytes                    |
-| `AUTH_SIMULATION_ENABLED`                    | privada         | `true` ou `false`; produção aceita somente `false`             |
-| `LUME_TENANT_WHATSAPP_DATA_SOURCE`           | privada         | `api` ou `mock`; produção aceita somente `api`                 |
-| `MAP_STYLE_URL`                              | pública por uso | URL HTTP local e HTTPS em produção; não pode conter credencial |
-| `NEXT_PUBLIC_TENANT_NAME`                    | pública         | contexto textual; padrão `Empresa`                             |
-| `NEXT_PUBLIC_TENANT_PRODUCT_NAME`            | pública         | contexto textual; padrão `Lume`                                |
+| Variável                                     | Visibilidade    | Regra                                                                                |
+| -------------------------------------------- | --------------- | ------------------------------------------------------------------------------------ |
+| `LUME_TENANT_API_URL`                        | privada         | obrigatória em runtime; URL HTTP local e HTTPS em produção                           |
+| `LUME_TENANT_API_TIMEOUT_MS`                 | privada         | opcional; inteiro entre 100 e 30000; padrão 5000                                     |
+| `LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS` | privada         | opcional; inteiro a partir de 30000; padrão 300000                                   |
+| `LUME_TENANT_API_WHATSAPP_IMPORT_TIMEOUT_MS` | privada         | opcional; inteiro a partir de 30000; padrão 600000                                   |
+| `SESSION_SECRET`                             | secreta         | obrigatória em runtime; pelo menos 32 bytes                                          |
+| `AUTH_SIMULATION_ENABLED`                    | privada         | `true` ou `false`; produção aceita somente `false`                                   |
+| `LUME_TENANT_WHATSAPP_DATA_SOURCE`           | privada         | `api` ou `mock`; produção aceita somente `api`                                       |
+| `MAP_STYLE_URL`                              | pública por uso | legado: URL validada; não controla o mapa Leaflet atual e não pode conter credencial |
+| `NEXT_PUBLIC_TENANT_NAME`                    | pública         | contexto textual; padrão `Empresa`                                                   |
+| `NEXT_PUBLIC_TENANT_PRODUCT_NAME`            | pública         | contexto textual; padrão `Lume`                                                      |
 
 Ausência de `LUME_TENANT_API_URL` e `SESSION_SECRET` é tolerada durante a
 compilação porque nenhuma rota deve acessar serviços ou criar cookies no build.
@@ -69,4 +69,5 @@ a rotação de forma coordenada. Credenciais individuais de agentes OpenAI não
 pertencem ao Tenant Web nem a `NEXT_PUBLIC_*`: devem ficar no cofre/backend e a
 interface pode receber apenas estado seguro da credencial, nunca a chave.
 
-> Revisão 2026-09-06: o planejador passou para Leaflet/OpenStreetMap. As referências acima a MapLibre e MAP_STYLE_URL são históricas; essa variável não controla o novo mapa.
+O planejador usa Leaflet/OpenStreetMap. `MAP_STYLE_URL` permanece como
+configuração de compatibilidade e não seleciona o estilo do mapa atual.

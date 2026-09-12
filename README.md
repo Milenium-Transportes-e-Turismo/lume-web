@@ -1,5 +1,8 @@
 # Lume Tenant Web
 
+Consulte o [índice da documentação](docs/README.md) para contratos, guias atuais,
+implantação e registros históricos.
+
 O fluxo de checklists, upload, revisão humana e candidatos restritos está em
 [`docs/document-management.md`](docs/document-management.md).
 Decisões aprovadas que ainda dependem de contrato da Tenant API estão separadas
@@ -63,9 +66,10 @@ pode ser convertido pelo frontend.
 `/users` exige ao menos uma permissão entre `users:view`, `users:create`,
 `users:update` e `users:manage`; os limites por papel e alvo continuam aplicados
 pela Tenant API. `/license` exige vínculo com Gerência e `license:view`. A
-sidebar separa módulos em **Geral**, **Cadastros**, **Comercial**, **Pessoas** e
-**Administração**; Painel WhatsApp e Orçamentos são exclusivos do escopo
-Comercial. **Orçamentos** é um único item
+sidebar organiza Empresa, Plataforma, Dashboards, Financeiro, Operacional e
+Comercial conforme o catálogo central e as capacidades publicadas pela API.
+Painel WhatsApp respeita o escopo de atendimento; não é exclusivo do Comercial.
+**Orçamentos** é um único item
 de navegação e abre `/quote-proposals`, onde as filas **Pendentes**, **Enviadas**,
 **Aprovadas** e **Canceladas** aparecem como abas. A contagem pendente é
 autoritativa da Tenant API. Os gráficos e motivos de cancelamento ficam no
@@ -328,3 +332,17 @@ de até 3.000 cadastros. Consulta exige clients:view; exportação exige também
 documents:view ou documents:manage. Geração, limites e persistência temporária
 reutilizam DataExchange. Não requer migration ou novas variáveis; atualizar API
 antes do Web. A importação no Google é feita manualmente com o CSV baixado.
+
+## Transportes
+
+CNPJs do tenant fica em Empresa > Dados; Frota e Tipos e categorias ficam em Empresa > Frota. Vínculos e contratos são administrados no perfil de cada Cadastro. Registros, em Financeiro > Controle, usa /transport para rotas de origem, importação e conferência de odômetros. CNPJs próprios são separados dos cadastros PF/PJ de clientes e funcionários. Consulte [o fluxo e os limites de ativação](docs/transport.md).
+
+## Sidebar e catálogos — 10/09/2026
+
+A sidebar usa duas colunas: ferramentas (tema, notificações e cor) e navegação hierárquica. O menu do usuário fica no topo, com perfil, documentos, suporte e saída. As permissões continuam vindo do catálogo autorizado; exemplos sem funcionalidade não geram links.
+
+Empresa reúne dados, pessoas com filtros de Papel, frota, tipos/categorias, agentes e canais. Plataforma mantém usuários/administração/licença. Registros fica em Financeiro → Controle e conserva /transport, com atalhos por aba. Integração Avic fica em /integrations/avic. Dashboards mostra o painel já existente, sem inventar métricas ou telas departamentais.
+
+A Frota mantém seus seletores e carrega todas as páginas de opções sem controles de busca/paginação em cada campo. Origem e ID externo ficam fora do formulário; referências anteriores são preservadas e não se presume que número de frota seja VeiculoId.
+
+Códigos de tipos/categorias são gerados pela API. O usuário informa tipo e nome; o código numérico é somente leitura. A atualização da API e a migração numeric_catalog_codes devem preceder a Web.

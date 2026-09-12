@@ -8,6 +8,7 @@ import { AuthenticatedShell } from './authenticated-shell';
 
 jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('@/features/auth/components', () => ({
@@ -65,7 +66,8 @@ describe('AuthenticatedShell', () => {
     );
     expect(screen.getByText('Conteúdo protegido')).toBeInTheDocument();
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(container.querySelector('header [data-slot="separator"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-slot="sidebar-inset"] > header')).toBeNull();
+    expect(container.querySelector('[data-slot="breadcrumb"]')).toBeNull();
   });
 
   it('supports the official responsive sidebar trigger', async () => {
