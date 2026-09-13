@@ -47,8 +47,7 @@ para a imagem. Requisitos:
 - `LUME_TENANT_WHATSAPP_DATA_SOURCE=api`;
 - `LUME_TENANT_API_WHATSAPP_IMPORT_TIMEOUT_MS` compatível com o maior backup
   aceito pela API; o exemplo usa dez minutos.
-- `MAP_STYLE_URL` pode apontar para um estilo MapLibre HTTPS; o padrão público é
-  `https://tiles.openfreemap.org/styles/liberty` e não contém segredo.
+- `MAP_STYLE_URL` é uma configuração legada; não controla o mapa Leaflet atual.
 
 Nunca grave tokens, cookies, `SESSION_SECRET` ou o arquivo real de ambiente em
 logs, argumentos de build, imagens ou repositórios. Credenciais individuais de
@@ -79,9 +78,8 @@ acima da janela do lote para não transformar um upload persistido em erro
 ambíguo no navegador.
 
 O processo server-side do Tenant Web precisa alcançar apenas a Tenant API e os
-destinos HTTPS dos anexos publicados por ela. O navegador também acessa o host
-do estilo e os hosts de tiles, sprites e fontes referenciados por esse estilo;
-uma CSP futura deve permiti-los explicitamente em `connect-src` e `img-src`.
+destinos HTTPS dos anexos publicados por ela. O navegador acessa os tiles do mapa Leaflet e os recursos públicos usados pela
+interface; uma CSP deve permitir apenas os hosts efetivamente utilizados.
 
 Para a importação assistida, o proxy deve aceitar até 2 GiB mais o overhead
 multipart e manter streaming habilitado. Esse limite contempla tanto um ZIP
@@ -141,7 +139,7 @@ balanceador. Nenhuma sonda expõe segredos ou JWTs.
     execute um cálculo controlado. A requisição deve ir somente para a Tenant
     API e uma base de pedágios indisponível deve aparecer como cobertura parcial,
     sem valores simulados. O mapa deve enquadrar a rota, mostrar origem, destino,
-    paradas e pedágios e preservar a atribuição OpenStreetMap/OpenMapTiles.
+    paradas e pedágios e preservar a atribuição do provedor cartográfico exibida no mapa.
 12. Confirme que o cadastro oferece somente conta de colaborador, que payloads
     de criação `client` e `document-portal` são recusados e que contas legadas
     continuam editáveis sem permitir troca do modo de acesso.
@@ -160,7 +158,8 @@ retire a imagem nova do balanceador, restaure a imagem anterior e valide as duas
 sondas. O frontend não executa migrations e seu rollback não deve reverter o
 banco da Tenant API.
 
-> Revisão 2026-09-06: o planejador passou para Leaflet/OpenStreetMap. As referências acima a MapLibre e MAP_STYLE_URL são históricas; essa variável não controla o novo mapa.
+O planejador atual usa Leaflet/OpenStreetMap; não depende da configuração legada
+de estilo MapLibre.
 
 ## Ajustes de interface e atividade administrativa — setembro de 2026
 
@@ -248,3 +247,5 @@ O desenvolvimento de staging usa os diretórios oficiais
 `/home/taiane/lume/lume-staging/lume-tenant-api`. Compare a revisão construída com
 a imagem executada e confirme readiness e comportamento autenticado. Arquivos
 `.env`, credenciais, mídias e diagnósticos privados ficam fora do Git.
+
+Preparação da promoção atual: [develop para main](release-develop-main.md).

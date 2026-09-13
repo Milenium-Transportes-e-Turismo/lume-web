@@ -346,3 +346,5 @@ Empresa reúne dados, pessoas com filtros de Papel, frota, tipos/categorias, age
 A Frota mantém seus seletores e carrega todas as páginas de opções sem controles de busca/paginação em cada campo. Origem e ID externo ficam fora do formulário; referências anteriores são preservadas e não se presume que número de frota seja VeiculoId.
 
 Códigos de tipos/categorias são gerados pela API. O usuário informa tipo e nome; o código numérico é somente leitura. A atualização da API e a migração numeric_catalog_codes devem preceder a Web.
+
+Preparação da promoção atual: [develop para main](docs/release-develop-main.md).

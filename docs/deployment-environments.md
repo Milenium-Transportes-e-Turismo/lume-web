@@ -37,7 +37,7 @@ Tenant API deve ser atualizada e ficar saudável antes do Tenant Web, porque ela
 
 ### Atualização da Tenant API
 
-No clone `/home/taiane/lume-staging/lume-tenant-api`, siga o runbook do próprio
+No clone `/home/taiane/lume/lume-staging/lume-tenant-api`, siga o runbook do próprio
 repositório em `docs/deployment-environments.md`: confirme backup, branch e SHA;
 execute o Compose com `.env.staging`, `compose.prod.yml` e o `compose.vps.yml`
 local; aguarde `migrate` terminar; então valide
@@ -54,7 +54,7 @@ de descoberta antes de continuar.
 
 ```bash
 set -Eeuo pipefail
-cd /home/taiane/lume-staging/lume-tenant-web
+cd /home/taiane/lume/lume-staging/lume-tenant-web
 test -z "$(git status --porcelain)"
 sudo nginx -t
 sudo docker ps --all --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
@@ -223,7 +223,7 @@ existir mais, inspecione os contêineres antes de executar qualquer novo deploy:
 
 ```bash
 set -Eeuo pipefail
-cd /home/taiane/lume-staging/lume-tenant-web
+cd /home/taiane/lume/lume-staging/lume-tenant-web
 web_container=lume-tenant-web-staging
 sudo docker ps --all --filter "name=${web_container}" --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 recovery_status='missing'

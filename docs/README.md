@@ -26,3 +26,5 @@ não comprovam o estado atual. Confirme revisão, migrações e imagem do ambien
 ## Transportes e roteirização
 
 - [Transportes](transport.md).
+
+Preparação da promoção atual: [develop para main](release-develop-main.md).
