@@ -500,7 +500,11 @@ function contactDisplayName(conversation: ApiConversation): string {
 }
 
 function mapAttachment(message: ApiMessage): WhatsAppMessageAttachment | null {
-  if (message.kind === 'text') return null;
+  if (
+    message.kind === 'text' ||
+    (message.kind === 'unknown' && message.media?.retentionStatus !== 'stored')
+  )
+    return null;
 
   const media = message.media ?? {};
   const retentionStatus =

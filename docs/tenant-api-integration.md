@@ -124,7 +124,10 @@ catálogo estático atualmente publicado; a configuração dinâmica permanece e
 `documentAccessMode=standard`; schema e Server Action rejeitam novas contas
 `document-portal`, `client` e o escopo `client-company`. Contas legadas continuam
 compatíveis, mas uma atualização consulta `GET /users/:id` e recusa mudança do
-modo persistido. Quando departamentos, permissões ou vínculo de cliente mudam, a
+modo persistido. A resposta preserva `version`; o editor envia essa versão em
+`expectedVersion` e um `commandId` UUID por alteração. Repetir o mesmo envio
+preserva o comando; mudar os dados gera outro. Conflitos recarregam o estado
+autoritativo e nunca repetem a gravação automaticamente. Quando departamentos, permissões ou vínculo de cliente mudam, a
 ação também compara a resposta de `PATCH /users/:id` com o pedido e sinaliza
 conflito se a API descartar os campos, sem produzir uma confirmação falsa.
 
@@ -804,3 +807,8 @@ com commandId, expectedVersion da conversa, expectedSessionVersion e decision
 (accept/dismiss). A aprovação da coleta cria outro orçamento e devolve à IA;
 a recusa mantém o atendimento humano. Sugestões de outro departamento oferecem
 encaminhamento autorizado. Em conflito, o painel recarrega o estado.
+
+Mensagens `unknown` sem arquivo retido não geram URL de download ou ação de
+interpretação: podem ser reações, produtos ou eventos do protocolo. O painel
+mostra o texto descritivo fornecido pela API ou informa conteúdo não suportado.
+Arquivos efetivamente retidos continuam acessíveis.

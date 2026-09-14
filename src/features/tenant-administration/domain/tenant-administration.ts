@@ -1,4 +1,5 @@
 export interface TenantUser {
+  readonly version: number;
   readonly id: string;
   readonly name: string;
   readonly username: string;
@@ -119,6 +120,8 @@ export interface CreateTenantUserInput {
 }
 
 export interface UpdateTenantUserInput {
+  readonly commandId: string;
+  readonly expectedVersion: number;
   readonly routingCompanyId?: string | null;
   readonly clientCategory?: 'legal-entity' | 'individual' | null;
   readonly name?: string;

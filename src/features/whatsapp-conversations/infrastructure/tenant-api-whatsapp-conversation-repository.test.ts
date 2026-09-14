@@ -1251,4 +1251,25 @@ describe('LumeApiWhatsAppConversationRepository', () => {
       closingStartedAt: '2026-07-21T13:40:00.000Z',
     });
   });
+  it('does not invent downloadable media for unknown provider events', async () => {
+    const fetcher = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(apiConversation()))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [apiMessage({ kind: 'unknown', media: null, text: null })],
+          meta: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ data: [], meta: { page: 1, pageSize: 100, total: 0, totalPages: 1 } }),
+      );
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+    );
+    const conversation = await repository.getConversationById(conversationId, 1);
+    expect(conversation?.messages[0].attachment).toBeNull();
+  });
 });

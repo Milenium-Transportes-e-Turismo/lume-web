@@ -3,7 +3,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LoaderCircle, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { Controller, useController, useForm, useWatch, type Control } from 'react-hook-form';
 
 import { updateTenantUserFormAction } from '@/features/tenant-administration/actions';
@@ -215,6 +216,10 @@ export function UserEditorForm({
   readonly routingCompanies?: readonly { readonly id: string; readonly label: string }[];
 }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const [pendingCommand, setPendingCommand] = useState<{ payload: string; id: string } | null>(
+    null,
+  );
   const form = useForm<UserEditorFormValues>({
     resolver: zodResolver(userEditorFormSchema),
     defaultValues: {
@@ -283,15 +288,25 @@ export function UserEditorForm({
                 ([key]) => !['clientCategory', 'routingCompanyId'].includes(key),
               ),
             );
-      const result = await updateTenantUserFormAction(
-        user.id,
-        Object.fromEntries(
+      const mutation = {
+        ...Object.fromEntries(
           Object.entries(scopedValues).filter(
             ([key]) =>
               !['jobTitle', 'maritalStatus', 'militaryDocumentStatus', 'dependents'].includes(key),
           ),
         ),
-      );
+        expectedVersion: user.version,
+      };
+      const payload = JSON.stringify(mutation);
+      const command =
+        pendingCommand?.payload === payload ? pendingCommand : { payload, id: crypto.randomUUID() };
+      setPendingCommand(command);
+      const result = await updateTenantUserFormAction(user.id, {
+        ...mutation,
+        commandId: command.id,
+      });
+      if (result.success) setPendingCommand(null);
+      router.refresh();
       toast.add({
         title: result.success ? 'Usuário atualizado' : 'Alteração não concluída',
         description: formatActionResultDescription(result),

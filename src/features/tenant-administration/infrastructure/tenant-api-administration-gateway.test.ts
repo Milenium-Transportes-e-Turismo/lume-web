@@ -42,6 +42,7 @@ describe('TenantApiAdministrationGateway', () => {
 
   it('keeps tenant user updates inside the local API', async () => {
     const responseUser = {
+      version: 7,
       id: '5a19a7d8-4aa8-4d35-b758-8450f865cff0',
       name: 'Ana Souza',
       username: 'ana.souza',
@@ -103,6 +104,7 @@ describe('TenantApiAdministrationGateway', () => {
 
   it('reads direct permissions and suspension metadata from the canonical user response', async () => {
     const suspended = {
+      version: 7,
       id: '5a19a7d8-4aa8-4d35-b758-8450f865cff0',
       name: 'Ana Souza',
       username: 'ana.souza',
@@ -139,6 +141,7 @@ describe('TenantApiAdministrationGateway', () => {
 
   it('sends and reads the canonical administrator flag', async () => {
     const administrator = {
+      version: 7,
       id: '5a19a7d8-4aa8-4d35-b758-8450f865cff0',
       name: 'Admin Lume',
       username: 'admin.lume',
@@ -411,5 +414,45 @@ describe('TenantApiAdministrationGateway', () => {
     await gateway.listPermissions();
 
     expect(timeout).toHaveBeenCalledWith(7_500);
+  });
+  it('preserves authoritative versions and sends the complete update contract', async () => {
+    const responseUser = {
+      version: 7,
+      id: '5a19a7d8-4aa8-4d35-b758-8450f865cff0',
+      name: 'Ana Souza',
+      username: 'ana.souza',
+      email: 'ana@example.com',
+      cpf: null,
+      type: 'employee',
+      departments: ['commercial'],
+      isAdministrator: false,
+      permissions: ['dashboard:view'],
+      clientCategory: null,
+      isActive: false,
+      createdAt: '2026-07-24T00:00:00.000Z',
+      updatedAt: '2026-07-24T01:00:00.000Z',
+    };
+
+    const fetcher = jest.fn().mockResolvedValue(jsonResponse(responseUser));
+    const gateway = new TenantApiAdministrationGateway(
+      'https://tenant.example/api/v1',
+      'access-token',
+      fetcher,
+    );
+    await expect(gateway.getUser(responseUser.id)).resolves.toMatchObject({ version: 7 });
+    const input = {
+      name: 'Ana Souza',
+      commandId: '11111111-1111-4111-8111-111111111111',
+      expectedVersion: 7,
+    };
+    await gateway.updateUser(responseUser.id, input);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `https://tenant.example/api/v1/users/${responseUser.id}`,
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify(input) }),
+    );
+    fetcher.mockResolvedValueOnce(jsonResponse({ ...responseUser, version: undefined }));
+    await expect(gateway.getUser(responseUser.id)).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
   });
 });

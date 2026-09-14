@@ -83,6 +83,7 @@ const permissionCatalog: PermissionCatalog = {
 };
 
 const tenantUser: TenantUser = {
+  version: 7,
   id: '00000000-0000-4000-8000-000000000001',
   name: 'Taiane Karine',
   username: 'taiane',
@@ -544,6 +545,8 @@ describe('user editor form', () => {
 
     await waitFor(() => expect(updateTenantUserFormAction).toHaveBeenCalledTimes(1));
     expect(updateTenantUserFormAction).toHaveBeenCalledWith(tenantUser.id, {
+      commandId: expect.any(String),
+      expectedVersion: 7,
       name: 'Taiane Karine Atualizada',
       email: tenantUser.email,
       isAdministrator: false,
@@ -730,4 +733,46 @@ describe('user editor form', () => {
     expect(screen.getByText('Administrador')).toBeInTheDocument();
     expect(screen.getByText('Acesso administrativo completo')).toBeInTheDocument();
   });
+});
+
+it('sends the displayed version and reuses the command only for an identical retry', async () => {
+  jest
+    .mocked(updateTenantUserFormAction)
+    .mockResolvedValue({ success: false, message: 'Tente novamente.', errorCode: 'NETWORK_ERROR' });
+  const interaction = userEvent.setup();
+  render(
+    <UserEditorForm user={tenantUser} permissionCatalog={permissionCatalog} canManageAccess />,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Salvar alterações' })).toBeEnabled(),
+  );
+  await interaction.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+  await waitFor(() => expect(updateTenantUserFormAction).toHaveBeenCalledTimes(1));
+  const first = jest.mocked(updateTenantUserFormAction).mock.calls[0][1] as {
+    commandId: string;
+    expectedVersion: number;
+  };
+  expect(first.expectedVersion).toBe(7);
+  expect(first.commandId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Salvar alterações' })).toBeEnabled(),
+  );
+  await interaction.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+  await waitFor(() => expect(updateTenantUserFormAction).toHaveBeenCalledTimes(2));
+  expect(jest.mocked(updateTenantUserFormAction).mock.calls[1][1]).toEqual(first);
+  await interaction.type(screen.getByLabelText('Nome'), ' Silva');
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Salvar alterações' })).toBeEnabled(),
+  );
+  await interaction.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+  await waitFor(() => expect(updateTenantUserFormAction).toHaveBeenCalledTimes(3));
+  expect(jest.mocked(updateTenantUserFormAction).mock.calls[2][1]).toEqual(
+    expect.objectContaining({
+      commandId: expect.not.stringMatching(first.commandId),
+      expectedVersion: 7,
+    }),
+  );
+  expect(mockRouterRefresh).toHaveBeenCalled();
 });

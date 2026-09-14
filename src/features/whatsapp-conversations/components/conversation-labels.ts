@@ -70,7 +70,7 @@ export const MESSAGE_KIND_LABELS: Record<WhatsAppMessageKind, string> = {
   sticker: 'Figurinha',
   location: 'Localização',
   contact: 'Contato',
-  unknown: 'Anexo',
+  unknown: 'Conteúdo não suportado',
 };
 
 export type ConversationControl = 'bot' | 'human' | 'paused' | 'closed';

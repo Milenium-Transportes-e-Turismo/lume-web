@@ -13,6 +13,7 @@ type Fetcher = typeof fetch;
 const isoDate = z.string().refine((value) => Number.isFinite(Date.parse(value)));
 const userSchema = z
   .object({
+    version: z.number().int().positive(),
     id: z.string().uuid(),
     name: z.string().min(1),
     username: z.string().min(1),

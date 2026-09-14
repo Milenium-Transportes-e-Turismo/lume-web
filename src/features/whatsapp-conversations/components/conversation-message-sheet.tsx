@@ -786,6 +786,9 @@ export function ConversationMessageSheet({
                                 {message.text}
                               </p>
                             ) : null}
+                            {message.kind === 'unknown' && !message.text && !message.attachment ? (
+                              <p>Conteúdo do WhatsApp ainda não suportado pelo painel.</p>
+                            ) : null}
                             {message.attachment ? (
                               <>
                                 <MessageAttachmentPreview

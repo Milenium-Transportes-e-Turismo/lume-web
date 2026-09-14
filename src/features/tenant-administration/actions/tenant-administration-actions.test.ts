@@ -26,6 +26,7 @@ jest.mock('../server', () => ({
 describe('tenant administration user actions', () => {
   const mockedRedirect = jest.mocked(redirect);
   const currentUser = {
+    version: 7,
     id: '00000000-0000-4000-8000-000000000001',
     documentAccessMode: 'standard' as const,
     departments: ['commercial'],
@@ -216,6 +217,8 @@ describe('tenant administration user actions', () => {
     ).resolves.toMatchObject({ success: true });
 
     expect(updateUser).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001', {
+      commandId: expect.any(String),
+      expectedVersion: 7,
       name: 'Usuário Comercial',
       email: 'comercial@example.com',
       departments: ['commercial'],
@@ -258,6 +261,8 @@ describe('tenant administration user actions', () => {
     ).resolves.toMatchObject({ success: true });
 
     expect(updateUser).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001', {
+      commandId: expect.any(String),
+      expectedVersion: 7,
       name: 'Usuário Comercial',
       email: 'comercial@example.com',
     });
@@ -316,6 +321,8 @@ describe('tenant administration user actions', () => {
       `NEXT_REDIRECT:/users/${userId}?success=Usuário atualizado com sucesso.`,
     );
     expect(updateUser).toHaveBeenCalledWith(userId, {
+      commandId: expect.any(String),
+      expectedVersion: 7,
       name: 'Usuário Comercial',
       email: 'comercial@example.com',
       departments: ['commercial'],
@@ -365,4 +372,42 @@ describe('tenant administration user actions', () => {
       expect.not.objectContaining({ documentAccessMode: expect.anything() }),
     );
   });
+  it('preserves the editor version and command instead of silently replacing a stale version', async () => {
+    const commandId = '11111111-1111-4111-8111-111111111111';
+    updateUser.mockRejectedValueOnce(
+      new TenantAdministrationError('conflict', 'Recarregue o usuário.', 'VERSION_CONFLICT'),
+    );
+    const result = await updateTenantUserFormAction(currentUser.id, {
+      name: 'Usuário Comercial',
+      email: 'comercial@example.com',
+      isAdministrator: false,
+      departments: ['commercial'],
+      permissionCodes: ['commercial:view'],
+      expectedVersion: 6,
+      commandId,
+    });
+    expect(updateUser).toHaveBeenCalledTimes(1);
+    expect(updateUser).toHaveBeenCalledWith(
+      currentUser.id,
+      expect.objectContaining({ expectedVersion: 6, commandId }),
+    );
+    expect(result).toMatchObject({ success: false, errorCode: 'VERSION_CONFLICT' });
+    expect(revalidatePath).toHaveBeenCalledWith(`/users/${currentUser.id}`);
+  });
+
+  it.each([{ expectedVersion: 0 }, { expectedVersion: 1.5 }, { commandId: 'invalid' }])(
+    'rejects invalid command metadata %j',
+    async (metadata) => {
+      const result = await updateTenantUserFormAction(currentUser.id, {
+        name: 'Usuário Comercial',
+        email: 'comercial@example.com',
+        isAdministrator: false,
+        departments: ['commercial'],
+        permissionCodes: ['commercial:view'],
+        ...metadata,
+      });
+      expect(result.success).toBe(false);
+      expect(updateUser).not.toHaveBeenCalled();
+    },
+  );
 });

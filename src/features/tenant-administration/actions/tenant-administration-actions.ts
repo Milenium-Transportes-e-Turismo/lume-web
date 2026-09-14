@@ -88,10 +88,16 @@ function requireClientScope(
     });
 }
 
-const userBaseSchema = z.object(userAssignmentFields).superRefine((input, context) => {
-  requireDepartmentForStandardUser(input, context);
-  requireClientScope(input, context);
-});
+const userBaseSchema = z
+  .object({
+    ...userAssignmentFields,
+    commandId: z.string().uuid().optional(),
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .superRefine((input, context) => {
+    requireDepartmentForStandardUser(input, context);
+    requireClientScope(input, context);
+  });
 const createUserSchema = z
   .object({
     ...userAssignmentFields,
@@ -216,7 +222,11 @@ async function updateUserWithoutChangingAccessMode(
       (currentMode === 'client' &&
         (input.clientCategory !== current.clientCategory ||
           input.routingCompanyId !== current.routingCompanyId)));
-  const updated = await gateway.updateUser(userId, mutation);
+  const updated = await gateway.updateUser(userId, {
+    ...mutation,
+    commandId: input.commandId ?? randomUUID(),
+    expectedVersion: input.expectedVersion ?? current.version,
+  });
 
   if (
     assignmentsChanged &&
@@ -353,7 +363,7 @@ export async function updateTenantUserAction(userId: string, formData: FormData)
   } catch (error) {
     if (
       error instanceof TenantAdministrationError &&
-      error.publicCode === 'AUTHORITATIVE_USER_STATE_MISMATCH'
+      (error.code === 'conflict' || error.publicCode === 'AUTHORITATIVE_USER_STATE_MISMATCH')
     ) {
       revalidatePath('/users');
       revalidatePath(`/users/${userId}`);
@@ -446,7 +456,7 @@ export async function updateTenantUserFormAction(
   } catch (error) {
     if (
       error instanceof TenantAdministrationError &&
-      error.publicCode === 'AUTHORITATIVE_USER_STATE_MISMATCH'
+      (error.code === 'conflict' || error.publicCode === 'AUTHORITATIVE_USER_STATE_MISMATCH')
     ) {
       revalidatePath('/users');
       revalidatePath(`/users/${userId}`);

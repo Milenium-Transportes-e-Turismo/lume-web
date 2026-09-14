@@ -81,6 +81,7 @@ export default async function UserEditorRoute({
         </header>
         <PageFeedbackToast error={query.error} success={query.success} />
         <UserEditorForm
+          key={`${user.id}:${user.version}`}
           user={user}
           permissionCatalog={permissionCatalog}
           canManageAccess={canManageAccess}
