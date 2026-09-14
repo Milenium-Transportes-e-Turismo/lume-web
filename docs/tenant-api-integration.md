@@ -812,3 +812,7 @@ Mensagens `unknown` sem arquivo retido não geram URL de download ou ação de
 interpretação: podem ser reações, produtos ou eventos do protocolo. O painel
 mostra o texto descritivo fornecido pela API ou informa conteúdo não suportado.
 Arquivos efetivamente retidos continuam acessíveis.
+
+A análise manual de mídia admite até 310 segundos, sem ampliar o prazo das
+consultas comuns. Se a espera falhar, o painel consulta o resultado já persistido
+antes de apresentar erro, pois interromper a conexão não cancela a análise.

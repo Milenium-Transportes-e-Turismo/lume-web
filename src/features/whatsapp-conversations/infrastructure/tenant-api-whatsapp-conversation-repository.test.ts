@@ -1272,4 +1272,24 @@ describe('LumeApiWhatsAppConversationRepository', () => {
     const conversation = await repository.getConversationById(conversationId, 1);
     expect(conversation?.messages[0].attachment).toBeNull();
   });
+  it('allows media processing to finish without extending ordinary request timeouts', async () => {
+    const signal = new AbortController().signal;
+    const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+    const fetcher = jest.fn().mockResolvedValue(jsonResponse({}));
+    const repository = new LumeApiWhatsAppConversationRepository(
+      'https://tenant.example/api/v1',
+      'token',
+      fetcher,
+      5000,
+    );
+    await repository
+      .analyzeMedia(conversationId, '00000000-0000-4000-8000-000000000501')
+      .catch(() => undefined);
+    expect(timeout).toHaveBeenLastCalledWith(310000);
+    await repository
+      .getMediaInterpretation(conversationId, '00000000-0000-4000-8000-000000000501')
+      .catch(() => undefined);
+    expect(timeout).toHaveBeenLastCalledWith(5000);
+    timeout.mockRestore();
+  });
 });

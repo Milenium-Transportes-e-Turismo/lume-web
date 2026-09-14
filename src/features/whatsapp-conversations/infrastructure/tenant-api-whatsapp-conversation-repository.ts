@@ -996,7 +996,7 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
       z.union([mediaInterpretationSchema, deferredMediaInterpretationSchema]),
       await this.request(
         `/whatsapp/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/actions/analyze-media`,
-        { method: 'POST' },
+        { method: 'POST', timeoutMs: Math.max(this.timeoutMs, 310_000) },
       ),
     );
   }
@@ -1377,7 +1377,7 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
 
   private async request(
     path: string,
-    input: { readonly method?: string; readonly body?: unknown } = {},
+    input: { readonly method?: string; readonly body?: unknown; readonly timeoutMs?: number } = {},
   ): Promise<unknown> {
     let response: Response;
 
@@ -1391,7 +1391,7 @@ export class LumeApiWhatsAppConversationRepository implements WhatsAppConversati
           ...(input.body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         body: input.body === undefined ? undefined : JSON.stringify(input.body),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: AbortSignal.timeout(input.timeoutMs ?? this.timeoutMs),
       });
     } catch {
       throw new WhatsAppConversationRepositoryError(

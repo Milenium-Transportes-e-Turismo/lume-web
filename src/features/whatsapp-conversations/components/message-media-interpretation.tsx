@@ -76,7 +76,18 @@ export function MessageMediaInterpretation({
         messageId: message.id,
       });
       if (result.success) setInterpretation(result.interpretation);
-      else setError(result.message);
+      else {
+        // A análise pode continuar na API mesmo quando a conexão de espera falha.
+        const refreshed = await getMediaInterpretationAction({
+          conversationId,
+          messageId: message.id,
+        });
+        if (refreshed.success && refreshed.interpretation.status !== 'not-requested') {
+          setInterpretation(refreshed.interpretation);
+        } else {
+          setError(result.message);
+        }
+      }
     });
   }
 
