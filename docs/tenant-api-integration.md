@@ -816,3 +816,9 @@ Arquivos efetivamente retidos continuam acessíveis.
 A análise manual de mídia admite até 310 segundos, sem ampliar o prazo das
 consultas comuns. Se a espera falhar, o painel consulta o resultado já persistido
 antes de apresentar erro, pois interromper a conexão não cancela a análise.
+
+O contexto do atendimento exibe o responsável junto ao controle humano e no
+campo Responsável. O nome segue o vínculo autoritativo da sessão; um vínculo
+divergente da conversa não substitui o responsável atual. Quando não há usuário
+vinculado, o painel orienta Assumir/Transferir. Mensagens do aplicativo WhatsApp
+não autorizam inferir a identidade de um usuário da plataforma.

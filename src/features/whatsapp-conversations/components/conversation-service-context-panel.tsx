@@ -175,6 +175,13 @@ export function ConversationServiceContextPanel({
 }: ConversationServiceContextPanelProps) {
   const session = getCurrentWhatsAppServiceSession(conversation);
   const evidence = getWhatsAppConversationEvidence(conversation);
+  const responsibleName =
+    session.responsible?.name ??
+    (session.responsibleUserId === null || session.responsibleUserId === conversation.assignedTo?.id
+      ? conversation.assignedTo?.name
+      : undefined);
+  const unassignedHuman =
+    session.controlMode === 'HUMAN' && !session.responsibleUserId && !conversation.assignedTo?.id;
   const [priority, setPriority] = useState<WhatsAppServiceSessionPriority>(session.priority);
   const [priorityReason, setPriorityReason] = useState('');
 
@@ -272,20 +279,30 @@ export function ConversationServiceContextPanel({
               )}
               {CONTROL_LABELS[session.controlMode]}
             </strong>
+            {session.controlMode === 'HUMAN' && responsibleName ? (
+              <span className="mt-1 block break-words text-xs font-medium">{responsibleName}</span>
+            ) : null}
           </div>
         </section>
 
+        {unassignedHuman ? (
+          <p className="px-3 pt-3 text-xs leading-5 text-muted-foreground">
+            Para vincular o atendente, use Assumir ou transfira para um usuário. Respostas pelo
+            aplicativo WhatsApp não identificam o usuário do Lume.
+          </p>
+        ) : null}
         <dl className="grid gap-2 px-3 py-3 text-xs">
           <div className="flex items-start justify-between gap-3">
             <dt className="flex items-center gap-1.5 text-muted-foreground">
               <UserRound aria-hidden="true" className="size-3.5" /> Responsável
             </dt>
             <dd className="max-w-[60%] text-right font-semibold">
-              {session.responsible?.name ??
-                conversation.assignedTo?.name ??
+              {responsibleName ??
                 (session.responsibleUserId
                   ? `Usuário ${compactReference(session.responsibleUserId)}`
-                  : 'Não atribuído')}
+                  : unassignedHuman
+                    ? 'Sem usuário vinculado'
+                    : 'Não atribuído')}
             </dd>
           </div>
           <div className="flex items-start justify-between gap-3">

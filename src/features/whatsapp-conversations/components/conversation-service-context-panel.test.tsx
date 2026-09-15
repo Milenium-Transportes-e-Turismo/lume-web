@@ -117,7 +117,7 @@ describe('ConversationServiceContextPanel', () => {
 
     expect(screen.getByText('Aguardando cliente')).toBeInTheDocument();
     expect(screen.getByText('Humano')).toBeInTheDocument();
-    expect(screen.getByText('Maria Souza')).toBeInTheDocument();
+    expect(screen.getAllByText('Maria Souza')).toHaveLength(2);
     expect(screen.getByText('Comercial prioritário')).toBeInTheDocument();
     expect(screen.getByText('WhatsApp Matriz')).toBeInTheDocument();
     expect(screen.getByText('OpenAI · gpt-5.4')).toBeInTheDocument();
@@ -267,5 +267,61 @@ describe('ConversationServiceContextPanel', () => {
       />,
     );
     expect(screen.queryByText('Direcionar ao Financeiro?')).not.toBeInTheDocument();
+  });
+  it('shows the assigned operator for a human conversation and updates after takeover', () => {
+    const conversation = createWhatsAppConversationFixture({ assignedTo: null });
+    const session = {
+      ...getCurrentWhatsAppServiceSession(conversation),
+      controlMode: 'HUMAN' as const,
+      responsibleUserId: null,
+      responsible: null,
+    };
+    const { rerender } = render(
+      <ConversationServiceContextPanel
+        conversation={{ ...conversation, currentServiceSession: session }}
+        isBusy={false}
+        {...handlers()}
+      />,
+    );
+    expect(screen.getByText('Sem usuário vinculado')).toBeInTheDocument();
+    expect(screen.getByText(/Respostas pelo aplicativo WhatsApp/)).toBeInTheDocument();
+    rerender(
+      <ConversationServiceContextPanel
+        conversation={{
+          ...conversation,
+          assignedTo: { id: 'operator-1', name: 'Odair Freitas' },
+          currentServiceSession: {
+            ...session,
+            responsibleUserId: 'operator-1',
+            responsible: { id: 'operator-1', name: 'Odair Freitas' },
+          },
+        }}
+        isBusy={false}
+        {...handlers()}
+      />,
+    );
+    expect(screen.getAllByText('Odair Freitas')).toHaveLength(2);
+    expect(screen.queryByText('Sem usuário vinculado')).not.toBeInTheDocument();
+  });
+
+  it('does not attribute the current session to a different legacy assignee', () => {
+    const conversation = createWhatsAppConversationFixture({
+      assignedTo: { id: 'old-user', name: 'Responsável anterior' },
+    });
+    const session = {
+      ...getCurrentWhatsAppServiceSession(conversation),
+      controlMode: 'HUMAN' as const,
+      responsibleUserId: 'current-user',
+      responsible: null,
+    };
+    render(
+      <ConversationServiceContextPanel
+        conversation={{ ...conversation, currentServiceSession: session }}
+        isBusy={false}
+        {...handlers()}
+      />,
+    );
+    expect(screen.queryByText('Responsável anterior')).not.toBeInTheDocument();
+    expect(screen.getByText('Usuário current-user')).toBeInTheDocument();
   });
 });
