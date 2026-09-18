@@ -6,9 +6,10 @@ import { AuthenticatedNavigation } from '@/features/navigation/authenticated-nav
 import { ThemeToggle } from '@/features/navigation/theme-toggle';
 import { AccentColorPicker } from '@/features/navigation/accent-color-preference';
 import { CommercialNotificationCenter } from '@/features/navigation/commercial-notification-center';
-import { LumeBrand } from '@/shared/lume-brand';
+import { LumeBrand, LumeBrandMark } from '@/shared/lume-brand';
 import { NavUser } from '@/shared/nav-user';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger } from '@/shared/ui/sidebar';
+import Link from 'next/link';
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   readonly user: User;
@@ -22,6 +23,9 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           role="toolbar"
           className="flex w-14 shrink-0 flex-col items-center gap-3 border-r border-sidebar-border py-3"
         >
+          <Link href="/dashboard" aria-label="Ir para o Dashboard" title="Dashboard">
+            <LumeBrandMark className="size-8" priority />
+          </Link>
           <SidebarTrigger
             aria-label="Recolher ou expandir navegação"
             title="Recolher ou expandir navegação"
@@ -35,7 +39,9 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <div className="flex min-w-0 flex-1 flex-col group-data-[collapsible=icon]:hidden">
           <SidebarHeader className="gap-3 border-b border-sidebar-border px-3 py-3">
             <div className="flex h-8 items-center px-1">
-              <LumeBrand compact />
+              <Link href="/dashboard" aria-label="Ir para o Dashboard">
+                <LumeBrand compact />
+              </Link>
             </div>
             <NavUser user={user} />
           </SidebarHeader>

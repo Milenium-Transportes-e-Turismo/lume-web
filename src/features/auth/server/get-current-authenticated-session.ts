@@ -9,6 +9,7 @@ import {
   type SessionStorage,
 } from '../application';
 import type { AuthenticatedSession } from '../domain';
+import { createLocalDemoSession } from '../simulation/create-local-demo-session';
 import {
   createCookieApiTokenStorage,
   createCookieSessionStorage,
@@ -16,6 +17,11 @@ import {
 } from '../infrastructure';
 
 export async function getCurrentAuthenticatedSession(): Promise<AuthenticatedSession | null> {
+  const environment = getServerEnv();
+  if (environment.AUTH_LOCAL_AUTO_LOGIN) {
+    return createLocalDemoSession();
+  }
+
   let sessionStorage: SessionStorage;
   let session: AuthenticatedSession | null;
 
@@ -28,7 +34,6 @@ export async function getCurrentAuthenticatedSession(): Promise<AuthenticatedSes
 
   if (session === null) return null;
 
-  const environment = getServerEnv();
   if (environment.AUTH_SIMULATION_ENABLED) {
     return session;
   }

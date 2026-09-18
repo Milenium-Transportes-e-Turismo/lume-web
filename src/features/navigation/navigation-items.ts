@@ -42,6 +42,7 @@ export type NavigationGroup =
 export interface InternalNavigationItem {
   readonly label: string;
   readonly href: string;
+  readonly navigationKey?: string;
   readonly permission: Permission;
   readonly alternativePermissions?: readonly Permission[];
   readonly icon: LucideIcon;
@@ -165,7 +166,7 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
   },
   {
     label: 'Roteirização',
-    href: '/routing',
+    href: '/operacao/roteirizacao',
     permission: 'route-planner:view',
     alternativePermissions: ['route-planner:calculate'],
     icon: Route,
@@ -223,6 +224,36 @@ export const INTERNAL_NAVIGATION_ITEMS: readonly InternalNavigationItem[] = [
     group: 'people-operations',
   },
 ];
+
+const NAVIGATION_KEYS_BY_PATH: Readonly<Record<string, string>> = {
+  '/dashboard': 'dashboard',
+  '/routing': 'operations.routing',
+  '/operacao/roteirizacao': 'operations.routing',
+  '/companies': 'company.companies',
+  '/fleet': 'company.fleet',
+  '/registrations': 'company.registrations',
+  '/contacts': 'company.contacts',
+  '/knowledge': 'company.knowledge',
+  '/ai-agents': 'company.ai-agents',
+  '/whatsapp-conversations': 'company.whatsapp-conversations',
+  '/quote-proposals': 'company.quote-proposals',
+  '/users': 'company.users',
+  '/administration': 'company.administration',
+  '/whatsapp-channels': 'company.whatsapp-channels',
+  '/license': 'company.license',
+  '/support': 'company.support',
+  '/documents': 'company.documents',
+  '/document-management': 'company.document-management',
+  '/transport': 'operations.transport',
+  '/integrations/avic': 'company.integrations.avic',
+  '/catalogs': 'company.catalogs',
+  '/registration-reconciliation': 'company.registration-reconciliation',
+  '/registration-data-reviews': 'company.registration-data-reviews',
+};
+
+export function navigationKeyForHref(href: string): string | undefined {
+  return NAVIGATION_KEYS_BY_PATH[href.split('?')[0]];
+}
 
 function hasOrganizationalScope(user: User, item: InternalNavigationItem): boolean {
   if (user.isAdministrator === true) return true;

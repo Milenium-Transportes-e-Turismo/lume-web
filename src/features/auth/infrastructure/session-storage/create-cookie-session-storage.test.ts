@@ -23,6 +23,24 @@ function createNextCookieStoreMock(): Awaited<ReturnType<typeof cookies>> {
 }
 
 describe('createCookieSessionStorage', () => {
+  it('supplies the same local demo identity to module adapters without reading cookies', async () => {
+    const original = process.env;
+    process.env = {
+      ...original,
+      NODE_ENV: 'development',
+      AUTH_SIMULATION_ENABLED: 'true',
+      AUTH_LOCAL_AUTO_LOGIN: 'true',
+      LUME_TENANT_WHATSAPP_DATA_SOURCE: 'mock',
+    };
+    try {
+      const storage = await createCookieSessionStorage();
+      expect((await storage.get())?.user.id).toBe('local-demo-user');
+      expect(mockedCookies).not.toHaveBeenCalled();
+    } finally {
+      process.env = original;
+    }
+  });
+
   beforeEach(() => {
     process.env.SESSION_SECRET = SESSION_SECRET;
     mockedCookies.mockResolvedValue(createNextCookieStoreMock());

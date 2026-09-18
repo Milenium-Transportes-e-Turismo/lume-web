@@ -379,3 +379,13 @@ Empresa reúne dados, pessoas com filtros de Papel, frota, tipos/categorias, age
 A Frota mantém seus seletores e carrega todas as páginas de opções sem controles de busca/paginação em cada campo. Origem e ID externo ficam fora do formulário; referências anteriores são preservadas e não se presume que número de frota seja VeiculoId.
 
 Códigos de tipos/categorias são gerados pela API. O usuário informa tipo e nome; o código numérico é somente leitura. A atualização da API e a migração numeric_catalog_codes devem preceder a Web.
+
+## Demonstração local sem login
+
+`AUTH_LOCAL_AUTO_LOGIN=true` permite abrir `/` ou `/login` e entrar diretamente
+no Dashboard com o perfil **Demonstração local**, sem cookies ou credenciais.
+Exige `NODE_ENV=development`, `AUTH_SIMULATION_ENABLED=true` e
+`LUME_TENANT_WHATSAPP_DATA_SOURCE=mock`. A configuração é recusada em produção.
+O acesso reúne os departamentos dos usuários simulados; não fornece tokens da
+API nem simula persistência. Módulos que dependem da API continuam indisponíveis.
+Para retornar ao login, defina `AUTH_LOCAL_AUTO_LOGIN=false` no `.env.local`.

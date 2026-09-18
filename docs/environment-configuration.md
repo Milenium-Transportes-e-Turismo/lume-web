@@ -71,3 +71,13 @@ interface pode receber apenas estado seguro da credencial, nunca a chave.
 
 O planejador usa Leaflet/OpenStreetMap. `MAP_STYLE_URL` permanece como
 configuração de compatibilidade e não seleciona o estilo do mapa atual.
+
+## Demonstração local sem login
+
+`AUTH_LOCAL_AUTO_LOGIN=true` permite abrir `/` ou `/login` e entrar diretamente
+no Dashboard com o perfil **Demonstração local**, sem cookies ou credenciais.
+Exige `NODE_ENV=development`, `AUTH_SIMULATION_ENABLED=true` e
+`LUME_TENANT_WHATSAPP_DATA_SOURCE=mock`. A configuração é recusada em produção.
+O acesso reúne os departamentos dos usuários simulados; não fornece tokens da
+API nem simula persistência. Módulos que dependem da API continuam indisponíveis.
+Para retornar ao login, defina `AUTH_LOCAL_AUTO_LOGIN=false` no `.env.local`.

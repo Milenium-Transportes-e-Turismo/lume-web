@@ -21,6 +21,7 @@ export type EnvironmentSource = Partial<
     | 'LUME_TENANT_API_WHATSAPP_IMPORT_TIMEOUT_MS'
     | 'SESSION_SECRET'
     | 'AUTH_SIMULATION_ENABLED'
+    | 'AUTH_LOCAL_AUTO_LOGIN'
     | 'LUME_TENANT_WHATSAPP_DATA_SOURCE'
     | 'MAP_STYLE_URL',
     string | undefined
@@ -126,6 +127,7 @@ export const serverEnvSchema = z
     ),
     SESSION_SECRET: optionalSessionSecretSchema,
     AUTH_SIMULATION_ENABLED: booleanEnvironmentSchema('AUTH_SIMULATION_ENABLED'),
+    AUTH_LOCAL_AUTO_LOGIN: booleanEnvironmentSchema('AUTH_LOCAL_AUTO_LOGIN'),
     LUME_TENANT_WHATSAPP_DATA_SOURCE: z.preprocess(
       (value) => {
         const normalized = emptyStringToUndefined(value);
@@ -140,6 +142,19 @@ export const serverEnvSchema = z
     MAP_STYLE_URL: optionalMapStyleUrlSchema,
   })
   .superRefine((environment, context) => {
+    if (
+      environment.AUTH_LOCAL_AUTO_LOGIN &&
+      (environment.NODE_ENV !== 'development' ||
+        !environment.AUTH_SIMULATION_ENABLED ||
+        environment.LUME_TENANT_WHATSAPP_DATA_SOURCE !== 'mock')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['AUTH_LOCAL_AUTO_LOGIN'],
+        message:
+          'AUTH_LOCAL_AUTO_LOGIN requires development, simulated authentication and mock data.',
+      });
+    }
     if (
       environment.NODE_ENV === 'production' &&
       environment.LUME_TENANT_API_URL !== undefined &&

@@ -1,9 +1,10 @@
 import { Users, Database, Bus, BookUser, ClipboardList, type LucideIcon } from 'lucide-react';
 import { hasPermission, type User } from '@/features/auth/domain';
-import { getAuthorizedNavigationItems } from './navigation-items';
+import { getAuthorizedNavigationItems, navigationKeyForHref } from './navigation-items';
 export type NavigationNode = {
   label: string;
   href?: string;
+  navigationKey?: string;
   icon?: LucideIcon;
   children?: NavigationNode[];
 };
@@ -11,13 +12,23 @@ export function getNavigationTree(user: User): { label: string; items: Navigatio
   const allowed = getAuthorizedNavigationItems(user);
   const lookup = (href: string, label?: string, target?: string): NavigationNode[] => {
     const item = allowed.find((candidate) => candidate.href === href);
-    return item ? [{ label: label ?? item.label, href: target ?? item.href, icon: item.icon }] : [];
+    return item
+      ? [
+          {
+            label: label ?? item.label,
+            href: target ?? item.href,
+            navigationKey: item.navigationKey ?? navigationKeyForHref(target ?? item.href),
+            icon: item.icon,
+          },
+        ]
+      : [];
   };
   const branch = (
     label: string,
     children: NavigationNode[],
     icon?: LucideIcon,
-  ): NavigationNode[] => (children.length ? [{ label, children, icon }] : []);
+    href?: string,
+  ): NavigationNode[] => (children.length ? [{ label, href, children, icon }] : []);
   const people = [
     ...lookup('/registrations', 'Funcionários', '/registrations?roleCodes=employee'),
     ...lookup(
@@ -44,14 +55,40 @@ export function getNavigationTree(user: User): { label: string; items: Navigatio
     ? [
         ...(canTrips
           ? [
-              { label: 'Pendências', href: '/transport?tab=issues' },
-              { label: 'Importação e análise', href: '/transport?tab=imports' },
-              { label: 'Registros importados', href: '/transport?tab=records' },
+              {
+                label: 'Pendências',
+                href: '/transport?tab=issues',
+                navigationKey: 'operations.transport.issues',
+              },
+              {
+                label: 'Importação e análise',
+                href: '/transport?tab=imports',
+                navigationKey: 'operations.transport.imports',
+              },
+              {
+                label: 'Registros importados',
+                href: '/transport?tab=records',
+                navigationKey: 'operations.transport.records',
+              },
             ]
           : []),
-        ...(canContracts ? [{ label: 'Rotas de origem', href: '/transport?tab=routes' }] : []),
+        ...(canContracts
+          ? [
+              {
+                label: 'Rotas de origem',
+                href: '/transport?tab=routes',
+                navigationKey: 'operations.transport.routes',
+              },
+            ]
+          : []),
         ...(canTrips && canContracts
-          ? [{ label: 'KM por contrato', href: '/transport?tab=summary' }]
+          ? [
+              {
+                label: 'KM por contrato',
+                href: '/transport?tab=summary',
+                navigationKey: 'operations.transport.summary',
+              },
+            ]
           : []),
       ]
     : [];
@@ -60,7 +97,7 @@ export function getNavigationTree(user: User): { label: string; items: Navigatio
       (group) => group.items.length,
     );
   return [
-    { label: '', items: [...lookup('/whatsapp-conversations'), ...lookup('/document-management')] },
+    { label: '', items: lookup('/document-management') },
     {
       label: 'Empresa',
       items: [
@@ -93,12 +130,33 @@ export function getNavigationTree(user: User): { label: string; items: Navigatio
       label: 'Plataforma',
       items: [...lookup('/users'), ...lookup('/administration'), ...lookup('/license')],
     },
-    { label: 'Dashboards', items: lookup('/dashboard') },
+    { label: 'Dashboards', items: [] },
     {
-      label: 'Financeiro',
-      items: branch('Controle', branch('Registros', recordChildren, ClipboardList)),
+      label: '',
+      items: [
+        ...branch(
+          'Financeiro',
+          branch('Controle', branch('Registros', recordChildren, ClipboardList)),
+          ClipboardList,
+          '/financeiro',
+        ),
+        ...branch('Operação', lookup('/operacao/roteirizacao'), undefined, '/operacao'),
+        ...branch(
+          'Comercial',
+          [...lookup('/whatsapp-conversations'), ...lookup('/quote-proposals')],
+          undefined,
+          '/comercial',
+        ),
+      ],
     },
-    { label: 'Operacional', items: lookup('/routing') },
-    { label: 'Comercial', items: lookup('/quote-proposals') },
   ].filter((group) => group.items.length);
+}
+
+export function getDepartmentNavigation(
+  user: User,
+  href: '/operacao' | '/financeiro' | '/comercial',
+): NavigationNode | undefined {
+  return getNavigationTree(user)
+    .flatMap((group) => group.items)
+    .find((item) => item.href === href && item.children?.length);
 }

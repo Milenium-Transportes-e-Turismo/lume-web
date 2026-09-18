@@ -100,6 +100,27 @@ function restoreSimulationFlag() {
 }
 
 describe('getCurrentAuthenticatedSession', () => {
+  it('opens the local demo without a cookie, credentials or API access', async () => {
+    const original = process.env;
+    process.env = {
+      ...original,
+      NODE_ENV: 'development',
+      AUTH_SIMULATION_ENABLED: 'true',
+      AUTH_LOCAL_AUTO_LOGIN: 'true',
+      LUME_TENANT_WHATSAPP_DATA_SOURCE: 'mock',
+    };
+    try {
+      const session = await getCurrentAuthenticatedSession();
+      expect(session?.user.name).toBe('Demonstração local');
+      expect(session?.user.departments).toContain('commercial');
+      expect(mockedCreateCookieSessionStorage).not.toHaveBeenCalled();
+      expect(mockedCreateCookieApiTokenStorage).not.toHaveBeenCalled();
+      expect(mockedCreateAuthenticationGateway).not.toHaveBeenCalled();
+    } finally {
+      process.env = original;
+    }
+  });
+
   beforeEach(() => {
     process.env.AUTH_SIMULATION_ENABLED = 'false';
   });

@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 import type { EmployeeUser } from '@/features/auth/domain';
@@ -6,6 +7,7 @@ import { getPendingQuoteProposalCountAction } from '@/features/quote-proposals/a
 import { SidebarProvider } from '@/shared/ui/sidebar';
 
 import { AuthenticatedNavigation } from './authenticated-navigation';
+import { addNavigationFavoriteAction } from './navigation-favorite-actions';
 
 jest.mock('next/navigation', () => ({
   usePathname: jest.fn(),
@@ -14,10 +16,16 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/features/quote-proposals/actions', () => ({
   getPendingQuoteProposalCountAction: jest.fn(),
 }));
+jest.mock('./navigation-favorite-actions', () => ({
+  listNavigationFavoritesAction: jest.fn().mockResolvedValue({ success: true, favorites: [] }),
+  addNavigationFavoriteAction: jest.fn(),
+  removeNavigationFavoriteAction: jest.fn(),
+}));
 
 const mockedUseSearchParams = jest.mocked(useSearchParams);
 const mockedUsePathname = jest.mocked(usePathname);
 const mockedPendingCount = jest.mocked(getPendingQuoteProposalCountAction);
+const mockedAddFavorite = jest.mocked(addNavigationFavoriteAction);
 
 function renderNavigation(user: EmployeeUser) {
   return render(
@@ -56,6 +64,8 @@ describe('AuthenticatedNavigation', () => {
       success: true,
       pendingTotal: 0,
     });
+    mockedAddFavorite.mockReset();
+    mockedAddFavorite.mockResolvedValue({ success: true, favorites: [] });
   });
 
   afterEach(() => {
@@ -67,6 +77,30 @@ describe('AuthenticatedNavigation', () => {
 
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('shows Dashboard in Favoritos immediately after it is favorited', async () => {
+    const interaction = userEvent.setup();
+    mockedAddFavorite.mockResolvedValue({
+      success: true,
+      favorites: [
+        {
+          id: 'favorite-dashboard',
+          navigationKey: 'dashboard',
+          createdAt: '2026-09-16T12:00:00.000Z',
+        },
+      ],
+    });
+
+    renderNavigation(createEmployee(['dashboard:view']));
+
+    await interaction.click(
+      screen.getByRole('button', { name: 'Adicionar Dashboard aos favoritos' }),
+    );
+
+    expect(mockedAddFavorite).toHaveBeenCalledWith('dashboard');
+    expect(await screen.findByText('Favoritos')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Dashboard' })).toHaveLength(2);
   });
 
   it('shows the AI agents module only with its permission', () => {
@@ -140,12 +174,19 @@ describe('AuthenticatedNavigation', () => {
     expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
   });
 
+  it('does not offer Dashboard to a user who lacks dashboard:view', () => {
+    renderNavigation(createEmployee(['ai-agents:view'], true, ['management']));
+
+    expect(screen.getByRole('link', { name: 'Agentes de IA' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+  });
+
   it('places WhatsApp and budgets in the Commercial group', async () => {
     renderNavigation(
       createEmployee(['dashboard:view', 'ai-agents:use', 'whatsapp-conversations:manage']),
     );
 
-    expect(screen.getByText('Dashboards')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('Comercial')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Painel WhatsApp' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Orçamentos' })).toBeInTheDocument();
@@ -172,16 +213,29 @@ describe('AuthenticatedNavigation', () => {
     expect(screen.getByRole('link', { name: 'Consultar' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('renders route planning under the Operations group', () => {
-    mockedUsePathname.mockReturnValue('/routing');
+  it('opens the Operations panel by name and expands its screens only from the separate control', async () => {
+    mockedUsePathname.mockReturnValue('/operacao/roteirizacao');
+    const interaction = userEvent.setup();
 
     renderNavigation(createEmployee(['route-planner:calculate'], true, ['operations']));
 
-    expect(screen.getByText('Operacional')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Roteirização' })).toHaveAttribute('href', '/routing');
+    expect(screen.getByRole('link', { name: 'Operação' })).toHaveAttribute('href', '/operacao');
+    expect(screen.getByRole('link', { name: 'Operação' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Roteirização' })).toHaveAttribute(
+      'href',
+      '/operacao/roteirizacao',
+    );
     expect(screen.getByRole('link', { name: 'Roteirização' })).toHaveAttribute(
       'aria-current',
       'page',
+    );
+
+    await interaction.click(screen.getByRole('button', { name: 'Recolher Operação' }));
+
+    expect(screen.queryByRole('link', { name: 'Roteirização' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expandir Operação' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
     );
   });
 

@@ -12,6 +12,24 @@ import {
 import { parsePublicEnv } from './env.public';
 
 describe('environment configuration', () => {
+  it('limits automatic login to explicit development simulation with mock data', () => {
+    const local = {
+      NODE_ENV: 'development',
+      AUTH_SIMULATION_ENABLED: 'true',
+      AUTH_LOCAL_AUTO_LOGIN: 'true',
+      LUME_TENANT_WHATSAPP_DATA_SOURCE: 'mock',
+    };
+    expect(parseServerEnv(local).AUTH_LOCAL_AUTO_LOGIN).toBe(true);
+    for (const overrides of [
+      { NODE_ENV: 'production' },
+      { NODE_ENV: 'test' },
+      { AUTH_SIMULATION_ENABLED: 'false' },
+      { LUME_TENANT_WHATSAPP_DATA_SOURCE: 'api' },
+    ]) {
+      expect(() => parseServerEnv({ ...local, ...overrides })).toThrow('AUTH_LOCAL_AUTO_LOGIN');
+    }
+  });
+
   it('applies safe defaults without requiring runtime secrets during a build', () => {
     expect(parseServerEnv({ NODE_ENV: 'development' })).toEqual({
       NODE_ENV: 'development',
@@ -19,6 +37,7 @@ describe('environment configuration', () => {
       LUME_TENANT_API_DOCUMENT_REVIEW_TIMEOUT_MS: DEFAULT_DOCUMENT_REVIEW_TIMEOUT_MS,
       LUME_TENANT_API_WHATSAPP_IMPORT_TIMEOUT_MS: DEFAULT_WHATSAPP_IMPORT_TIMEOUT_MS,
       AUTH_SIMULATION_ENABLED: false,
+      AUTH_LOCAL_AUTO_LOGIN: false,
       LUME_TENANT_WHATSAPP_DATA_SOURCE: 'api',
       MAP_STYLE_URL: DEFAULT_MAP_STYLE_URL,
     });
