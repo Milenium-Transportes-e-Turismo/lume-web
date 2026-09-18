@@ -4,17 +4,18 @@
 
 ### Alterado
 
-- Navegação autenticada reorganizada por departamentos.
-- Rotas de Operação, Roteirização, Comercial e Financeiro.
-- Compatibilidade da rota `/routing`.
-- Configuração de sessão e `LUME_TENANT_API_URL`.
+- `AuthenticatedNavigation` passou a organizar a navegação autenticada por departamento.
+- As áreas de Operação, Roteirização, Comercial e Financeiro passaram a usar o mesmo padrão de navegação.
+- `/routing` continua funcionando como rota compatível para o módulo de roteirização.
+- Sessão e `LUME_TENANT_API_URL` foram ajustados para que o Web use a API do ambiente correto.
 
 ### Adicionado
 
-- Catálogo e árvore de navegação.
-- Painel de departamentos.
-- Ações de favoritos integradas à API.
-- Testes de navegação e autenticação.
+- Catálogo compartilhado com grupos, rotas, ícones e regras de visibilidade.
+- `DepartmentPanel`: mostra as opções disponíveis do departamento atual.
+- `AuthenticatedShell` e `AppSidebar`: reutilizam o layout autenticado nas páginas.
+- Ações de favorito na navegação, integradas aos endpoints da API.
+- Testes de navegação, autenticação, visibilidade e redirecionamento.
 
 ## Evidência atual
 
