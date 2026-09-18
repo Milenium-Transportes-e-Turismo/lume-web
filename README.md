@@ -38,6 +38,26 @@ Esta PR reorganiza a experiência após o login para que o usuário encontre os 
 
 O frontend apenas apresenta as opções. A autorização definitiva permanece no backend, evitando que esconder um item no menu seja tratado como controle de segurança.
 
+### Arquivos e responsabilidades
+
+- `src/features/navigation/authenticated-navigation.tsx`: monta a navegação a partir da sessão atual.
+- `src/features/navigation/department-panel.tsx`: renderiza as opções do departamento selecionado.
+- `src/features/navigation/navigation-catalog.ts`: centraliza grupos, rótulos, ícones, rotas e regras de visibilidade.
+- `src/features/navigation/authenticated-shell.tsx`: fornece a estrutura comum das telas autenticadas.
+- `src/shared/app-sidebar.tsx`: mantém o menu lateral e integra a navegação ao layout principal.
+- Páginas em `src/app/comercial`, `src/app/operacao`, `src/app/financeiro`, `src/app/routing` e áreas relacionadas: consomem o padrão de departamento.
+- Testes da feature de navigation: cobrem usuário autenticado, rotas visíveis, redirecionamentos e favoritos.
+
+### Contrato com a API
+
+O Web usa a mesma `navigationKey` para renderizar o item e para solicitar sua inclusão ou remoção como favorito. Assim, o frontend não mantém uma segunda identificação para o mesmo menu. Se a API negar a operação, o Web não deve considerar o item salvo.
+
+O endereço da API vem de `LUME_TENANT_API_URL`. Em sandbox ele aponta para a API do SBX; em produção deve apontar para o endpoint de produção. Essa variável precisa ser conferida no build e no container antes da promoção.
+
+### Escopo e limites
+
+Esta PR reorganiza a navegação e adiciona favoritos. Ela não substitui as verificações de autorização do backend, não altera o modelo de permissões e não muda o conteúdo funcional das telas de negócio. Rotas antigas continuam disponíveis quando necessárias por compatibilidade.
+
 ## Evidência atual
 
 - Branch: `feat/gestor-evolution` → `develop`.
@@ -52,4 +72,5 @@ O frontend apenas apresenta as opções. A autorização definitiva permanece no
 2. Executar typecheck, testes, lint, build e `git diff --check`.
 3. Validar login, navegação, favoritos, erros e responsividade no SBX.
 4. Confirmar permissões por tenant e usuário no backend.
-5. Promover Web junto com API após a migration.
+5. Conferir a variável `LUME_TENANT_API_URL` no build da imagem.
+6. Promover Web junto com API após a migration.
