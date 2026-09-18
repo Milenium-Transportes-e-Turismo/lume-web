@@ -358,3 +358,26 @@ Exige `NODE_ENV=development`, `AUTH_SIMULATION_ENABLED=true` e
 O acesso reúne os departamentos dos usuários simulados; não fornece tokens da
 API nem simula persistência. Módulos que dependem da API continuam indisponíveis.
 Para retornar ao login, defina `AUTH_LOCAL_AUTO_LOGIN=false` no `.env.local`.
+
+## PR atual: navegação e favoritos
+
+### Alterado
+
+- A navegação autenticada foi reorganizada por departamentos.
+- Foram ajustadas as rotas de Operação, Roteirização, Comercial e Financeiro.
+- A sessão e `LUME_TENANT_API_URL` passaram a seguir a configuração da Tenant API.
+
+### Adicionado
+
+- Catálogo e árvore de navegação.
+- Painel de departamentos.
+- Ações de favoritos integradas à API.
+- Testes direcionados de navegação e autenticação.
+
+### Fluxo de validação
+
+- Branch de trabalho: `feat/gestor-evolution`.
+- Destino da PR: `develop`.
+- Teste direcionado do Web: 16/16.
+- O SBX usa a API `develop` e banco restaurado da produção em ambiente separado.
+- A alteração de permissão no Dockerfile feita no SBX é operacional e não faz parte desta PR.
